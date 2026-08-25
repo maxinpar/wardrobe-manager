@@ -169,7 +169,7 @@ def evaluate(
     for item in look.primary():
         blocker = _unavailable(item)
         if blocker is None and rain and item["rain_unsafe"]:
-            blocker = f"{item['material_hint'] or 'suede'} in the rain"
+            blocker = f"not rain-safe ({item['material_hint'] or 'suede'})"
         if blocker is None and not allow_tailoring and item["verdict"] == "Tailor":
             blocker = "still needs tailoring"
 
@@ -269,6 +269,15 @@ def pick(
 # ------------------------------------------------------------- loading --
 
 
+def _rain_unsafe_word(*fields) -> str | None:
+    """Which word makes this garment rain-unsafe — 'suede' or 'nubuck'."""
+    blob = " ".join(f or "" for f in fields).lower()
+    for word in ("nubuck", "suede"):
+        if word in blob:
+            return word
+    return None
+
+
 LOOKS_SQL = """
 SELECT o.slug, o.name, o.register_code, o.rationale, o.hidden_by_default,
        o.sort_order,
@@ -305,7 +314,7 @@ def load_looks(conn) -> list[Look]:
             {
                 "item_id": row["item_id"],
                 "name": row["item_name"],
-                "material_hint": (row["material"] or "").split(",")[0] or None,
+                "material_hint": _rain_unsafe_word(row["material"], row["item_name"]),
                 "cat": row["cat_code"],
                 "slot_role": row["slot_role"],
                 "position": row["position"],

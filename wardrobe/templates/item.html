@@ -13,11 +13,17 @@
 <div class="photos">
   {% for p in photos %}
     <figure>
-      <img src="{{ url_for('photo', relative_path=p.thumb_path or p.stored_path) }}"
-           alt="{{ p.angle_label or 'photo' }}" loading="lazy">
+      {# thumbnail in the page, full size one tap away #}
+      <a href="{{ url_for('photo', relative_path=p.stored_path) }}">
+        <img src="{{ url_for('photo', relative_path=p.thumb_path or p.stored_path) }}"
+             alt="{{ p.angle_label or 'photo' }}" loading="lazy">
+      </a>
       <figcaption>
         {{ p.angle_label or p.source_filename }}
         {% if p.is_render %}<span class="badge render">generated illustration, not a photo of this garment</span>{% endif %}
+        {% if item.no_photo and not p.is_render %}
+          <span class="badge warn">group reference shot — not an individual photo of this garment</span>
+        {% endif %}
       </figcaption>
     </figure>
   {% else %}

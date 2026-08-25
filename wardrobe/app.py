@@ -50,7 +50,7 @@ SELECT i.*, c.label AS cat_label, c.sort_order AS cat_sort,
        COALESCE(l.state_code, 'clean') AS laundry_state,
        ls.label AS laundry_label,
        (SELECT p.thumb_path FROM photos p
-         WHERE p.item_id = i.id AND NOT p.is_render
+         WHERE p.item_id = i.id AND NOT p.is_render AND NOT i.no_photo
          ORDER BY p.sort_order LIMIT 1) AS thumb_path,
        (SELECT count(*) FROM photos p WHERE p.item_id = i.id) AS photo_count,
        (SELECT string_agg(o.occasion_code, ',' ORDER BY o.occasion_code)
@@ -141,9 +141,11 @@ def photo_thumbs(conn) -> dict[str, dict]:
         conn,
         """
         SELECT i.id, i.hex, i.no_photo,
-               (SELECT p.thumb_path FROM photos p WHERE p.item_id = i.id
+               (SELECT p.thumb_path FROM photos p
+                 WHERE p.item_id = i.id AND NOT i.no_photo
                  ORDER BY p.is_render, p.sort_order LIMIT 1) AS thumb_path,
-               (SELECT p.is_render FROM photos p WHERE p.item_id = i.id
+               (SELECT p.is_render FROM photos p
+                 WHERE p.item_id = i.id AND NOT i.no_photo
                  ORDER BY p.is_render, p.sort_order LIMIT 1) AS is_render
         FROM items i
         """,
