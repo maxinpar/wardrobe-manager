@@ -21,7 +21,7 @@
       <figcaption>
         {{ p.angle_label or p.source_filename }}
         {% if p.is_render %}<span class="badge render">generated illustration, not a photo of this garment</span>{% endif %}
-        {% if item.no_photo and not p.is_render %}
+        {% if p.is_group_reference %}
           <span class="badge warn">group reference shot — not an individual photo of this garment</span>
         {% endif %}
       </figcaption>

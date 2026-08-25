@@ -197,9 +197,14 @@ page shows which is which.
 - **13 items have no photo** (6 belts, 5 shoes, 2 trousers) and those photos are
   gone for good. The app falls back to the colour swatch and shows a "needs
   reshoot" badge with the prefix to reuse.
-- **Generated catalogue renders** (`Retail/`) are flagged `is_render` and
-  labelled "illustration" in the UI — they are never presented as photos of the
-  actual garment.
+- **Generated catalogue renders** (`Retail/`) are the preferred image
+  everywhere: the catalogue grid, the outfit chips and the top of the item
+  detail page all lead with the render where one exists, falling back to a real
+  photo, then to the colour swatch. They are flagged `is_render` and labelled
+  "illustration" wherever they appear, so they are never presented as photos of
+  the actual garment. Current coverage: **39 of 69 items have a render**, 17
+  more show a real photo, 13 show a swatch. The 30 core items still without one
+  are listed by `scripts/missing_renders.py`.
 
 Out of scope for v1, deliberately, and not built:
 

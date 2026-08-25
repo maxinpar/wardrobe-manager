@@ -360,9 +360,9 @@ def photo_prefix_report(items: list[dict]) -> tuple[list[str], bool]:
     try:
         root = config.photo_source_root()
     except SystemExit:
-        return ["PHOTO_SOURCE_ROOT not set — skipped the photo check"], False
+        return ["PHOTO_SOURCE_ROOT not set — skipped the photo check"], [], False
     if not root.exists():
-        return [f"{root} not reachable — skipped the photo check"], False
+        return [f"{root} not reachable — skipped the photo check"], [], False
 
     folders = {
         "Knitwear": "Knitwear",
@@ -378,15 +378,26 @@ def photo_prefix_report(items: list[dict]) -> tuple[list[str], bool]:
         listings[cat] = [p.name for p in path.iterdir()] if path.exists() else []
 
     unmatched = []
+    stale_no_photo = []
     for item in items:
         prefix = item.get("photoPrefix")
         if not prefix:
             continue
         names = listings.get(item["cat"], [])
-        if not any(n.startswith(prefix) for n in names):
+        matched = [n for n in names if n.startswith(prefix)]
+        if not matched:
             flag = " (noPhoto: true)" if item.get("noPhoto") else ""
             unmatched.append(f"{item['id']}: prefix {prefix!r} matched no file{flag}")
-    return unmatched, True
+        elif item.get("noPhoto"):
+            # The JSON says the photos are lost, but files are sitting on disk
+            # under this item's own prefix — the flag has gone stale.
+            own = [n for n in matched if n.startswith(item["id"])]
+            if own:
+                stale_no_photo.append(
+                    f"{item['id']}: noPhoto is true but {len(own)} file(s) exist "
+                    f"({', '.join(sorted(own)[:3])}{'…' if len(own) > 3 else ''})"
+                )
+    return unmatched, stale_no_photo, True
 
 
 def reconcile(items: list[dict]) -> list[str]:
@@ -502,7 +513,7 @@ def main() -> int:
             joined = " · ".join(f"{k}: {v}" for k, v in sorted(counts.items(), key=str))
             print(f"  {field:15} {joined}")
 
-        unmatched, checked = photo_prefix_report(items)
+        unmatched, stale_no_photo, checked = photo_prefix_report(items)
         print("\nPhoto prefixes with no file on disk")
         if not checked:
             print("  " + unmatched[0])
@@ -511,6 +522,16 @@ def main() -> int:
                 print("  *", line)
         else:
             print("  none — every photoPrefix matched at least one file")
+
+        if stale_no_photo:
+            print("\nNEEDS A DECISION — noPhoto says lost, but the files are there")
+            for line in stale_no_photo:
+                print("  *", line)
+            print(
+                "  wardrobe.json is stale for these. The app shows the photos "
+                "either way\n  (it goes by what is on disk); fix the flag in the "
+                "JSON when convenient."
+            )
 
         print("\nFields this import could not parse")
         if warnings:

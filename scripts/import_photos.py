@@ -140,6 +140,25 @@ def main() -> int:
             "SELECT id, cat_code, photo_prefix, retail_prefix, no_photo FROM items ORDER BY id",
         )
 
+        # A render stands for one specific garment, so it must never attach to
+        # more than one. Five items (three loafers, two Nikes) share a group
+        # retail prefix; for those, only <item_id>_retail is accepted.
+        prefix_owners: dict[str, int] = {}
+        for item in items:
+            if item["retail_prefix"]:
+                prefix_owners[item["retail_prefix"]] = (
+                    prefix_owners.get(item["retail_prefix"], 0) + 1
+                )
+        shared_prefixes = {p for p, n in prefix_owners.items() if n > 1}
+        if shared_prefixes:
+            print(
+                f"Ignoring {len(shared_prefixes)} retail prefix(es) shared by several "
+                f"items; those items match <id>_retail only:"
+            )
+            for p in sorted(shared_prefixes):
+                print("   ", p)
+            print()
+
         for item in items:
             matches = []
             prefix = item["photo_prefix"]
@@ -148,11 +167,12 @@ def main() -> int:
                     if path.name.startswith(prefix):
                         matches.append((path, folders[item["cat_code"]], False))
 
-            retail_prefix = item["retail_prefix"] or prefix
-            if retail_prefix:
-                for path in retail_files:
-                    if path.name.startswith(retail_prefix):
-                        matches.append((path, "Retail", True))
+            accepted = [f"{item['id']}_retail"]
+            if item["retail_prefix"] and item["retail_prefix"] not in shared_prefixes:
+                accepted.append(item["retail_prefix"])
+            for path in retail_files:
+                if any(path.name.startswith(a) for a in accepted):
+                    matches.append((path, "Retail", True))
 
             if not matches:
                 continue

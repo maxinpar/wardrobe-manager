@@ -49,9 +49,19 @@ SELECT i.*, c.label AS cat_label, c.sort_order AS cat_sort,
        v.label AS verdict_label, v.wearable,
        COALESCE(l.state_code, 'clean') AS laundry_state,
        ls.label AS laundry_label,
+       -- The generated retail render is the preferred catalogue image; a real
+       -- photo of this garment is the fallback, and the hex swatch after that.
+       -- starts_with(filename, id) is what makes a photo this item's own: a
+       -- shared group-reference shot (three loafers in one frame) is named for
+       -- the group, so it never stands in as a photo of one of them.
        (SELECT p.thumb_path FROM photos p
-         WHERE p.item_id = i.id AND NOT p.is_render AND NOT i.no_photo
-         ORDER BY p.sort_order LIMIT 1) AS thumb_path,
+         WHERE p.item_id = i.id
+           AND (p.is_render OR starts_with(p.source_filename, i.id))
+         ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS thumb_path,
+       (SELECT p.is_render FROM photos p
+         WHERE p.item_id = i.id
+           AND (p.is_render OR starts_with(p.source_filename, i.id))
+         ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS thumb_is_render,
        (SELECT count(*) FROM photos p WHERE p.item_id = i.id) AS photo_count,
        (SELECT string_agg(o.occasion_code, ',' ORDER BY o.occasion_code)
           FROM item_occasions o WHERE o.item_id = i.id) AS occasions
@@ -142,11 +152,13 @@ def photo_thumbs(conn) -> dict[str, dict]:
         """
         SELECT i.id, i.hex, i.no_photo,
                (SELECT p.thumb_path FROM photos p
-                 WHERE p.item_id = i.id AND NOT i.no_photo
-                 ORDER BY p.is_render, p.sort_order LIMIT 1) AS thumb_path,
+                 WHERE p.item_id = i.id
+                   AND (p.is_render OR starts_with(p.source_filename, i.id))
+                 ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS thumb_path,
                (SELECT p.is_render FROM photos p
-                 WHERE p.item_id = i.id AND NOT i.no_photo
-                 ORDER BY p.is_render, p.sort_order LIMIT 1) AS is_render
+                 WHERE p.item_id = i.id
+                   AND (p.is_render OR starts_with(p.source_filename, i.id))
+                 ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS is_render
         FROM items i
         """,
     )
@@ -267,9 +279,12 @@ def item_detail(item_id: str):
             abort(404)
         photos = db.fetch_all(
             conn,
-            "SELECT p.*, a.label AS angle_label FROM photos p "
+            "SELECT p.*, a.label AS angle_label, "
+            "       (NOT p.is_render AND NOT starts_with(p.source_filename, i.id)) "
+            "         AS is_group_reference "
+            "FROM photos p JOIN items i ON i.id = p.item_id "
             "LEFT JOIN photo_angles a ON a.code = p.angle_code "
-            "WHERE p.item_id = %s ORDER BY p.is_render, p.sort_order",
+            "WHERE p.item_id = %s ORDER BY p.is_render DESC, p.sort_order",
             (item_id,),
         )
         occasions = db.fetch_all(
