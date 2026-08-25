@@ -531,8 +531,16 @@ def main() -> int:
             print(
                 "  All trousers came back from the tailor on 2026-08-20 and are "
                 "wearable as-is,\n  but wardrobe.json still says Tailor. Imported "
-                "as-is, as you asked. To flip them,\n  correct the verdict in the app "
-                "(it records a hand-correction that this importer\n  will not overwrite)."
+                "as-is, as you asked.\n\n  There is no edit UI in v1, so flip them "
+                "with this. The second statement is\n  what stops the next import "
+                "putting 'Tailor' back:\n\n"
+                "    UPDATE items SET verdict_code = 'Keep'\n"
+                "     WHERE cat_code = 'Trousers' AND verdict_code = 'Tailor';\n\n"
+                "    INSERT INTO item_field_sources (item_id, field_name, source, note)\n"
+                "    SELECT id, 'verdict_code', 'manual', 'tailored 2026-08-20'\n"
+                "      FROM items WHERE cat_code = 'Trousers'\n"
+                "    ON CONFLICT (item_id, field_name)\n"
+                "    DO UPDATE SET source = 'manual', updated_at = now();"
             )
             for row in stale:
                 print(f"    {row['id']}  {row['name']}")

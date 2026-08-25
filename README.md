@@ -187,10 +187,13 @@ page shows which is which.
 
 ## Known state and follow-ups
 
-- **Trouser verdicts.** All 12 trousers came back from the tailor on 2026-08-20
-  and are wearable, but `wardrobe.json` still says `Tailor`. Imported as-is, by
-  request; the importer flags them every run. Correct them in the app when you
-  want them flipped. Knitwear `Tailor` items are unconfirmed and untouched.
+- **Trouser verdicts.** The trousers came back from the tailor on 2026-08-20
+  and are wearable, but `wardrobe.json` still says `Tailor` for 6 of them.
+  Imported as-is, by request; the importer prints them, and the exact SQL to
+  flip them, on every run. Marking `verdict_code` as `manual` in
+  `item_field_sources` is what makes the correction stick — the importer never
+  overwrites a manual value. Knitwear `Tailor` items are unconfirmed and
+  untouched.
 - **13 items have no photo** (6 belts, 5 shoes, 2 trousers) and those photos are
   gone for good. The app falls back to the colour swatch and shows a "needs
   reshoot" badge with the prefix to reuse.
