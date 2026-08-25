@@ -1,9 +1,14 @@
+# Secrets
+.env
+
+# Photos and thumbnails — copied from Drive at import time, never committed
+photos/
+
 # Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
-.env
 
 # Editors
 .idea/
@@ -12,3 +17,6 @@ venv/
 # OS
 Thumbs.db
 .DS_Store
+
+# Generated export — regenerate with scripts/export_wardrobe.py
+export/

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Wear log — Wardrobe{% endblock %}
+
+{% block content %}
+<h2>Wear log</h2>
+
+{% if not events %}
+  <p class="muted">Nothing logged yet. Log a look from the Today screen.</p>
+{% endif %}
+
+{% for e in events %}
+  <section class="entry">
+    <h3>{{ e.worn_on.strftime('%a %d %b %Y') }}
+      {% if e.outfit_name %}— {{ e.outfit_name }}{% endif %}
+      {% if e.rating %}<span class="badge ok">{{ e.rating }}/10</span>{% endif %}
+    </h3>
+    <p class="muted">
+      {{ e.context or 'no context' }}
+      {% if e.temp_c is not none %} · {{ e.temp_c }} °C{% endif %}
+      {% if e.rain %} · rain{% endif %}
+    </p>
+
+    <p>
+      {% for i in items.get(e.id, []) %}
+        {% if i.id %}
+          <a href="{{ url_for('item_detail', item_id=i.id) }}">{{ i.name }}</a>
+        {% else %}
+          <span class="muted">{{ i.free_text }}{{ ' (base layer)' if i.is_base_layer }}</span>
+        {% endif %}
+        {{ ' · ' if not loop.last }}
+      {% endfor %}
+    </p>
+
+    {% if e.note %}<p>{{ e.note }}</p>{% endif %}
+    {% if e.tweak %}<p class="sub">Tweak: {{ e.tweak }}</p>{% endif %}
+
+    {% if rate == e.id or not e.rating %}
+      <form class="rate" method="post" action="{{ url_for('rate_event', event_id=e.id) }}">
+        <label>Rating
+          <input type="number" name="rating" min="1" max="10" value="{{ e.rating or '' }}" inputmode="numeric">
+        </label>
+        <input type="text" name="context" placeholder="Context (work, dinner…)" value="{{ e.context or '' }}">
+        <input type="text" name="note" placeholder="How did it go?" value="{{ e.note or '' }}">
+        <button type="submit">Save</button>
+      </form>
+    {% endif %}
+  </section>
+{% endfor %}
+{% endblock %}

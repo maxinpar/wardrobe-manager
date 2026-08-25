@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% from "_macros.html" import verdict_badge %}
+{% block title %}{{ item.name }} — Wardrobe{% endblock %}
+
+{% block content %}
+<a class="back" href="{{ url_for('catalogue') }}">← Catalogue</a>
+
+<h2>{{ item.name }}</h2>
+<p class="muted">{{ item.cat_label }} · {{ item.colour }} · {{ verdict_badge(item.verdict_code) }}
+  {% if item.scope_code == 'out' %}<span class="badge out">out of scope</span>{% endif %}
+</p>
+
+<div class="photos">
+  {% for p in photos %}
+    <figure>
+      {# thumbnail in the page, full size one tap away #}
+      <a href="{{ url_for('photo', relative_path=p.stored_path) }}">
+        <img src="{{ url_for('photo', relative_path=p.thumb_path or p.stored_path) }}"
+             alt="{{ p.angle_label or 'photo' }}" loading="lazy">
+      </a>
+      <figcaption>
+        {{ p.angle_label or p.source_filename }}
+        {% if p.is_render %}<span class="badge render">generated illustration, not a photo of this garment</span>{% endif %}
+        {% if p.is_group_reference %}
+          <span class="badge warn">group reference shot — not an individual photo of this garment</span>
+        {% endif %}
+      </figcaption>
+    </figure>
+  {% else %}
+    <div class="no-photo">
+      <span class="swatch big" style="background: {{ item.hex or '#ccc' }}"></span>
+      <p>
+        {% if item.no_photo %}
+          No photo of this one exists — those photos are gone for good. Reshoot it
+          using the prefix <code>{{ item.photo_prefix }}</code>.
+        {% else %}
+          No photo has been matched on disk yet.
+        {% endif %}
+      </p>
+    </div>
+  {% endfor %}
+</div>
+
+<form class="state" method="post" action="{{ url_for('item_state', item_id=item.id) }}">
+  <input type="hidden" name="next" value="{{ url_for('item_detail', item_id=item.id) }}">
+  <span>State:</span>
+  {% for s in states %}
+    <button type="submit" name="state" value="{{ s.code }}"
+            class="{{ 'on' if item.laundry_state == s.code }}">{{ s.label }}</button>
+  {% endfor %}
+</form>
+
+{# The hand-written prose is the rule engine. It is shown exactly as written. #}
+<dl class="fields">
+  {% for label, value in [
+      ('Pairs with', item.pairs), ('Layering', item.layer), ('Avoid', item.avoid),
+      ('Notes', item.notes), ('Fit', item.fit), ('Condition', item.condition),
+      ('Verdict note', item.verdict_note), ('Care', item.care_note)] %}
+    {% if value %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endif %}
+  {% endfor %}
+
+  <dt>Material</dt><dd>{{ item.material or '—' }}</dd>
+  <dt>Cut</dt><dd>{{ item.cut or '—' }}</dd>
+  <dt>Neck</dt><dd>{{ item.neck_raw or '—' }}</dd>
+  <dt>Weight</dt><dd>{{ item.weight_code or '—' }}</dd>
+  <dt>Colour role</dt><dd>{{ item.role_code or '—' }} · <code>{{ item.hex }}</code></dd>
+  <dt>Works alone</dt>
+  <dd>{% if item.works_alone is none %}n/a{% elif item.works_alone %}yes{% else %}no — needs a tee or shirt under it{% endif %}</dd>
+
+  <dt>Formality</dt>
+  <dd>{{ item.formality_raw or '—' }}
+    {% if item.formality_rank %}
+      <span class="badge derived-{{ sources.get('formality_rank', 'derived') }}">rank {{ item.formality_rank }} ({{ sources.get('formality_rank', 'derived') }})</span>
+    {% endif %}
+    {% if item.formality_note %}<br><em>{{ item.formality_note }}</em>{% endif %}
+  </dd>
+
+  <dt>Occasions</dt>
+  <dd>
+    {% for o in occasions %}<span class="badge">{{ o.label }}</span>{% else %}—{% endfor %}
+    <span class="badge derived-{{ sources.get('occasions', 'derived') }}">{{ sources.get('occasions', 'derived') }}</span>
+  </dd>
+
+  <dt>Warmth</dt>
+  <dd>{{ item.warmth }}/5 <span class="badge derived-{{ sources.get('warmth', 'derived') }}">{{ sources.get('warmth', 'derived') }}</span></dd>
+
+  <dt>Weather</dt>
+  <dd>
+    rain-proof: {{ 'yes' if item.weatherproof_rain else 'no' }} ·
+    wind-proof: {{ 'yes' if item.weatherproof_wind else 'no' }}
+    {% if item.rain_unsafe %}<span class="badge warn">stays home in the rain</span>{% endif %}
+  </dd>
+
+  <dt>Pattern</dt>
+  <dd>{{ item.pattern }} <span class="badge derived-{{ sources.get('pattern', 'derived') }}">{{ sources.get('pattern', 'derived') }}</span></dd>
+
+  <dt>Photo prefix</dt><dd><code>{{ item.photo_prefix }}</code> · {{ item.photo_count }} frame(s)</dd>
+  <dt>id</dt><dd><code>{{ item.id }}</code></dd>
+</dl>
+
+{% if in_outfits %}
+  <h3>In these looks</h3>
+  <ul>
+    {% for o in in_outfits %}
+      <li><a href="{{ url_for('outfits_view') }}#{{ o.slug }}">{{ o.name }}</a>
+        <span class="muted">{{ o.slot_role }}{{ ' (alternate)' if o.is_alternate }}</span></li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% if worn %}
+  <h3>Worn</h3>
+  <ul>
+    {% for w in worn %}
+      <li>{{ w.worn_on }}{% if w.rating %} · {{ w.rating }}/10{% endif %}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

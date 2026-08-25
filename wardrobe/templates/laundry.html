@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Laundry — Wardrobe{% endblock %}
+
+{% block content %}
+<h2>Laundry</h2>
+
+<div class="bulk">
+  <form method="post" action="{{ url_for('laundry_bulk') }}">
+    <input type="hidden" name="from" value="worn">
+    <input type="hidden" name="to" value="in_wash">
+    <button type="submit">All worn → in the wash</button>
+  </form>
+  <form method="post" action="{{ url_for('laundry_bulk') }}">
+    <input type="hidden" name="from" value="in_wash">
+    <input type="hidden" name="to" value="clean">
+    <button type="submit">All in the wash → clean</button>
+  </form>
+</div>
+
+{% for s in states %}
+  <section class="lane">
+    <h3>{{ s.label }} <span class="muted">{{ by_state.get(s.code, [])|length }}</span></h3>
+    <ul class="lane-items">
+      {% for item in by_state.get(s.code, []) %}
+        <li>
+          {% if item.thumb_path %}
+            <img src="{{ url_for('photo', relative_path=item.thumb_path) }}" alt="" loading="lazy">
+          {% else %}
+            <span class="swatch" style="background: {{ item.hex or '#ccc' }}"></span>
+          {% endif %}
+          <a href="{{ url_for('item_detail', item_id=item.id) }}">{{ item.name }}</a>
+          <span class="muted">{{ item.cat_label }}</span>
+          <form method="post" action="{{ url_for('item_state', item_id=item.id) }}">
+            <input type="hidden" name="next" value="{{ url_for('laundry_view') }}">
+            {% for target in states if target.code != s.code %}
+              <button type="submit" name="state" value="{{ target.code }}">{{ target.label }}</button>
+            {% endfor %}
+          </form>
+        </li>
+      {% else %}
+        <li class="muted">nothing here</li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endfor %}
+{% endblock %}
