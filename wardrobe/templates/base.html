@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Wardrobe{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <h1>Wardrobe</h1>
+  <nav>
+    <a href="{{ url_for('today_view') }}" class="{{ 'on' if request.endpoint == 'today_view' }}">Today</a>
+    <a href="{{ url_for('catalogue') }}" class="{{ 'on' if request.endpoint in ('catalogue', 'item_detail') }}">Catalogue</a>
+    <a href="{{ url_for('outfits_view') }}" class="{{ 'on' if request.endpoint == 'outfits_view' }}">Outfits</a>
+    <a href="{{ url_for('log_view') }}" class="{{ 'on' if request.endpoint == 'log_view' }}">Log</a>
+    <a href="{{ url_for('laundry_view') }}" class="{{ 'on' if request.endpoint == 'laundry_view' }}">Laundry</a>
+  </nav>
+</header>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="flashes">{% for m in messages %}<p>{{ m }}</p>{% endfor %}</div>
+  {% endif %}
+{% endwith %}
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

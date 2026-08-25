@@ -1,0 +1,172 @@
+/* Mobile-first. One stylesheet, no framework, no build step. */
+
+:root {
+  --bg: #fbfaf8;
+  --fg: #1c1a17;
+  --muted: #6d675f;
+  --line: #e0dbd3;
+  --card: #fff;
+  --accent: #3a5a78;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161513;
+    --fg: #ece8e2;
+    --muted: #9a938a;
+    --line: #302d29;
+    --card: #1f1d1a;
+    --accent: #8fb3d0;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+main { padding: 0.75rem 0.9rem 4rem; max-width: 1100px; margin: 0 auto; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 0.9rem 0;
+}
+.topbar h1 { font-size: 1rem; margin: 0 0 0.4rem; letter-spacing: 0.02em; }
+.topbar nav { display: flex; gap: 0.25rem; overflow-x: auto; }
+.topbar nav a {
+  padding: 0.45rem 0.7rem; text-decoration: none; color: var(--muted);
+  border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.topbar nav a.on { color: var(--fg); border-bottom-color: var(--accent); }
+
+h2 { font-size: 1.25rem; margin: 1.2rem 0 0.4rem; }
+h3 { font-size: 1rem; margin: 1rem 0 0.4rem; }
+a { color: var(--accent); }
+
+.muted { color: var(--muted); font-size: 0.85rem; }
+.sub { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+.rationale { background: var(--card); border-left: 3px solid var(--line); padding: 0.6rem 0.8rem; }
+
+.flashes { background: #e8f2e8; color: #1d3a1d; padding: 0.6rem 0.9rem; }
+.flashes p { margin: 0; }
+
+/* ---------------------------------------------------------- forms --- */
+
+button, input, select {
+  font: inherit; color: inherit;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 6px; padding: 0.45rem 0.6rem;
+}
+button { cursor: pointer; }
+button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+button.big { width: 100%; padding: 0.9rem; font-size: 1.05rem; margin-top: 0.6rem; }
+button.on { background: var(--accent); color: #fff; }
+
+.weather, .filters, .bulk, .state, .rate {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+  margin-bottom: 0.8rem;
+}
+.filters input[type="search"] { flex: 1 1 100%; }
+.weather label { display: flex; align-items: center; gap: 0.3rem; }
+.weather input[type="number"] { width: 5rem; }
+.check { font-size: 0.9rem; }
+
+/* ---------------------------------------------------------- cards ---- */
+
+.grid {
+  display: grid; gap: 0.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+.card {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 0.5rem; text-decoration: none; color: inherit;
+}
+.card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; }
+.card-name { font-weight: 600; font-size: 0.9rem; }
+.card-meta { color: var(--muted); font-size: 0.78rem; }
+
+.swatch { width: 2rem; height: 2rem; border-radius: 6px; display: inline-block; border: 1px solid var(--line); }
+.swatch.big { width: 100%; aspect-ratio: 1; border-radius: 6px; }
+
+/* ---------------------------------------------------------- chips ---- */
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; }
+.chip {
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  width: 104px; text-decoration: none; color: inherit; font-size: 0.78rem;
+  text-align: center;
+}
+.chip img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
+.chip .swatch { width: 100%; aspect-ratio: 1; }
+.chip-name { line-height: 1.25; }
+.chip-note { color: var(--muted); font-style: italic; }
+
+/* --------------------------------------------------------- badges ---- */
+
+.badge {
+  display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.4rem;
+  border-radius: 999px; background: var(--line); color: var(--fg);
+  margin-right: 0.2rem;
+}
+.badge.ok { background: #cfe6cf; color: #1d3a1d; }
+.badge.warn { background: #f4dcc3; color: #4a3210; }
+.badge.render { background: #e0d8ef; color: #34275a; }
+.badge.reshoot { background: #f0d6d6; color: #5a2727; }
+.badge.out { background: #ddd; color: #444; }
+.verdict-keep { background: #cfe6cf; color: #1d3a1d; }
+.verdict-tailor { background: #f4e7c3; color: #4a3d10; }
+.verdict-replace { background: #f4dcc3; color: #4a3210; }
+.verdict-bin { background: #f0d6d6; color: #5a2727; }
+.state-worn { background: #f4e7c3; color: #4a3d10; }
+.state-in_wash { background: #cfe0f0; color: #17324a; }
+.state-at_tailor { background: #e0d8ef; color: #34275a; }
+.derived-derived { background: var(--line); color: var(--muted); }
+.derived-manual { background: #cfe6cf; color: #1d3a1d; }
+
+/* ----------------------------------------------------- item detail --- */
+
+.photos { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.photos figure { margin: 0; }
+.photos img { width: 100%; border-radius: 8px; }
+.photos figcaption { font-size: 0.75rem; color: var(--muted); }
+.no-photo { display: flex; gap: 0.8rem; align-items: center; max-width: 420px; }
+.no-photo .swatch.big { width: 90px; }
+
+.fields { display: grid; grid-template-columns: 1fr; gap: 0.1rem 1rem; margin-top: 1rem; }
+.fields dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-top: 0.7rem; }
+.fields dd { margin: 0; }
+
+@media (min-width: 700px) {
+  .fields { grid-template-columns: 170px 1fr; }
+  .fields dt { margin-top: 0.35rem; }
+  .fields dd { margin-top: 0.35rem; }
+}
+
+/* --------------------------------------------------------- today ----- */
+
+.pick { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 0.9rem; }
+.pick h2 { margin-top: 0; }
+.runners, .rejected { padding-left: 1.1rem; }
+.rejected li { color: var(--muted); font-size: 0.9rem; }
+
+.look { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 0.9rem; margin-bottom: 0.8rem; }
+.entry { border-bottom: 1px solid var(--line); padding-bottom: 0.8rem; margin-bottom: 0.8rem; }
+
+/* -------------------------------------------------------- laundry ---- */
+
+.lane { margin-bottom: 1.2rem; }
+.lane-items { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
+.lane-items li {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem;
+}
+.lane-items img { width: 2.4rem; height: 2.4rem; object-fit: cover; border-radius: 6px; }
+.lane-items form { display: flex; gap: 0.25rem; margin-left: auto; }
+.lane-items button { font-size: 0.75rem; padding: 0.3rem 0.45rem; }

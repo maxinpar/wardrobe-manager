@@ -97,6 +97,22 @@ def empty_to_none(value):
     return None if value == "" else value
 
 
+def source_of_derived(item: dict) -> dict[str, str]:
+    """Which 'derived' columns actually came from the JSON for this item.
+
+    Only outerwear carries warmth and weatherproof today. Recording those as
+    'imported' rather than 'derived' is what lets export_wardrobe.py rebuild the
+    original JSON shape — the other 63 items must not grow a warmth key.
+    """
+    sources = {f: "derived" for f in DERIVED_FIELDS}
+    if item.get("warmth") is not None:
+        sources["warmth"] = "imported"
+    if item.get("weatherproof") is not None:
+        sources["weatherproof_rain"] = "imported"
+        sources["weatherproof_wind"] = "imported"
+    return sources
+
+
 def build_row(item: dict) -> tuple[dict, list[str], list[str]]:
     """Return (column values, occasions, parse warnings) for one JSON item."""
     warnings = []
@@ -135,7 +151,14 @@ def manual_fields(conn, item_id: str) -> set[str]:
     return {r["field_name"] for r in rows}
 
 
-def upsert_item(conn, row: dict, occasions: list[str], changes: list[str]) -> None:
+def upsert_item(
+    conn,
+    row: dict,
+    occasions: list[str],
+    changes: list[str],
+    derived_sources: dict[str, str] | None = None,
+) -> None:
+    derived_sources = derived_sources or {f: "derived" for f in DERIVED_FIELDS}
     item_id = row["id"]
     existing = db.fetch_one(conn, "SELECT * FROM items WHERE id = %s", (item_id,))
     protected = manual_fields(conn, item_id)
@@ -178,9 +201,10 @@ def upsert_item(conn, row: dict, occasions: list[str], changes: list[str]) -> No
     for column in DERIVED_FIELDS:
         conn.execute(
             "INSERT INTO item_field_sources (item_id, field_name, source) "
-            "VALUES (%s, %s, 'derived') "
-            "ON CONFLICT (item_id, field_name) DO NOTHING",
-            (item_id, column),
+            "VALUES (%s, %s, %s) "
+            "ON CONFLICT (item_id, field_name) DO UPDATE SET source = EXCLUDED.source "
+            "WHERE item_field_sources.source <> 'manual'",
+            (item_id, column, derived_sources.get(column, "derived")),
         )
 
     if "occasions" not in protected:
@@ -416,6 +440,18 @@ def main() -> int:
     derived_summary = defaultdict(Counter)
 
     with db.connect(args.database_url) as conn:
+        # Top-level owner/profile: kept verbatim so the export can rebuild the
+        # exact JSON shape the Claude Project expects.
+        for key, value in (
+            ("catalogue.owner", json.dumps(payload.get("owner"))),
+            ("catalogue.profile", json.dumps(payload.get("profile"), ensure_ascii=False)),
+        ):
+            conn.execute(
+                "INSERT INTO app_settings (key, value) VALUES (%s, %s) "
+                "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                (key, value),
+            )
+
         for item in items:
             row, occasions, item_warnings = build_row(item)
             warnings.extend(item_warnings)
@@ -425,7 +461,7 @@ def main() -> int:
             derived_summary["rain_unsafe"][row["rain_unsafe"]] += 1
             for code in occasions:
                 derived_summary["occasions"][code] += 1
-            upsert_item(conn, row, occasions, changes)
+            upsert_item(conn, row, occasions, changes, source_of_derived(item))
 
         seed_outfits(conn, changes)
         seed_wear_events(conn, changes)

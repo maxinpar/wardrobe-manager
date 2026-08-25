@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip %}
+{% block title %}Today — Wardrobe{% endblock %}
+
+{% block content %}
+<form class="weather" method="get" action="{{ url_for('today_view') }}">
+  <label>Temp °C <input type="number" name="temp" value="{{ temp_c if temp_c is not none }}" step="1" inputmode="numeric"></label>
+  <label class="check"><input type="checkbox" name="rain" value="1" {{ 'checked' if rain }}> Rain</label>
+  <label class="check"><input type="checkbox" name="allow_disliked" value="1" {{ 'checked' if allow_disliked }}> Allow roll-necks</label>
+  <button type="submit">Update</button>
+  <span class="muted">{{ day.strftime('%a %d %b') }} · {{ band }}</span>
+</form>
+
+{% if best %}
+  <section class="pick">
+    <h2>{{ best.look.name }}</h2>
+    <p class="muted">{{ best.look.register|capitalize }} · {{ best.reasons|join(' · ') }}</p>
+
+    <div class="chips">
+      {% for item in best.chosen %}
+        {{ chip(item.item_id, item.name, thumbs, item.note) }}
+      {% endfor %}
+    </div>
+
+    {% if best.substitutions %}
+      <p class="sub">Swapped: {{ best.substitutions|join('; ') }}</p>
+    {% endif %}
+
+    <p class="rationale">{{ best.look.rationale }}</p>
+
+    <form method="post" action="{{ url_for('wear_today') }}">
+      <input type="hidden" name="outfit_slug" value="{{ best.look.slug }}">
+      {% for item in best.chosen %}
+        <input type="hidden" name="item_id" value="{{ item.item_id }}">
+      {% endfor %}
+      <input type="hidden" name="temp_c" value="{{ temp_c if temp_c is not none }}">
+      <input type="hidden" name="rain" value="{{ '1' if rain else '0' }}">
+      <button class="primary big" type="submit">Wore this</button>
+    </form>
+  </section>
+{% else %}
+  <section class="pick empty">
+    <h2>Nothing is wearable today</h2>
+    <p>Every vetted look is blocked. The reasons are below — most likely the wash.</p>
+  </section>
+{% endif %}
+
+{% if ranked %}
+  <h3>Runners-up</h3>
+  <ul class="runners">
+    {% for c in ranked %}
+      <li>
+        <strong>{{ c.look.name }}</strong> <span class="muted">{{ c.score }} · {{ c.reasons|join(' · ') }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% if rejected %}
+  <h3>Not today</h3>
+  <ul class="rejected">
+    {% for r in rejected %}<li>{{ r.reason }}</li>{% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

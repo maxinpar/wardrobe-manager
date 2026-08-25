@@ -1,0 +1,25 @@
+{# A garment chip: real photo if there is one, otherwise the colour swatch.
+   A generated catalogue render is labelled as such — it is an illustration,
+   not a photograph of the actual garment. #}
+{% macro chip(item_id, name, info, note=None) %}
+  {% set photo = info.get(item_id) if info else None %}
+  <a class="chip" href="{{ url_for('item_detail', item_id=item_id) }}">
+    {% if photo and photo.thumb_path %}
+      <img src="{{ url_for('photo', relative_path=photo.thumb_path) }}" alt="" loading="lazy">
+      {% if photo.is_render %}<span class="badge render">illustration</span>{% endif %}
+    {% else %}
+      <span class="swatch" style="background: {{ (photo.hex if photo else none) or '#ccc' }}"></span>
+      {% if photo and photo.no_photo %}<span class="badge reshoot">needs reshoot</span>{% endif %}
+    {% endif %}
+    <span class="chip-name">{{ name }}</span>
+    {% if note %}<span class="chip-note">{{ note }}</span>{% endif %}
+  </a>
+{% endmacro %}
+
+{% macro verdict_badge(code) %}
+  <span class="badge verdict-{{ code|lower }}">{{ code }}</span>
+{% endmacro %}
+
+{% macro state_badge(code, label) %}
+  <span class="badge state-{{ code }}">{{ label }}</span>
+{% endmacro %}

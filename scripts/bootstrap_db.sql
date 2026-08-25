@@ -15,6 +15,9 @@
 
 CREATE ROLE wardrobe_app LOGIN PASSWORD :'pw';
 
+-- CREATEDB so the export round-trip check can build its own scratch database.
+ALTER ROLE wardrobe_app CREATEDB;
+
 CREATE DATABASE wardrobe OWNER wardrobe_app ENCODING 'UTF8' TEMPLATE template0;
 
 \connect wardrobe
