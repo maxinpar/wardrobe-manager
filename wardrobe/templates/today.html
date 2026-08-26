@@ -13,8 +13,8 @@
 
 {% if best %}
   <section class="pick">
-    <h2>{{ best.look.name }}</h2>
-    <p class="muted">{{ best.look.register|capitalize }} · {{ best.reasons|join(' · ') }}</p>
+    <h2>{{ best.fit.name }}</h2>
+    <p class="muted">{{ best.fit.register|capitalize }} · {{ best.reasons|join(' · ') }}</p>
 
     <div class="chips">
       {% for item in best.chosen %}
@@ -26,10 +26,10 @@
       <p class="sub">Swapped: {{ best.substitutions|join('; ') }}</p>
     {% endif %}
 
-    <p class="rationale">{{ best.look.rationale }}</p>
+    <p class="rationale">{{ best.fit.commentary }}</p>
 
     <form method="post" action="{{ url_for('wear_today') }}">
-      <input type="hidden" name="outfit_slug" value="{{ best.look.slug }}">
+      <input type="hidden" name="fit_id" value="{{ best.fit.id }}">
       {% for item in best.chosen %}
         <input type="hidden" name="item_id" value="{{ item.item_id }}">
       {% endfor %}
@@ -50,7 +50,7 @@
   <ul class="runners">
     {% for c in ranked %}
       <li>
-        <strong>{{ c.look.name }}</strong> <span class="muted">{{ c.score }} · {{ c.reasons|join(' · ') }}</span>
+        <strong>{{ c.fit.name }}</strong> <span class="muted">{{ c.score }} · {{ c.reasons|join(' · ') }}</span>
       </li>
     {% endfor %}
   </ul>

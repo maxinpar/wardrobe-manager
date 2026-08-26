@@ -11,7 +11,7 @@
 {% for e in events %}
   <section class="entry">
     <h3>{{ e.worn_on.strftime('%a %d %b %Y') }}
-      {% if e.outfit_name %}— {{ e.outfit_name }}{% endif %}
+      {% if e.fit_name %}— {{ e.fit_name }}{% endif %}
       {% if e.rating %}<span class="badge ok">{{ e.rating }}/10</span>{% endif %}
     </h3>
     <p class="muted">

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip %}
+{% block title %}Fits — Wardrobe{% endblock %}
+
+{% block content %}
+<p class="muted">
+  {{ total }} fits — hand-reasoned, not generated.
+  {% if blocked_count %}
+    <strong>{{ blocked_count }}</strong> not wearable right now{% if job_count %},
+    {{ job_count }} blocked on a job{% endif %}.
+  {% else %}
+    All wearable right now.
+  {% endif %}
+</p>
+
+<form class="filters" method="get">
+  <label class="check">
+    <input type="checkbox" name="killer" value="1" {{ 'checked' if only_killer }}> Killer only
+  </label>
+  <label class="check">
+    <input type="checkbox" name="blocked" value="1" {{ 'checked' if blocked_only }}> Not wearable
+  </label>
+  <label class="check">
+    <input type="checkbox" name="show_hidden" value="1" {{ 'checked' if show_hidden }}> Show roll-neck
+  </label>
+  {# Season is a browsing label only — it filters this list and nothing else. #}
+  <select name="season">
+    <option value="">Any season</option>
+    {% for s in lookups.seasons %}
+      <option value="{{ s.code }}" {{ 'selected' if season == s.code }}>{{ s.label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Filter</button>
+  <a class="clear" href="{{ url_for('fits_view') }}">Clear</a>
+</form>
+
+{% for register, label in [('everyday', 'Everyday'), ('sharp', 'Sharp')] %}
+  {% if groups.get(register) %}
+    <h2>{{ label }}</h2>
+    {% for fit, problems in groups.get(register, []) %}
+      {% set m = meta.get(fit.id, {}) %}
+      <section class="look" id="{{ fit.id }}">
+        <h3>
+          <a href="{{ url_for('fit_detail', fit_id=fit.id) }}">{{ fit.name }}</a>
+          {% if fit.killer %}<span class="badge killer">killer</span>{% endif %}
+          {% if fit.score %}<span class="badge score">{{ fit.score }}/10</span>{% endif %}
+          {% if fit.hidden_by_default %}<span class="badge">hidden by default</span>{% endif %}
+          {% if problems %}
+            <span class="badge warn">not wearable now</span>
+          {% else %}
+            <span class="badge ok">wearable now</span>
+          {% endif %}
+        </h3>
+
+        <p class="muted">
+          {% if fit.style %}<em>{{ fit.style }}</em> · {% endif %}
+          {{ m.bands|join(' · ') if m.bands }}
+          {% if m.seasons %} · {{ m.seasons|join(', ') }}{% endif %}
+          {% if m.good_for %} · good for {{ m.good_for|join(', ') }}{% endif %}
+          {% if m.bad_for %} · <span class="warn-text">not for {{ m.bad_for|join(', ') }}</span>{% endif %}
+        </p>
+
+        <div class="chips">
+          {% for item in fit.primary() %}
+            {{ chip(item.item_id, item.name, thumbs, item.note) }}
+          {% endfor %}
+        </div>
+
+        {% set alts = fit.items | selectattr('is_alternate') | list %}
+        {% if alts %}
+          <p class="muted">Or: {% for a in alts %}{{ a.name }}{{ ' (' ~ a.note ~ ')' if a.note }}{{ '; ' if not loop.last }}{% endfor %}</p>
+        {% endif %}
+
+        {# The catch is a wear-time warning: it belongs where the choice is made. #}
+        {% if fit.catch %}<p class="catch">⚠ {{ fit.catch }}</p>{% endif %}
+
+        {% if problems %}
+          {# Never hidden — named, so Max can see what is blocking what. #}
+          <p class="sub">{% for p in problems %}<span class="badge warn">{{ p }}</span>{% endfor %}</p>
+        {% endif %}
+
+        {% for job in m.jobs or [] %}
+          <form class="job" method="post" action="{{ url_for('precondition_done', job_id=job.id) }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <input type="hidden" name="done" value="1">
+            <button type="submit">Mark done</button>
+            <span>{{ job.text }}</span>
+          </form>
+        {% endfor %}
+
+        <p class="rationale">{{ fit.commentary }}</p>
+      </section>
+    {% endfor %}
+  {% endif %}
+{% endfor %}
+
+{% if not groups.everyday and not groups.sharp %}
+  <p class="muted">Nothing matches those filters.</p>
+{% endif %}
+{% endblock %}

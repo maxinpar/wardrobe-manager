@@ -170,3 +170,28 @@ button.on { background: var(--accent); color: #fff; }
 .lane-items img { width: 2.4rem; height: 2.4rem; object-fit: cover; border-radius: 6px; }
 .lane-items form { display: flex; gap: 0.25rem; margin-left: auto; }
 .lane-items button { font-size: 0.75rem; padding: 0.3rem 0.45rem; }
+
+/* ------------------------------------------------------------ fits ---- */
+
+.badge.killer { background: #f0d9b5; color: #4a3210; font-weight: 600; }
+.badge.score  { background: #cfe0f0; color: #17324a; }
+.warn-text { color: #8a5a1a; }
+
+.catch {
+  background: #fdf3e3; border-left: 3px solid #d9a441;
+  padding: 0.5rem 0.7rem; margin: 0.5rem 0; color: #4a3210;
+}
+@media (prefers-color-scheme: dark) {
+  .catch { background: #2b2317; color: #e8d3ac; }
+}
+
+.hero img { width: 100%; max-width: 420px; border-radius: 10px; }
+.hero figcaption { font-size: 0.75rem; color: var(--muted); }
+
+.jobs { list-style: none; padding: 0; display: grid; gap: 0.4rem; }
+.jobs li { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.jobs .done { text-decoration: line-through; color: var(--muted); }
+.job { display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; font-size: 0.85rem; }
+
+.rules { color: var(--muted); font-size: 0.85rem; padding-left: 1.1rem; }
+.rules li { margin-bottom: 0.3rem; }

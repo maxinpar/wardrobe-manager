@@ -1,0 +1,31 @@
+{
+  "_why": [
+    "The known-good shape of wardrobe.json. import_wardrobe.py refuses to write if",
+    "the source file disagrees with these numbers, so a silent corruption of the",
+    "catalogue cannot slip through unnoticed.",
+    "",
+    "When the catalogue legitimately changes, update this file in the same commit as",
+    "the new wardrobe.json and say why in _changes. Editing it is how you record a",
+    "deliberate change; the importer failing is how you find out about an accidental one."
+  ],
+  "_matches_wardrobe_json_generated": "2026-08-26",
+  "_changes": [
+    "2026-08-25: first baseline, from the wardrobe.json delivered with the port brief.",
+    "2026-08-26: no_photo 13 -> 12. scripts/patch_wardrobe_20260826.py filed",
+    "trousers_11_black-coated-jeans, which now has five photos on disk. The remaining 12",
+    "are two different problems: 7 with no image at all (6 belts + trousers_00), and 5",
+    "sharing a group shot (shoes_08a/b/c, shoes_09a/b) that have no individual photo."
+  ],
+  "total": 69,
+  "cat": {
+    "Knitwear": 18,
+    "Trousers": 12,
+    "Shoes": 12,
+    "Belts": 11,
+    "Tops": 10,
+    "Outerwear": 6
+  },
+  "verdict": { "Keep": 45, "Tailor": 10, "Bin": 8, "Replace": 6 },
+  "scope": { "core": 65, "out": 4 },
+  "no_photo": 12
+}

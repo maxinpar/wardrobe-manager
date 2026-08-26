@@ -64,15 +64,18 @@ Plain numbered `.sql` files in `migrations/`, applied once each and recorded in
 ```
 
 The first form is a dry run — it prints every change it would make and writes
-nothing. The second one commits. It also seeds the 10 vetted looks (plus the
-hidden roll-neck one) and the single wear event.
+nothing. The second one commits. It also seeds the 18 fits (11 from
+`work-outfits.md` including the hidden roll-neck, 7 from `killer-looks.md`) and
+both wear events.
 
 The importer prints a verification report: counts per category, verdict and
 scope, items with no photo, `photoPrefix` values that matched no file on disk,
 and anything it couldn't parse. If the numbers don't reconcile against the
 known-good baseline (69 items · Knitwear 18 / Trousers 12 / Shoes 12 / Belts 11
 / Tops 10 / Outerwear 6 · Keep 45, Tailor 10, Bin 8, Replace 6 · core 65, out 4
-· 13 without photos) it stops rather than papering over it.
+· 12 without an individual photo) it stops rather than papering over it. The
+baseline lives in `data/baseline.json`, so a legitimate catalogue change is
+recorded as a data edit rather than buried in a code change.
 
 Re-running it is safe: it upserts on `items.id`, and it never touches laundry
 state, the wear log, or any field you've corrected by hand.
@@ -112,11 +115,50 @@ add it.
   role, formality, occasion and laundry state, plus free-text search across
   name, colour, material and notes. The detail view shows every field, all the
   photos, and the `pairs` / `layer` / `avoid` prose exactly as written.
-- **Outfits** — the vetted looks by register, each showing whether it's wearable
-  right now. The roll-neck look is behind a toggle.
+- **Fits** — the seeded fits by register, each showing its temperature bands,
+  season, good-for occasions, catch, and whether it's wearable right now. Filter
+  by killer, by season, or to just the ones that are blocked. The roll-neck fit
+  is behind a toggle. A fit is **never hidden** when something is wrong with it —
+  it is badged with the specific problem ("Ecco sneaker is in the wash",
+  "Contains a binned item", "Blocked: clean the coating").
 - **Log** — what was worn, newest first, with rating and note.
 - **Laundry** — flip items between clean / worn / in the wash / at the tailor,
   with two bulk moves.
+
+## Fits
+
+A fit is a managed entity, not a list of item ids with a paragraph attached.
+Beyond its garments it carries a style, commentary (why it works), a catch
+(what goes wrong — surfaced where you choose, not buried), a formality rank,
+temperature bands, seasons, good-for/bad-for occasions, and a hero image.
+
+**Three numbers are kept apart and never overwrite each other:**
+
+| | |
+|---|---|
+| `fits.score` | Your own 1–10 opinion. Typed by you on the fit page. **Nothing in the app ever computes or overwrites it**, and it survives a re-import. |
+| Picker rank | Computed per request from weather, laundry, day and rotation. Never stored. |
+| `wear_events.rating` | How one wearing actually went. Averaged and shown *next to* your score, never merged into it. |
+
+`killer` and `style` are yours too — same rule.
+
+**Staleness is computed on read, never stored.** A stored `wearable` boolean
+would go stale, which is the exact failure it would exist to prevent. Mark an
+item `in_wash` and every fit containing it is badged immediately, by name.
+
+**Alternates rescue a fit rather than skipping it.** Where a fit offers "or the
+Ecco sneaker" and the primary is in the wash, the picker substitutes and says
+so. An alternate with no primary in its slot is an optional addition ("add the
+vest on top in winter") rather than a swap.
+
+**Preconditions** are one-off jobs blocking a fit — clean the jacket coating,
+repair a cuff. Not laundry, not a verdict. Tick one off from the Fits screen and
+its fit becomes pickable again. "Repair the cuff" is a precondition; "wear the
+blazer open" is a catch.
+
+**Season is a browsing label only.** It filters the Fits list and is never read
+by the picker; temperature band and rain drive every decision. There is a test
+that changing a season leaves the picker's output identical.
 
 ## The picker
 
@@ -124,8 +166,8 @@ Ported from `WardrobeKit.pick()`, not reinvented. It **chooses among the vetted
 looks** rather than generating new combinations — that keeps the hand-reasoned
 styling rules intact. It scores on weather band (cold < 14 °C, mild 14–22, warm
 > 22), rain safety (suede and nubuck stay home), a Friday bonus for the cardigan
-look, a bonus for wear-as-is over needs-tailoring, and a stable per-day
-rotation. It is deterministic per calendar day — no `random()` anywhere, so the
+fit, a bonus for wear-as-is over needs-tailoring, and a stable per-day rotation.
+The temperature band is **read** from the fit, not inferred from its garments. It is deterministic per calendar day — no `random()` anywhere, so the
 same day always gives the same look.
 
 New in this version: a look whose garments aren't clean is skipped and says why
@@ -139,8 +181,11 @@ look.
 ```
 
 `validate_picker.py` sweeps a year of dates against six temperatures and both
-rain states and fails if any vetted look can never be picked — that's the
-correctness check for the port.
+rain states and fails if any of the ten work-outfits fits can never be picked —
+that's the correctness check for the port. Fits from `killer-looks.md` are
+exempt: several are deliberately occasion-specific and need to be browsable, not
+picked. Fits blocked on an outstanding job are swept with that job assumed done,
+and reported separately.
 
 ## Keeping the Claude Project in sync
 
@@ -185,6 +230,20 @@ page shows which is which.
   catalogue can never wipe them.
 - Secrets live in `.env` only, which is gitignored.
 
+## Two sources of fits
+
+| Source | Fits | References garments by | Metadata |
+|---|---|---|---|
+| `data/work-outfits.md` | 11 (incl. the hidden roll-neck) | display name — **not unique**, so hand-mapped in `wardrobe/seed_data.py` and asserted to resolve to exactly one item | bands, rain-safety, formality and good-for are **derived** from the garments |
+| `data/killer-looks.md` | 7 | item id — unambiguous | authored in the document, so **imported** as written and never re-derived |
+
+`bad_for` is only ever imported. Deriving a negative claim would invent warnings
+nobody made, so the eleven work-outfits fits have none.
+
+`style` comes from `data/style-drafts.md` as a **draft** (`source='suggested'`),
+labelled as such on the fit page. The moment you edit one it becomes `manual`
+and the importer stops offering a draft for it.
+
 ## Known state and follow-ups
 
 - **Trouser verdicts.** The trousers came back from the tailor on 2026-08-20
@@ -194,9 +253,18 @@ page shows which is which.
   `item_field_sources` is what makes the correction stick — the importer never
   overwrites a manual value. Knitwear `Tailor` items are unconfirmed and
   untouched.
-- **13 items have no photo** (6 belts, 5 shoes, 2 trousers) and those photos are
-  gone for good. The app falls back to the colour swatch and shows a "needs
-  reshoot" badge with the prefix to reuse.
+- **12 items have no individual photo, and that is two different problems.**
+  Six belts have **no image at all** — those photos are gone for good, and the
+  app shows a colour swatch with the prefix to reuse. Five shoes
+  (`shoes_08a/b/c`, `shoes_09a/b`) **share a group shot**: there is an image to
+  look at, it just isn't an individual one, so they are badged "needs an
+  individual shot" instead. `trousers_00_decathlon-stone` has a retail render
+  but no source photograph at all — that render was made from a written
+  description and has never been checked against the garment.
+- **`photoPrefix` is not unique.** The five group-shot shoes share two prefixes,
+  which is why they have never rendered individually. The importer warns about
+  it every run; renders are matched by `<item_id>_retail` so one can never
+  attach to three garments at once.
 - **Generated catalogue renders** (`Retail/`) are the preferred image
   everywhere: the catalogue grid, the outfit chips and the top of the item
   detail page all lead with the render where one exists, falling back to a real
@@ -208,6 +276,10 @@ page shows which is which.
 
 Out of scope for v1, deliberately, and not built:
 
+- the fit builder, and fit image generation — deferred to v2, blocked on image
+  generation rather than on UI work. The rule checker ships with the builder;
+  until then the styling rules are stored as reference text and shown on the fit
+  page without being enforced.
 - item add/edit UI — the importer is the write path for catalogue data
 - free combinatorial outfit generation from the `pairs` / `avoid` rules
 - a weather API (Sydney) — the picker takes manual input, with a clean seam
@@ -215,6 +287,22 @@ Out of scope for v1, deliberately, and not built:
 - the SVG illustration set (`wardrobe-kit.js`)
 - migrating the old 17 MB `Wardrobe_Manager.html` — superseded, left alone
 - logging the missing categories: tees, shirts, shorts, socks
+
+## Fit photos
+
+`G:\My Drive\Claude stuff\Wardrobe Photos\Fits` holds two kinds of image and the
+app must never confuse them:
+
+```
+fit_<slug>_render.<ext>       a generated render — NOT evidence the fit was worn
+fit_<slug>_NN_<angle>.jpg     a real photo of Max wearing it
+```
+
+A render becomes the fit's `hero_image` and is labelled "generated illustration"
+wherever it appears. A worn photo belongs to the **wear event**, not the fit —
+one fit worn three times has three sets. A file in `Fits/` that isn't named for
+a fit is reported and left alone: Gemini names every export identically, and
+guessing is how photos get lost.
 
 ## Layout
 

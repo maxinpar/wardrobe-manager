@@ -31,8 +31,8 @@
       <span class="swatch big" style="background: {{ item.hex or '#ccc' }}"></span>
       <p>
         {% if item.no_photo %}
-          No photo of this one exists — those photos are gone for good. Reshoot it
-          using the prefix <code>{{ item.photo_prefix }}</code>.
+          No image of this one exists at all — those photos are gone for good.
+          Reshoot it using the prefix <code>{{ item.photo_prefix }}</code>.
         {% else %}
           No photo has been matched on disk yet.
         {% endif %}
@@ -98,12 +98,12 @@
   <dt>id</dt><dd><code>{{ item.id }}</code></dd>
 </dl>
 
-{% if in_outfits %}
-  <h3>In these looks</h3>
+{% if in_fits %}
+  <h3>In these fits</h3>
   <ul>
-    {% for o in in_outfits %}
-      <li><a href="{{ url_for('outfits_view') }}#{{ o.slug }}">{{ o.name }}</a>
-        <span class="muted">{{ o.slot_role }}{{ ' (alternate)' if o.is_alternate }}</span></li>
+    {% for o in in_fits %}
+      <li><a href="{{ url_for('fit_detail', fit_id=o.id) }}">{{ o.name }}</a>
+        <span class="muted">{{ o.role }}{{ ' (alternate)' if o.is_alternate }}</span></li>
     {% endfor %}
   </ul>
 {% endif %}
