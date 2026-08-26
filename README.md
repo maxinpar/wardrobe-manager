@@ -65,15 +65,15 @@ Plain numbered `.sql` files in `migrations/`, applied once each and recorded in
 
 The first form is a dry run — it prints every change it would make and writes
 nothing. The second one commits. It also seeds the 18 fits (11 from
-`work-outfits.md` including the hidden roll-neck, 7 from `killer-looks.md`) and
-both wear events.
+`work-outfits.md` including the hidden roll-neck, 7 from `killer-looks.md`),
+both wear events, and retires any id that has left the catalogue.
 
 The importer prints a verification report: counts per category, verdict and
 scope, items with no photo, `photoPrefix` values that matched no file on disk,
 and anything it couldn't parse. If the numbers don't reconcile against the
-known-good baseline (69 items · Knitwear 18 / Trousers 12 / Shoes 12 / Belts 11
-/ Tops 10 / Outerwear 6 · Keep 45, Tailor 10, Bin 8, Replace 6 · core 65, out 4
-· 12 without an individual photo) it stops rather than papering over it. The
+known-good baseline (68 items · Knitwear 18 / Shoes 12 / Belts 11 / Trousers 11
+/ Tops 10 / Outerwear 6 · Keep 45, Tailor 9, Bin 8, Replace 6 · core 64, out 4
+· 2 without a photo) it stops rather than papering over it. The
 baseline lives in `data/baseline.json`, so a legitimate catalogue change is
 recorded as a data edit rather than buried in a code change.
 
