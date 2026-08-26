@@ -241,6 +241,89 @@ def main() -> int:
                     )
                     indexed += 1
 
+        # ---- fits: hero renders and worn photos -------------------------
+        # fit_<slug>_render.<ext>   generated render — NOT evidence it was worn
+        # fit_<slug>_NN_<angle>.jpg real worn photo, belongs to the wear event
+        fits_dir = source_root / "Fits"
+        fit_files = (
+            sorted(
+                p for p in fits_dir.iterdir()
+                if p.is_file() and p.suffix.lower() in IMAGE_SUFFIXES
+            )
+            if fits_dir.exists()
+            else []
+        )
+        unfiled = []
+        heroes = 0
+        worn_photos = 0
+
+        for path in fit_files:
+            if not path.name.startswith("fit_"):
+                # Gemini names every export identically. An unnamed file cannot
+                # be attributed to a fit, and guessing is how photos get lost.
+                unfiled.append(path.name)
+                continue
+
+            stem = path.stem
+            is_render = stem.endswith("_render")
+            slug = stem[: -len("_render")] if is_render else stem.rsplit("_", 2)[0]
+
+            rel = Path("fits") / path.name
+            rel_thumb = (Path("fits") / "thumbs" / path.name).with_suffix(".jpg")
+            if args.commit:
+                (store / rel).parent.mkdir(parents=True, exist_ok=True)
+                if not (store / rel).exists():
+                    shutil.copy2(path, store / rel)  # copy, never move
+                    copied += 1
+                if not (store / rel_thumb).exists():
+                    make_thumb(store / rel, store / rel_thumb)
+
+            stored = str(rel).replace("\\", "/")
+            thumb = str(rel_thumb).replace("\\", "/")
+
+            if is_render:
+                fit = db.fetch_one(conn, "SELECT id FROM fits WHERE id = %s", (slug,))
+                if fit is None:
+                    unfiled.append(f"{path.name} (no fit {slug!r})")
+                    continue
+                conn.execute(
+                    "UPDATE fits SET hero_image_path = %s, hero_thumb_path = %s, "
+                    "hero_is_generated = true WHERE id = %s",
+                    (stored, thumb, slug),
+                )
+                heroes += 1
+            else:
+                # A worn photo belongs to the wear event, never to the fit.
+                event = db.fetch_one(
+                    conn,
+                    "SELECT id FROM wear_events WHERE fit_photo_slug = %s "
+                    "ORDER BY worn_on DESC LIMIT 1",
+                    (slug,),
+                )
+                if event is None:
+                    unfiled.append(f"{path.name} (no wear event for {slug!r})")
+                    continue
+                angle = guess_angle(path.name, slug)
+                conn.execute(
+                    "INSERT INTO wear_event_photos (wear_event_id, stored_path, "
+                    "thumb_path, source_filename, angle_code, sort_order) "
+                    "VALUES (%s, %s, %s, %s, %s, 0) "
+                    "ON CONFLICT (wear_event_id, source_filename) DO UPDATE SET "
+                    "stored_path = EXCLUDED.stored_path, thumb_path = EXCLUDED.thumb_path",
+                    (event["id"], stored, thumb, path.name, angle),
+                )
+                worn_photos += 1
+
+        print(f"\nFits folder: {heroes} hero render(s), {worn_photos} worn photo(s)")
+        if unfiled:
+            print("  Not filed — a fit photo must be named for its fit:")
+            for name in unfiled:
+                print("   ", name)
+            print(
+                "    fit_<slug>_render.<ext>       generated render\n"
+                "    fit_<slug>_NN_<angle>.jpg     real worn photo"
+            )
+
         no_photo_rows = db.fetch_all(
             conn,
             "SELECT i.id FROM items i LEFT JOIN photos p ON p.item_id = i.id "

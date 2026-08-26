@@ -20,3 +20,7 @@ Thumbs.db
 
 # Generated export — regenerate with scripts/export_wardrobe.py
 export/
+
+# Patch artefacts — the pre-patch original is in git history
+*.bak
+*.new

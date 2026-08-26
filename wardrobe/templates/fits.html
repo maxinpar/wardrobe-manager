@@ -53,6 +53,7 @@
         </h3>
 
         <p class="muted">
+          {% if fit.style %}<em>{{ fit.style }}</em> · {% endif %}
           {{ m.bands|join(' · ') if m.bands }}
           {% if m.seasons %} · {{ m.seasons|join(', ') }}{% endif %}
           {% if m.good_for %} · good for {{ m.good_for|join(', ') }}{% endif %}

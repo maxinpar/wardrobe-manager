@@ -91,6 +91,9 @@
     <form class="rate" method="post" action="{{ url_for('fit_style', fit_id=fit.id) }}">
       <input type="text" name="style" value="{{ fit.style or '' }}" placeholder="short characterisation">
       <button type="submit">Save</button>
+      {% if sources.get('style') == 'suggested' %}
+        <span class="badge">draft — edit or bin it, it isn't yours yet</span>
+      {% endif %}
     </form>
   </dd>
 </dl>

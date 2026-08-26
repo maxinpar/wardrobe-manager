@@ -68,6 +68,12 @@ SELECT i.*, c.label AS cat_label, c.sort_order AS cat_sort,
            AND (p.is_render OR starts_with(p.source_filename, i.id))
          ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS thumb_is_render,
        (SELECT count(*) FROM photos p WHERE p.item_id = i.id) AS photo_count,
+       -- noPhoto means "no INDIVIDUAL photo", which is two different problems.
+       -- A garment sharing a group shot has an image to look at; a garment with
+       -- nothing at all does not, and only the second is a lost photo.
+       (SELECT count(*) FROM photos p
+         WHERE p.item_id = i.id AND NOT p.is_render
+           AND NOT starts_with(p.source_filename, i.id)) > 0 AS has_group_shot,
        (SELECT string_agg(o.occasion_code, ',' ORDER BY o.occasion_code)
           FROM item_occasions o WHERE o.item_id = i.id) AS occasions
 FROM items i
@@ -554,6 +560,15 @@ def fit_style(fit_id: str):
         conn.execute(
             "UPDATE fits SET style = %s WHERE id = %s",
             ((request.form.get("style") or "").strip() or None, fit_id),
+        )
+        # Once he has touched it, it stops being a draft and the importer
+        # stops offering one.
+        conn.execute(
+            "INSERT INTO fit_field_sources (fit_id, field_name, source) "
+            "VALUES (%s, 'style', 'manual') "
+            "ON CONFLICT (fit_id, field_name) DO UPDATE SET source = 'manual', "
+            "updated_at = now()",
+            (fit_id,),
         )
         conn.commit()
     return redirect(url_for("fit_detail", fit_id=fit_id))

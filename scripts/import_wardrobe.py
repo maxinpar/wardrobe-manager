@@ -247,7 +247,9 @@ def resolve_item(conn, item_id: str) -> None:
 
 # Fields on a fit that belong to Max, not to the seed file. The importer must
 # never write these, on any run, for any reason.
-FIT_FIELDS_MAX_OWNS = ("killer", "score", "style")
+# `style` is NOT here: it starts as a draft (source 'suggested') and only
+# becomes Max's when he edits it on the fit page.
+FIT_FIELDS_MAX_OWNS = ("killer", "score")
 
 # Derived on import from the garments, overridable by hand.
 FIT_DERIVED_FIELDS = (
@@ -255,6 +257,7 @@ FIT_DERIVED_FIELDS = (
     "rain_safe",
     "formality_rank",
     "good_for",
+    "bad_for",
     "seasons",
 )
 
@@ -379,13 +382,19 @@ def seed_fits(conn, changes: list[str]) -> None:
                 )
                 changes.append(f"NEW      precondition on {fit_id}: {text}")
 
-        # Derived metadata.
+        # Metadata. killer-looks.md authors its own bands, rain_safe, formality
+        # and good_for/bad_for — those are imported as written. work-outfits.md
+        # says nothing about them, so they are derived from the garments.
         garments = fit_garments(conn, fit_id)
-        bands = fit_derive.temp_bands(garments)
+        authored = "temp_bands" in fit
+        bands = fit["temp_bands"] if authored else fit_derive.temp_bands(garments)
+        provenance = "imported" if authored else "derived"
 
         if "temp_bands" not in protected:
             replace_set(conn, "fit_temp_bands", "band_code", fit_id, bands)
         if "seasons" not in protected:
+            # Season is always derived from the bands: it is a browsing label,
+            # and neither source document authors one.
             replace_set(
                 conn, "fit_seasons", "season_code", fit_id, fit_derive.seasons(bands)
             )
@@ -393,29 +402,72 @@ def seed_fits(conn, changes: list[str]) -> None:
             conn.execute(
                 "DELETE FROM fit_occasions WHERE fit_id = %s AND kind = 'good'", (fit_id,)
             )
-            for code in fit_derive.good_for(garments):
+            good = fit["good_for"] if authored else fit_derive.good_for(garments)
+            for code in good:
                 conn.execute(
                     "INSERT INTO fit_occasions (fit_id, occasion_code, kind) "
                     "VALUES (%s, %s, 'good')",
                     (fit_id, code),
                 )
+        if "bad_for" not in protected and authored:
+            # Only ever imported. A negative claim is never derived: deriving
+            # "this fit is wrong for X" would invent warnings Max never made.
+            conn.execute(
+                "DELETE FROM fit_occasions WHERE fit_id = %s AND kind = 'bad'", (fit_id,)
+            )
+            for code in fit["bad_for"]:
+                conn.execute(
+                    "INSERT INTO fit_occasions (fit_id, occasion_code, kind) "
+                    "VALUES (%s, %s, 'bad')",
+                    (fit_id, code),
+                )
         if "rain_safe" not in protected:
             conn.execute(
                 "UPDATE fits SET rain_safe = %s WHERE id = %s",
-                (fit_derive.rain_safe(garments), fit_id),
+                (
+                    fit["rain_safe"] if authored else fit_derive.rain_safe(garments),
+                    fit_id,
+                ),
             )
         if "formality_rank" not in protected:
             conn.execute(
                 "UPDATE fits SET formality_rank = %s WHERE id = %s",
-                (fit_derive.formality_rank(garments), fit_id),
+                (
+                    fit["formality_rank"]
+                    if authored
+                    else fit_derive.formality_rank(garments),
+                    fit_id,
+                ),
             )
+
+        # A draft style, offered rather than authored: only ever written while
+        # the row still says 'suggested', so an edit by Max is never undone.
+        draft = seed_data.STYLE_DRAFTS.get(fit_id)
+        if draft and "style" not in protected:
+            current = db.fetch_one(
+                conn,
+                "SELECT source FROM fit_field_sources WHERE fit_id = %s "
+                "AND field_name = 'style'",
+                (fit_id,),
+            )
+            if current is None or current["source"] == "suggested":
+                conn.execute(
+                    "UPDATE fits SET style = %s WHERE id = %s", (draft, fit_id)
+                )
+                conn.execute(
+                    "INSERT INTO fit_field_sources (fit_id, field_name, source, note) "
+                    "VALUES (%s, 'style', 'suggested', 'data/style-drafts.md') "
+                    "ON CONFLICT (fit_id, field_name) DO UPDATE SET source = 'suggested'",
+                    (fit_id,),
+                )
 
         for field in FIT_DERIVED_FIELDS:
             conn.execute(
                 "INSERT INTO fit_field_sources (fit_id, field_name, source) "
-                "VALUES (%s, %s, 'derived') "
-                "ON CONFLICT (fit_id, field_name) DO NOTHING",
-                (fit_id, field),
+                "VALUES (%s, %s, %s) "
+                "ON CONFLICT (fit_id, field_name) DO UPDATE SET source = EXCLUDED.source "
+                "WHERE fit_field_sources.source NOT IN ('manual', 'suggested')",
+                (fit_id, field, "imported" if authored and field != "seasons" else "derived"),
             )
         for field in FIT_FIELDS_MAX_OWNS:
             conn.execute(
@@ -442,7 +494,8 @@ def seed_wear_events(conn, changes: list[str]) -> None:
         row = db.fetch_one(
             conn,
             "INSERT INTO wear_events (worn_on, fit_id, context, temp_c, rain, "
-            "rating, note, tweak) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            "rating, note, tweak, fit_photo_slug) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (
                 event["worn_on"],
                 event["fit_id"],
@@ -452,6 +505,7 @@ def seed_wear_events(conn, changes: list[str]) -> None:
                 event["rating"],
                 event["note"],
                 event["tweak"],
+                event.get("photo_slug"),
             ),
         )
         event_id = row["id"]

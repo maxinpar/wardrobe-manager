@@ -61,7 +61,13 @@
         {% if item.thumb_is_render %}<span class="badge render">illustration</span>{% endif %}
       {% else %}
         <span class="swatch big" style="background: {{ item.hex or '#ccc' }}"></span>
-        {% if item.no_photo %}<span class="badge reshoot">needs reshoot</span>{% endif %}
+        {% if item.no_photo %}
+          {% if item.has_group_shot %}
+            <span class="badge warn">needs an individual shot</span>
+          {% else %}
+            <span class="badge reshoot">no image at all</span>
+          {% endif %}
+        {% endif %}
       {% endif %}
       <span class="card-name">{{ item.name }}</span>
       <span class="card-meta">{{ item.cat_label }} · {{ item.colour }}</span>

@@ -227,22 +227,19 @@ page shows which is which.
   catalogue can never wipe them.
 - Secrets live in `.env` only, which is gitignored.
 
-## Waiting on source data
+## Two sources of fits
 
-Three things in the fits addendum (2026-08-26) could not be built from what is
-in this repo, and are **not** faked:
+| Source | Fits | References garments by | Metadata |
+|---|---|---|---|
+| `data/work-outfits.md` | 11 (incl. the hidden roll-neck) | display name — **not unique**, so hand-mapped in `wardrobe/seed_data.py` and asserted to resolve to exactly one item | bands, rain-safety, formality and good-for are **derived** from the garments |
+| `data/killer-looks.md` | 7 | item id — unambiguous | authored in the document, so **imported** as written and never re-derived |
 
-- **`killer-looks.md` is missing.** It holds 7 of the 17 fits, and unlike
-  `work-outfits.md` it references garments by item id, so it imports directly.
-  Drop it in `data/` and the ten seeded here become seventeen. Those seven also
-  carry the `style` and `catch` values the ten don't have.
-- **The second wear event** ("Moto & burgundy", 2026-08-26) has no source entry.
-  Inventing its garments would be worse than leaving it out. The schema already
-  tolerates a wear event with no photo.
-- **The newer `wardrobe.json`.** The addendum says 12 items have no photo, not
-  13, because `trousers_11_black-coated-jeans` was filed. The copy in `data/`
-  still says 13 and still flags that item `noPhoto: true`, so `data/baseline.json`
-  still says 13 — update both together, in one commit.
+`bad_for` is only ever imported. Deriving a negative claim would invent warnings
+nobody made, so the eleven work-outfits fits have none.
+
+`style` comes from `data/style-drafts.md` as a **draft** (`source='suggested'`),
+labelled as such on the fit page. The moment you edit one it becomes `manual`
+and the importer stops offering a draft for it.
 
 ## Known state and follow-ups
 
@@ -253,9 +250,18 @@ in this repo, and are **not** faked:
   `item_field_sources` is what makes the correction stick — the importer never
   overwrites a manual value. Knitwear `Tailor` items are unconfirmed and
   untouched.
-- **13 items have no photo** (6 belts, 5 shoes, 2 trousers) and those photos are
-  gone for good. The app falls back to the colour swatch and shows a "needs
-  reshoot" badge with the prefix to reuse.
+- **12 items have no individual photo, and that is two different problems.**
+  Six belts have **no image at all** — those photos are gone for good, and the
+  app shows a colour swatch with the prefix to reuse. Five shoes
+  (`shoes_08a/b/c`, `shoes_09a/b`) **share a group shot**: there is an image to
+  look at, it just isn't an individual one, so they are badged "needs an
+  individual shot" instead. `trousers_00_decathlon-stone` has a retail render
+  but no source photograph at all — that render was made from a written
+  description and has never been checked against the garment.
+- **`photoPrefix` is not unique.** The five group-shot shoes share two prefixes,
+  which is why they have never rendered individually. The importer warns about
+  it every run; renders are matched by `<item_id>_retail` so one can never
+  attach to three garments at once.
 - **Generated catalogue renders** (`Retail/`) are the preferred image
   everywhere: the catalogue grid, the outfit chips and the top of the item
   detail page all lead with the render where one exists, falling back to a real
@@ -278,6 +284,22 @@ Out of scope for v1, deliberately, and not built:
 - the SVG illustration set (`wardrobe-kit.js`)
 - migrating the old 17 MB `Wardrobe_Manager.html` — superseded, left alone
 - logging the missing categories: tees, shirts, shorts, socks
+
+## Fit photos
+
+`G:\My Drive\Claude stuff\Wardrobe Photos\Fits` holds two kinds of image and the
+app must never confuse them:
+
+```
+fit_<slug>_render.<ext>       a generated render — NOT evidence the fit was worn
+fit_<slug>_NN_<angle>.jpg     a real photo of Max wearing it
+```
+
+A render becomes the fit's `hero_image` and is labelled "generated illustration"
+wherever it appears. A worn photo belongs to the **wear event**, not the fit —
+one fit worn three times has three sets. A file in `Fits/` that isn't named for
+a fit is reported and left alone: Gemini names every export identically, and
+guessing is how photos get lost.
 
 ## Layout
 
