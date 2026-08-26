@@ -1,0 +1,31 @@
+{
+  "_why": [
+    "The known-good shape of wardrobe.json. import_wardrobe.py refuses to write if",
+    "the source file disagrees with these numbers, so a silent corruption of the",
+    "catalogue cannot slip through unnoticed.",
+    "",
+    "When the catalogue legitimately changes, update this file in the same commit as",
+    "the new wardrobe.json and say why in _changes. Editing it is how you record a",
+    "deliberate change; the importer failing is how you find out about an accidental one."
+  ],
+  "_matches_wardrobe_json_generated": "2026-08-25",
+  "_changes": [
+    "2026-08-25: first baseline, from the wardrobe.json delivered with the port brief.",
+    "PENDING: the fits addendum (2026-08-26) says no_photo becomes 12, not 13, because",
+    "trousers_11_black-coated-jeans was filed on 2026-08-25. The wardrobe.json in this",
+    "repo still carries noPhoto: true for it, so the baseline still says 13. Set this to",
+    "12 at the same time as dropping in the newer wardrobe.json."
+  ],
+  "total": 69,
+  "cat": {
+    "Knitwear": 18,
+    "Trousers": 12,
+    "Shoes": 12,
+    "Belts": 11,
+    "Tops": 10,
+    "Outerwear": 6
+  },
+  "verdict": { "Keep": 45, "Tailor": 10, "Bin": 8, "Replace": 6 },
+  "scope": { "core": 65, "out": 4 },
+  "no_photo": 13
+}

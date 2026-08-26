@@ -1,13 +1,16 @@
-"""Check that the picker can return every vetted look.
+"""Check that the picker can still return every vetted work-outfits fit.
 
     python scripts/validate_picker.py
 
-The 10 looks are the correctness check for the port: if some weather/day/state
-combination can't produce one of them, the port is wrong. This sweeps a year of
-dates against cold/mild/warm and dry/wet and reports which look wins when.
+The 10 fits from work-outfits.md are the correctness check for the port: if
+some weather/day/state combination can't produce one of them, the port is
+wrong. This sweeps a year of dates against cold/mild/warm and dry/wet.
 
-The hidden roll-neck look is checked separately, with allow_disliked on — by
-default it must never be picked.
+Two exemptions, both from the fits addendum:
+  * the hidden roll-neck fit must never be picked unless explicitly allowed
+  * the killer-looks fits need NOT be reachable — several are deliberately
+    occasion-specific. They must be browsable and flaggable, not necessarily
+    picked.
 """
 
 from __future__ import annotations
@@ -25,51 +28,84 @@ TEMPS = [8, 12, 18, 22, 26, 31]
 RAIN = [False, True]
 DAYS = 366
 
+MUST_BE_REACHABLE_SOURCE = "work-outfits.md"
+
 
 def main() -> int:
     with db.connect() as conn:
-        looks = picker.load_looks(conn)
+        fits = picker.load_fits(conn)
 
-    if not looks:
-        raise SystemExit("No vetted looks in the database — run the importer first.")
+    if not fits:
+        raise SystemExit("No fits in the database — run the importer first.")
+
+    # A fit blocked on a one-off job (clean the jacket, repair the cuff) is
+    # correctly unpickable today, but that says nothing about whether the port
+    # is right. The sweep therefore runs with the jobs assumed done, and the
+    # blocked ones are reported separately.
+    blocked_now = {f.id: list(f.blocked_by) for f in fits if f.blocked_by}
+    for fit in fits:
+        fit.blocked_by = []
 
     start = date(2026, 1, 1)
-    wins_default = Counter()
-    wins_allowing_disliked = Counter()
+    wins_default: Counter[str] = Counter()
+    wins_allowing_disliked: Counter[str] = Counter()
 
     for offset in range(DAYS):
         day = start + timedelta(days=offset)
         for temp in TEMPS:
             for rain in RAIN:
-                best, _, _ = picker.pick(looks, day, temp_c=temp, rain=rain)
+                best, _, _ = picker.pick(fits, day, temp_c=temp, rain=rain)
                 if best:
-                    wins_default[best.look.slug] += 1
+                    wins_default[best.fit.id] += 1
                 best, _, _ = picker.pick(
-                    looks, day, temp_c=temp, rain=rain, allow_disliked=True
+                    fits, day, temp_c=temp, rain=rain, allow_disliked=True
                 )
                 if best:
-                    wins_allowing_disliked[best.look.slug] += 1
+                    wins_allowing_disliked[best.fit.id] += 1
 
-    vetted = [l for l in looks if not l.hidden_by_default]
-    hidden = [l for l in looks if l.hidden_by_default]
+    must_reach = [
+        f
+        for f in fits
+        if not f.hidden_by_default
+        and (f.source or "").startswith(MUST_BE_REACHABLE_SOURCE)
+    ]
+    exempt = [
+        f
+        for f in fits
+        if not f.hidden_by_default
+        and not (f.source or "").startswith(MUST_BE_REACHABLE_SOURCE)
+    ]
+    hidden = [f for f in fits if f.hidden_by_default]
 
     print(f"Swept {DAYS} days x {len(TEMPS)} temperatures x {len(RAIN)} rain states\n")
-    print("Look                          picked (default)   picked (roll-necks allowed)")
-    for look in looks:
+    print("Fit                           picked (default)   picked (roll-necks allowed)")
+    for fit in fits:
+        mark = " " if fit in must_reach else "*"
         print(
-            f"  {look.name:28} {wins_default[look.slug]:8}"
-            f"{wins_allowing_disliked[look.slug]:20}"
+            f" {mark}{fit.name:28} {wins_default[fit.id]:8}"
+            f"{wins_allowing_disliked[fit.id]:20}"
         )
+    if exempt:
+        print("\n  * need not be reachable (killer-looks fits, occasion-specific)")
+
+    if blocked_now:
+        print(
+            f"\nSwept with {len(blocked_now)} fit(s)' outstanding jobs assumed done — "
+            "they are\nunpickable until the job is ticked off, which is the point of "
+            "preconditions:"
+        )
+        for fit_id, jobs in sorted(blocked_now.items()):
+            print(f"  {fit_id}: {'; '.join(jobs)}")
 
     problems = []
-    for look in vetted:
-        if wins_default[look.slug] == 0:
-            problems.append(f"{look.name} is never picked — the port is wrong")
-    for look in hidden:
-        if wins_default[look.slug] != 0:
-            problems.append(f"{look.name} is hidden by default but was picked")
-        if wins_allowing_disliked[look.slug] == 0:
-            problems.append(f"{look.name} can't be picked even when allowed")
+    for fit in must_reach:
+        if wins_default[fit.id] == 0:
+            problems.append(f"{fit.name} is never picked — the port is wrong")
+    for fit in hidden:
+        if wins_default[fit.id] != 0:
+            problems.append(f"{fit.name} is hidden by default but was picked")
+        if wins_allowing_disliked[fit.id] == 0:
+            problems.append(f"{fit.name} can't be picked even when allowed")
 
     print()
     if problems:
@@ -79,8 +115,9 @@ def main() -> int:
         return 2
 
     print(
-        f"All {len(vetted)} vetted looks are reachable; "
-        f"{len(hidden)} hidden look(s) appear only when explicitly allowed."
+        f"All {len(must_reach)} work-outfits fits are reachable; "
+        f"{len(hidden)} hidden fit(s) appear only when explicitly allowed"
+        + (f"; {len(exempt)} exempt." if exempt else ".")
     )
     return 0
 

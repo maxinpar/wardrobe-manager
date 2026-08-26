@@ -55,7 +55,8 @@ def admin_url(base_url: str) -> str:
 
 def counts(url: str) -> dict[str, int]:
     tables = [
-        "items", "item_occasions", "item_field_sources", "outfits", "outfit_items",
+        "items", "item_occasions", "item_field_sources", "fits", "fit_items",
+        "fit_temp_bands", "fit_seasons", "fit_occasions", "fit_preconditions",
         "wear_events", "wear_event_items", "item_laundry",
     ]
     out = {}

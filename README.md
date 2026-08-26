@@ -112,11 +112,50 @@ add it.
   role, formality, occasion and laundry state, plus free-text search across
   name, colour, material and notes. The detail view shows every field, all the
   photos, and the `pairs` / `layer` / `avoid` prose exactly as written.
-- **Outfits** — the vetted looks by register, each showing whether it's wearable
-  right now. The roll-neck look is behind a toggle.
+- **Fits** — the seeded fits by register, each showing its temperature bands,
+  season, good-for occasions, catch, and whether it's wearable right now. Filter
+  by killer, by season, or to just the ones that are blocked. The roll-neck fit
+  is behind a toggle. A fit is **never hidden** when something is wrong with it —
+  it is badged with the specific problem ("Ecco sneaker is in the wash",
+  "Contains a binned item", "Blocked: clean the coating").
 - **Log** — what was worn, newest first, with rating and note.
 - **Laundry** — flip items between clean / worn / in the wash / at the tailor,
   with two bulk moves.
+
+## Fits
+
+A fit is a managed entity, not a list of item ids with a paragraph attached.
+Beyond its garments it carries a style, commentary (why it works), a catch
+(what goes wrong — surfaced where you choose, not buried), a formality rank,
+temperature bands, seasons, good-for/bad-for occasions, and a hero image.
+
+**Three numbers are kept apart and never overwrite each other:**
+
+| | |
+|---|---|
+| `fits.score` | Your own 1–10 opinion. Typed by you on the fit page. **Nothing in the app ever computes or overwrites it**, and it survives a re-import. |
+| Picker rank | Computed per request from weather, laundry, day and rotation. Never stored. |
+| `wear_events.rating` | How one wearing actually went. Averaged and shown *next to* your score, never merged into it. |
+
+`killer` and `style` are yours too — same rule.
+
+**Staleness is computed on read, never stored.** A stored `wearable` boolean
+would go stale, which is the exact failure it would exist to prevent. Mark an
+item `in_wash` and every fit containing it is badged immediately, by name.
+
+**Alternates rescue a fit rather than skipping it.** Where a fit offers "or the
+Ecco sneaker" and the primary is in the wash, the picker substitutes and says
+so. An alternate with no primary in its slot is an optional addition ("add the
+vest on top in winter") rather than a swap.
+
+**Preconditions** are one-off jobs blocking a fit — clean the jacket coating,
+repair a cuff. Not laundry, not a verdict. Tick one off from the Fits screen and
+its fit becomes pickable again. "Repair the cuff" is a precondition; "wear the
+blazer open" is a catch.
+
+**Season is a browsing label only.** It filters the Fits list and is never read
+by the picker; temperature band and rain drive every decision. There is a test
+that changing a season leaves the picker's output identical.
 
 ## The picker
 
@@ -124,8 +163,8 @@ Ported from `WardrobeKit.pick()`, not reinvented. It **chooses among the vetted
 looks** rather than generating new combinations — that keeps the hand-reasoned
 styling rules intact. It scores on weather band (cold < 14 °C, mild 14–22, warm
 > 22), rain safety (suede and nubuck stay home), a Friday bonus for the cardigan
-look, a bonus for wear-as-is over needs-tailoring, and a stable per-day
-rotation. It is deterministic per calendar day — no `random()` anywhere, so the
+fit, a bonus for wear-as-is over needs-tailoring, and a stable per-day rotation.
+The temperature band is **read** from the fit, not inferred from its garments. It is deterministic per calendar day — no `random()` anywhere, so the
 same day always gives the same look.
 
 New in this version: a look whose garments aren't clean is skipped and says why
@@ -139,8 +178,11 @@ look.
 ```
 
 `validate_picker.py` sweeps a year of dates against six temperatures and both
-rain states and fails if any vetted look can never be picked — that's the
-correctness check for the port.
+rain states and fails if any of the ten work-outfits fits can never be picked —
+that's the correctness check for the port. Fits from `killer-looks.md` are
+exempt: several are deliberately occasion-specific and need to be browsable, not
+picked. Fits blocked on an outstanding job are swept with that job assumed done,
+and reported separately.
 
 ## Keeping the Claude Project in sync
 
@@ -185,6 +227,23 @@ page shows which is which.
   catalogue can never wipe them.
 - Secrets live in `.env` only, which is gitignored.
 
+## Waiting on source data
+
+Three things in the fits addendum (2026-08-26) could not be built from what is
+in this repo, and are **not** faked:
+
+- **`killer-looks.md` is missing.** It holds 7 of the 17 fits, and unlike
+  `work-outfits.md` it references garments by item id, so it imports directly.
+  Drop it in `data/` and the ten seeded here become seventeen. Those seven also
+  carry the `style` and `catch` values the ten don't have.
+- **The second wear event** ("Moto & burgundy", 2026-08-26) has no source entry.
+  Inventing its garments would be worse than leaving it out. The schema already
+  tolerates a wear event with no photo.
+- **The newer `wardrobe.json`.** The addendum says 12 items have no photo, not
+  13, because `trousers_11_black-coated-jeans` was filed. The copy in `data/`
+  still says 13 and still flags that item `noPhoto: true`, so `data/baseline.json`
+  still says 13 — update both together, in one commit.
+
 ## Known state and follow-ups
 
 - **Trouser verdicts.** The trousers came back from the tailor on 2026-08-20
@@ -208,6 +267,10 @@ page shows which is which.
 
 Out of scope for v1, deliberately, and not built:
 
+- the fit builder, and fit image generation — deferred to v2, blocked on image
+  generation rather than on UI work. The rule checker ships with the builder;
+  until then the styling rules are stored as reference text and shown on the fit
+  page without being enforced.
 - item add/edit UI — the importer is the write path for catalogue data
 - free combinatorial outfit generation from the `pairs` / `avoid` rules
 - a weather API (Sydney) — the picker takes manual input, with a clean seam

@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip %}
+{% block title %}{{ fit.name }} — Wardrobe{% endblock %}
+
+{% block content %}
+<a class="back" href="{{ url_for('fits_view') }}">← Fits</a>
+
+<h2>{{ fit.name }}
+  {% if fit.killer %}<span class="badge killer">killer</span>{% endif %}
+  {% if fit.hidden_by_default %}<span class="badge">hidden by default</span>{% endif %}
+</h2>
+<p class="muted">
+  {{ fit.register|capitalize }}
+  {% if row.formality_rank %} · formality {{ row.formality_rank }}/5{% endif %}
+  {% if meta.bands %} · {{ meta.bands|join(' · ') }}{% endif %}
+  {% if not row.rain_safe %} · <span class="warn-text">not rain-safe</span>{% endif %}
+</p>
+
+{% if problems %}
+  <p>{% for p in problems %}<span class="badge warn">{{ p }}</span>{% endfor %}</p>
+{% else %}
+  <p><span class="badge ok">wearable now</span></p>
+{% endif %}
+
+{% if row.hero_image_path %}
+  <figure class="hero">
+    <img src="{{ url_for('photo', relative_path=row.hero_thumb_path or row.hero_image_path) }}" alt="">
+    {# Never presented as a photograph of Max wearing it. #}
+    <figcaption>
+      {% if row.hero_is_generated %}
+        <span class="badge render">generated illustration — not a photo of this fit being worn</span>
+      {% endif %}
+    </figcaption>
+  </figure>
+{% endif %}
+
+<div class="chips">
+  {% for item in fit.primary() %}
+    {{ chip(item.item_id, item.name, thumbs, item.note) }}
+  {% endfor %}
+</div>
+
+{% set alts = fit.items | selectattr('is_alternate') | list %}
+{% if alts %}
+  <h3>Alternates</h3>
+  <div class="chips">
+    {% for a in alts %}{{ chip(a.item_id, a.name, thumbs, a.note) }}{% endfor %}
+  </div>
+  <p class="muted">A fit whose garment is in the wash uses its alternate rather than disappearing.</p>
+{% endif %}
+
+{% if fit.catch %}<p class="catch">⚠ {{ fit.catch }}</p>{% endif %}
+<p class="rationale">{{ fit.commentary }}</p>
+
+{# ---- the three numbers, kept apart ---- #}
+<h3>Numbers</h3>
+<dl class="fields">
+  <dt>Your score</dt>
+  <dd>
+    <form class="rate" method="post" action="{{ url_for('fit_score', fit_id=fit.id) }}">
+      <input type="number" name="score" min="1" max="10" value="{{ fit.score or '' }}"
+             inputmode="numeric" placeholder="1–10">
+      <button type="submit">Save</button>
+      <span class="muted">yours — nothing in the app ever writes this</span>
+    </form>
+  </dd>
+
+  <dt>Worn rating</dt>
+  <dd>
+    {% if ratings %}
+      {{ ratings.avg_rating }}/10 average over {{ ratings.wearings }} wearing(s)
+      <span class="muted">— kept separate from your score</span>
+    {% else %}
+      <span class="muted">never worn and rated yet</span>
+    {% endif %}
+  </dd>
+
+  <dt>Picker rank</dt>
+  <dd class="muted">computed per day on the Today screen; never stored</dd>
+
+  <dt>Killer</dt>
+  <dd>
+    <form class="rate" method="post" action="{{ url_for('fit_killer', fit_id=fit.id) }}">
+      <input type="hidden" name="killer" value="{{ '0' if fit.killer else '1' }}">
+      <button type="submit">{{ 'Remove killer flag' if fit.killer else 'Mark as killer' }}</button>
+    </form>
+  </dd>
+
+  <dt>Style</dt>
+  <dd>
+    <form class="rate" method="post" action="{{ url_for('fit_style', fit_id=fit.id) }}">
+      <input type="text" name="style" value="{{ fit.style or '' }}" placeholder="short characterisation">
+      <button type="submit">Save</button>
+    </form>
+  </dd>
+</dl>
+
+<h3>When to wear it</h3>
+<dl class="fields">
+  <dt>Temperature</dt>
+  <dd>{{ meta.bands|join(' · ') if meta.bands else '—' }}
+    <span class="badge derived-{{ sources.get('temp_bands', 'derived') }}">{{ sources.get('temp_bands', 'derived') }}</span>
+    <span class="muted">drives the picker</span></dd>
+
+  <dt>Rain</dt>
+  <dd>{{ 'safe in the rain' if row.rain_safe else 'keep it for dry days' }}
+    <span class="badge derived-{{ sources.get('rain_safe', 'derived') }}">{{ sources.get('rain_safe', 'derived') }}</span>
+    <span class="muted">drives the picker</span></dd>
+
+  <dt>Season</dt>
+  <dd>{{ meta.seasons|join(', ') if meta.seasons else '—' }}
+    <span class="muted">browsing label only — the picker never reads it</span></dd>
+
+  <dt>Good for</dt>
+  <dd>{% for o in meta.good_for or [] %}<span class="badge">{{ o }}</span>{% else %}—{% endfor %}</dd>
+
+  <dt>Bad for</dt>
+  <dd>{% for o in meta.bad_for or [] %}<span class="badge warn">{{ o }}</span>{% else %}—{% endfor %}</dd>
+
+  <dt>Source</dt><dd><code>{{ row.source }}</code></dd>
+  <dt>id</dt><dd><code>{{ fit.id }}</code></dd>
+</dl>
+
+{% if jobs %}
+  <h3>Jobs</h3>
+  <ul class="jobs">
+    {% for job in jobs %}
+      <li>
+        <form method="post" action="{{ url_for('precondition_done', job_id=job.id) }}">
+          <input type="hidden" name="next" value="{{ url_for('fit_detail', fit_id=fit.id) }}">
+          <input type="hidden" name="done" value="{{ '0' if job.done else '1' }}">
+          <button type="submit">{{ 'Reopen' if job.done else 'Mark done' }}</button>
+        </form>
+        <span class="{{ 'done' if job.done }}">{{ job.text }}</span>
+        {% if job.done_at %}<span class="muted">done {{ job.done_at.strftime('%d %b') }}</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% if worn %}
+  <h3>Worn</h3>
+  <ul>
+    {% for w in worn %}
+      <li>{{ w.worn_on.strftime('%a %d %b %Y') }}{% if w.rating %} · {{ w.rating }}/10{% endif %}
+        {% if w.note %}<br><span class="muted">{{ w.note }}</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% if worn_photos %}
+    <div class="photos">
+      {% for p in worn_photos %}
+        <figure>
+          <a href="{{ url_for('photo', relative_path=p.stored_path) }}">
+            <img src="{{ url_for('photo', relative_path=p.thumb_path or p.stored_path) }}" alt="" loading="lazy">
+          </a>
+          <figcaption>worn {{ p.worn_on.strftime('%d %b') }}</figcaption>
+        </figure>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endif %}
+
+<h3>The rules these are checked against</h3>
+<p class="muted">Reference only — the app does not enforce these in v1. The fits were
+hand-checked; the checker ships with the builder.</p>
+<ul class="rules">
+  {% for rule in rules %}<li>{{ rule }}</li>{% endfor %}
+</ul>
+{% endblock %}

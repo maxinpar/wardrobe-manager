@@ -1,21 +1,29 @@
-"""The outfit picker, ported from WardrobeKit.pick().
+"""The fit picker, ported from WardrobeKit.pick().
 
-It chooses among the vetted looks. It does not generate new combinations —
-that is deliberate: the 10 looks carry hand-reasoned styling rules that a
-generator would quietly break. Free combinatorial generation is a follow-up.
+It chooses among the seeded fits. It does not generate new combinations — that
+is deliberate: the fits carry hand-reasoned styling rules a generator would
+quietly break. The builder is v2.
 
 Scoring, per rules-and-context.md §3:
 
   * weather band — cold (< 14 °C) / mild (14–22) / warm (> 22)
   * rain safety — rain rules out suede and nubuck
-  * a Friday bonus for the cardigan look
+  * a Friday bonus for the cardigan fit
   * a bonus for wear-as-is over needs-tailoring
   * a stable per-day rotation
 
-New in this version: a look whose garments aren't clean is skipped, with the
-reason said out loud ("Friday layer is out — the grey polo is in the wash").
+Two things the fits addendum changes:
 
-pick() is deterministic per calendar day: same outfit all day, a different one
+  * The temperature band is READ from fits.temp_bands, not inferred here. A fit
+    usually spans two bands. Seasons are a browsing label and are never read by
+    this module — if you find yourself writing season logic here, you have
+    misread the spec.
+  * A stale fit — one whose garment is in the wash, binned, out of scope, or
+    blocked on an unmet precondition — is skipped, and the reason is said out
+    loud. Where the fit offers an alternate for that slot, the alternate is
+    substituted and the fit is rescued rather than skipped.
+
+pick() is deterministic per calendar day: same fit all day, a different one
 tomorrow. There is no random() anywhere — the rotation is seeded from the date,
 so the page can be re-rendered as often as you like without flickering.
 
@@ -43,7 +51,7 @@ FRIDAY_BONUS = 2.0
 WEAR_AS_IS_BONUS = 1.0
 ROTATION_MAX = 2.0
 
-FRIDAY_LOOK = "friday-layer"  # the cardigan look
+FRIDAY_FIT = "fit_friday_layer"  # the cardigan fit
 
 _ADJACENT = {
     BAND_COLD: {BAND_MILD},
@@ -63,35 +71,41 @@ def weather_band(temp_c: float | None) -> str:
 
 
 @dataclass
-class Look:
-    """One vetted outfit, flattened for scoring."""
+class Fit:
+    """One seeded fit, flattened for scoring."""
 
-    slug: str
+    id: str
     name: str
     register: str
-    rationale: str
+    commentary: str
+    catch: str | None
+    style: str | None
+    score: int | None            # Max's own 1-10. Read only; never written here.
+    killer: bool
     hidden_by_default: bool
     sort_order: int
-    # each entry: {item_id, name, slot_role, position, is_alternate, warmth,
-    #              rain_unsafe, verdict, laundry_state, cat}
+    source: str | None = None    # which pass produced it, e.g. 'work-outfits.md 2026-08-24'
+    temp_bands: list[str] = field(default_factory=list)
+    # each entry: {item_id, name, role, position, is_alternate, warmth,
+    #              rain_unsafe, verdict, scope, laundry_state, cat}
     items: list[dict] = field(default_factory=list)
+    # unmet one-off jobs blocking this fit
+    blocked_by: list[str] = field(default_factory=list)
 
     def primary(self) -> list[dict]:
         return [i for i in self.items if not i["is_alternate"]]
 
-    def alternates_for(self, slot_role: str, position: int) -> list[dict]:
+    def alternates_for(self, role: str, position: int) -> list[dict]:
         return [
             i
             for i in self.items
-            if i["is_alternate"]
-            and i["slot_role"] == slot_role
-            and i["position"] == position
+            if i["is_alternate"] and i["role"] == role and i["position"] == position
         ]
 
 
 @dataclass
 class Candidate:
-    look: Look
+    fit: Fit
     score: float
     band: str
     chosen: list[dict]         # the garments as picked, after substitutions
@@ -101,73 +115,83 @@ class Candidate:
 
 @dataclass
 class Rejection:
-    look: Look
+    fit: Fit
     reason: str
 
 
-def look_band(look: Look) -> str:
-    """Which weather this look is for, from the warmth of its garments.
-
-    Tops and outer layers decide it — a shoe's warmth says nothing useful about
-    the weather, and belts say nothing at all.
-    """
-    layers = [
-        i for i in look.primary() if i["slot_role"] in ("top", "mid-layer", "outer")
-    ]
-    if not layers:
-        return BAND_MILD
-
-    # Anything with a second layer — cardigan, blazer, vest, coat — is a cold look.
-    if len(layers) >= 2:
-        return BAND_COLD
-
-    only = layers[0]
-    warmth = only["warmth"] or 3
-    if warmth >= 4:
-        return BAND_COLD
-    # A polo on its own is the warm-weather answer; a knit on its own is mild.
-    if only["cat"] == "Tops" and warmth <= 3:
-        return BAND_WARM
-    return BAND_MILD
-
-
-def rotation_value(slug: str, day: date) -> float:
-    """A stable pseudo-random 0..ROTATION_MAX, fixed for a given day and look."""
-    digest = hashlib.sha256(f"{day.isoformat()}:{slug}".encode()).hexdigest()
+def rotation_value(fit_id: str, day: date) -> float:
+    """A stable pseudo-random 0..ROTATION_MAX, fixed for a given day and fit."""
+    digest = hashlib.sha256(f"{day.isoformat()}:{fit_id}".encode()).hexdigest()
     return (int(digest[:8], 16) % 1000) / 1000 * ROTATION_MAX
 
 
-def _unavailable(item: dict) -> str | None:
-    """Why this garment can't be worn today, or None."""
-    if item["laundry_state"] and item["laundry_state"] != "clean":
+def unavailable(item: dict) -> str | None:
+    """Why this garment can't be worn today, or None.
+
+    Computed from current item state every time — never stored. A stored
+    'wearable' boolean would go stale, which is the exact failure it would exist
+    to prevent.
+    """
+    state = item.get("laundry_state")
+    if state and state != "clean":
         labels = {
             "worn": "already worn",
             "in_wash": "in the wash",
             "at_tailor": "at the tailor",
         }
-        return labels.get(item["laundry_state"], item["laundry_state"])
+        return labels.get(state, state)
     if item["verdict"] == "Bin":
         return "binned"
+    if item["verdict"] == "Replace":
+        return "on the way out (Replace)"
+    if item.get("scope") == "out":
+        return "out of scope"
     return None
 
 
+def staleness(fit: Fit) -> list[str]:
+    """Everything currently blocking this fit, named. Empty means wearable.
+
+    The Fits screen shows these as badges and never hides the fit; the picker
+    skips it and says why.
+    """
+    problems = []
+    for item in fit.primary():
+        blocker = unavailable(item)
+        if blocker is None:
+            continue
+        # An alternate that is itself fine rescues the slot.
+        if any(
+            unavailable(alt) is None
+            for alt in fit.alternates_for(item["role"], item["position"])
+        ):
+            continue
+        problems.append(f"{item['name']} is {blocker}")
+    for job in fit.blocked_by:
+        problems.append(f"Blocked: {job}")
+    return problems
+
+
 def evaluate(
-    look: Look,
+    fit: Fit,
     day: date,
     temp_c: float | None = None,
     rain: bool = False,
     allow_disliked: bool = False,
     allow_tailoring: bool = True,
 ) -> Candidate | Rejection:
-    """Score one look for one day, substituting alternates where it helps."""
-    if look.hidden_by_default and not allow_disliked:
-        return Rejection(look, f"{look.name} is hidden by default (roll-neck)")
+    """Score one fit for one day, substituting alternates where it helps."""
+    if fit.hidden_by_default and not allow_disliked:
+        return Rejection(fit, f"{fit.name} is hidden by default (roll-neck)")
+
+    if fit.blocked_by:
+        return Rejection(fit, f"{fit.name} is blocked: {'; '.join(fit.blocked_by)}")
 
     chosen: list[dict] = []
     substitutions: list[str] = []
 
-    for item in look.primary():
-        blocker = _unavailable(item)
+    for item in fit.primary():
+        blocker = unavailable(item)
         if blocker is None and rain and item["rain_unsafe"]:
             blocker = f"not rain-safe ({item['material_hint'] or 'suede'})"
         if blocker is None and not allow_tailoring and item["verdict"] == "Tailor":
@@ -178,8 +202,8 @@ def evaluate(
             continue
 
         replacement = None
-        for alt in look.alternates_for(item["slot_role"], item["position"]):
-            if _unavailable(alt) is not None:
+        for alt in fit.alternates_for(item["role"], item["position"]):
+            if unavailable(alt) is not None:
                 continue
             if rain and alt["rain_unsafe"]:
                 continue
@@ -189,32 +213,30 @@ def evaluate(
             break
 
         if replacement is None:
-            return Rejection(
-                look, f"{look.name} is out — the {item['name']} is {blocker}"
-            )
+            return Rejection(fit, f"{fit.name} is out — the {item['name']} is {blocker}")
 
         chosen.append(replacement)
         substitutions.append(
             f"{replacement['name']} instead of the {item['name']} ({blocker})"
         )
 
-    band = look_band(look)
     target = weather_band(temp_c)
+    bands = fit.temp_bands or [BAND_MILD]
     reasons = []
 
-    if band == target:
+    if target in bands:
         score = BAND_EXACT
-        reasons.append(f"built for {band} weather")
-    elif target in _ADJACENT[band]:
+        reasons.append(f"built for {target} weather")
+    elif any(target in _ADJACENT[b] for b in bands):
         score = BAND_ADJACENT
-        reasons.append(f"a {band}-weather look, workable in {target}")
+        reasons.append(f"a {'/'.join(bands)} fit, workable in {target}")
     else:
         score = 0.0
-        reasons.append(f"a {band}-weather look on a {target} day")
+        reasons.append(f"a {'/'.join(bands)} fit on a {target} day")
 
-    if day.weekday() == 4 and look.slug == FRIDAY_LOOK:
+    if day.weekday() == 4 and fit.id == FRIDAY_FIT:
         score += FRIDAY_BONUS
-        reasons.append("Friday — the cardigan look")
+        reasons.append("Friday — the cardigan fit")
 
     if all(i["verdict"] != "Tailor" for i in chosen):
         score += WEAR_AS_IS_BONUS
@@ -224,12 +246,12 @@ def evaluate(
         score += 0.5
         reasons.append("has a rain-ready layer")
 
-    score += rotation_value(look.slug, day)
+    score += rotation_value(fit.id, day)
 
     return Candidate(
-        look=look,
+        fit=fit,
         score=round(score, 3),
-        band=band,
+        band="/".join(bands),
         chosen=chosen,
         substitutions=substitutions,
         reasons=reasons,
@@ -237,7 +259,7 @@ def evaluate(
 
 
 def pick(
-    looks: list[Look],
+    fits: list[Fit],
     day: date,
     temp_c: float | None = None,
     rain: bool = False,
@@ -245,23 +267,23 @@ def pick(
     allow_tailoring: bool = True,
     exclude: list[str] | None = None,
 ) -> tuple[Candidate | None, list[Candidate], list[Rejection]]:
-    """Return (today's pick, the ranked runners-up, the rejected looks)."""
+    """Return (today's pick, the ranked runners-up, the rejected fits)."""
     exclude = set(exclude or [])
     candidates: list[Candidate] = []
     rejections: list[Rejection] = []
 
-    for look in looks:
-        if look.slug in exclude:
-            rejections.append(Rejection(look, f"{look.name} was excluded by hand"))
+    for fit in fits:
+        if fit.id in exclude:
+            rejections.append(Rejection(fit, f"{fit.name} was excluded by hand"))
             continue
-        result = evaluate(look, day, temp_c, rain, allow_disliked, allow_tailoring)
+        result = evaluate(fit, day, temp_c, rain, allow_disliked, allow_tailoring)
         if isinstance(result, Rejection):
             rejections.append(result)
         else:
             candidates.append(result)
 
     # sort_order breaks any remaining tie, so the result is fully deterministic
-    candidates.sort(key=lambda c: (-c.score, c.look.sort_order))
+    candidates.sort(key=lambda c: (-c.score, c.fit.sort_order))
     best = candidates[0] if candidates else None
     return best, candidates, rejections
 
@@ -278,45 +300,69 @@ def _rain_unsafe_word(*fields) -> str | None:
     return None
 
 
-LOOKS_SQL = """
-SELECT o.slug, o.name, o.register_code, o.rationale, o.hidden_by_default,
-       o.sort_order,
-       oi.item_id, i.name AS item_name, i.material, i.cat_code,
-       oi.slot_role, oi.position, oi.is_alternate, oi.note,
-       i.warmth, i.rain_unsafe, i.weatherproof_rain, i.verdict_code,
+FITS_SQL = """
+SELECT f.id, f.name, f.register_code, f.commentary, f.catch, f.style, f.score,
+       f.killer, f.hidden_by_default, f.sort_order, f.source,
+       fi.item_id, i.name AS item_name, i.material, i.cat_code,
+       fi.role, fi.position, fi.is_alternate, fi.note,
+       i.warmth, i.rain_unsafe, i.weatherproof_rain, i.verdict_code, i.scope_code,
        COALESCE(l.state_code, 'clean') AS laundry_state
-FROM outfits o
-JOIN outfit_items oi ON oi.outfit_id = o.id
-JOIN items i ON i.id = oi.item_id
+FROM fits f
+JOIN fit_items fi ON fi.fit_id = f.id
+JOIN items i ON i.id = fi.item_id
 LEFT JOIN item_laundry l ON l.item_id = i.id
-WHERE o.vetted
-ORDER BY o.sort_order, oi.position, oi.is_alternate
+ORDER BY f.sort_order, fi.position, fi.is_alternate
 """
 
+BANDS_SQL = "SELECT fit_id, band_code FROM fit_temp_bands ORDER BY fit_id, band_code"
 
-def load_looks(conn) -> list[Look]:
+BLOCKERS_SQL = (
+    "SELECT fit_id, text FROM fit_preconditions WHERE NOT done ORDER BY fit_id, id"
+)
+
+
+def load_fits(conn) -> list[Fit]:
     from . import db as _db
 
-    looks: dict[str, Look] = {}
-    for row in _db.fetch_all(conn, LOOKS_SQL):
-        look = looks.get(row["slug"])
-        if look is None:
-            look = Look(
-                slug=row["slug"],
+    bands: dict[str, list[str]] = {}
+    for row in _db.fetch_all(conn, BANDS_SQL):
+        bands.setdefault(row["fit_id"], []).append(row["band_code"])
+
+    blockers: dict[str, list[str]] = {}
+    for row in _db.fetch_all(conn, BLOCKERS_SQL):
+        blockers.setdefault(row["fit_id"], []).append(row["text"])
+
+    fits: dict[str, Fit] = {}
+    for row in _db.fetch_all(conn, FITS_SQL):
+        fit = fits.get(row["id"])
+        if fit is None:
+            fit = Fit(
+                id=row["id"],
                 name=row["name"],
                 register=row["register_code"],
-                rationale=row["rationale"],
+                commentary=row["commentary"],
+                catch=row["catch"],
+                style=row["style"],
+                score=row["score"],
+                killer=row["killer"],
                 hidden_by_default=row["hidden_by_default"],
                 sort_order=row["sort_order"],
+                source=row["source"],
+                temp_bands=[
+                    b
+                    for b in (BAND_COLD, BAND_MILD, BAND_WARM)
+                    if b in bands.get(row["id"], [])
+                ],
+                blocked_by=blockers.get(row["id"], []),
             )
-            looks[row["slug"]] = look
-        look.items.append(
+            fits[row["id"]] = fit
+        fit.items.append(
             {
                 "item_id": row["item_id"],
                 "name": row["item_name"],
                 "material_hint": _rain_unsafe_word(row["material"], row["item_name"]),
                 "cat": row["cat_code"],
-                "slot_role": row["slot_role"],
+                "role": row["role"],
                 "position": row["position"],
                 "is_alternate": row["is_alternate"],
                 "note": row["note"],
@@ -324,7 +370,8 @@ def load_looks(conn) -> list[Look]:
                 "rain_unsafe": row["rain_unsafe"],
                 "weatherproof_rain": row["weatherproof_rain"],
                 "verdict": row["verdict_code"],
+                "scope": row["scope_code"],
                 "laundry_state": row["laundry_state"],
             }
         )
-    return list(looks.values())
+    return list(fits.values())

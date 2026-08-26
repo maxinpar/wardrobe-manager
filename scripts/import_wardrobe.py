@@ -1,4 +1,4 @@
-"""Import data/wardrobe.json into Postgres, plus the vetted outfits and wear log.
+"""Import data/wardrobe.json into Postgres, plus the seeded fits and wear log.
 
     python scripts/import_wardrobe.py             # dry run: says what would change
     python scripts/import_wardrobe.py --commit    # actually writes
@@ -23,25 +23,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from wardrobe import config, db, derive, seed_data  # noqa: E402
+from wardrobe import config, db, derive, fit_derive, seed_data  # noqa: E402
 
 SOURCE_JSON = config.REPO_ROOT / "data" / "wardrobe.json"
 
-# The numbers this dataset is known to have. If the import doesn't reconcile
-# against these, something is wrong with the data or with this script — stop.
+# The numbers this dataset is known to have, in data/baseline.json. If the
+# import doesn't reconcile against them, something is wrong with the data or
+# with this script — stop. Keeping them in a data file means a legitimate change
+# to the catalogue is recorded as a data edit, not buried in a code change.
+BASELINE_PATH = config.REPO_ROOT / "data" / "baseline.json"
 EXPECTED = {
-    "total": 69,
-    "cat": {
-        "Knitwear": 18,
-        "Trousers": 12,
-        "Shoes": 12,
-        "Belts": 11,
-        "Tops": 10,
-        "Outerwear": 6,
-    },
-    "verdict": {"Keep": 45, "Tailor": 10, "Bin": 8, "Replace": 6},
-    "scope": {"core": 65, "out": 4},
-    "no_photo": 13,
+    k: v for k, v in json.loads(BASELINE_PATH.read_text(encoding="utf-8")).items()
+    if not k.startswith("_")
 }
 
 # Straight copies from the JSON. These are catalogue truth; the importer always
@@ -238,7 +231,7 @@ def upsert_item(
     )
 
 
-# ------------------------------------------------------------ outfit seeds --
+# --------------------------------------------------------------- fit seeds --
 
 
 def resolve_item(conn, item_id: str) -> None:
@@ -252,52 +245,184 @@ def resolve_item(conn, item_id: str) -> None:
         )
 
 
-def seed_outfits(conn, changes: list[str]) -> None:
-    for outfit in seed_data.OUTFITS:
-        for item_id, *_ in outfit["items"]:
-            resolve_item(conn, item_id)
+# Fields on a fit that belong to Max, not to the seed file. The importer must
+# never write these, on any run, for any reason.
+FIT_FIELDS_MAX_OWNS = ("killer", "score", "style")
 
-        existing = db.fetch_one(
-            conn, "SELECT * FROM outfits WHERE slug = %s", (outfit["slug"],)
+# Derived on import from the garments, overridable by hand.
+FIT_DERIVED_FIELDS = (
+    "temp_bands",
+    "rain_safe",
+    "formality_rank",
+    "good_for",
+    "seasons",
+)
+
+
+def fit_manual_fields(conn, fit_id: str) -> set[str]:
+    rows = db.fetch_all(
+        conn,
+        "SELECT field_name FROM fit_field_sources "
+        "WHERE fit_id = %s AND source = 'manual'",
+        (fit_id,),
+    )
+    return {r["field_name"] for r in rows}
+
+
+def fit_garments(conn, fit_id: str) -> list[dict]:
+    """The fit's garments with the item attributes the derivation needs."""
+    return db.fetch_all(
+        conn,
+        """
+        SELECT fi.item_id, fi.role, fi.position, fi.is_alternate,
+               i.cat_code AS cat, i.warmth, i.rain_unsafe, i.formality_rank,
+               (SELECT array_agg(io.occasion_code)
+                  FROM item_occasions io WHERE io.item_id = i.id) AS occasions
+        FROM fit_items fi
+        JOIN items i ON i.id = fi.item_id
+        WHERE fi.fit_id = %s
+        ORDER BY fi.position, fi.is_alternate
+        """,
+        (fit_id,),
+    )
+
+
+def replace_set(conn, table: str, column: str, fit_id: str, values: list[str]) -> None:
+    conn.execute(f"DELETE FROM {table} WHERE fit_id = %s", (fit_id,))
+    for value in values:
+        conn.execute(
+            f"INSERT INTO {table} (fit_id, {column}) VALUES (%s, %s)", (fit_id, value)
         )
+
+
+def seed_fits(conn, changes: list[str]) -> None:
+    for fit in seed_data.FITS:
+        for item_id, *_ in fit["items"]:
+            resolve_item(conn, item_id)
+        for _, item_id in fit["preconditions"]:
+            if item_id:
+                resolve_item(conn, item_id)
+
+        fit_id = fit["id"]
+        existing = db.fetch_one(conn, "SELECT * FROM fits WHERE id = %s", (fit_id,))
+        protected = fit_manual_fields(conn, fit_id)
+
         if existing is None:
+            conn.execute(
+                "INSERT INTO fits (id, name, register_code, commentary, catch, "
+                "hidden_by_default, vetted, sort_order, source) "
+                "VALUES (%s, %s, %s, %s, %s, %s, true, %s, %s)",
+                (
+                    fit_id,
+                    fit["name"],
+                    fit["register"],
+                    fit["commentary"],
+                    fit["catch"],
+                    fit["hidden_by_default"],
+                    fit["sort_order"],
+                    fit["source"],
+                ),
+            )
+            changes.append(f"NEW      fit {fit_id}")
+        else:
+            # killer, score and style are never in this UPDATE — they are Max's.
+            conn.execute(
+                "UPDATE fits SET name = %s, register_code = %s, commentary = %s, "
+                "catch = %s, hidden_by_default = %s, sort_order = %s, source = %s "
+                "WHERE id = %s",
+                (
+                    fit["name"],
+                    fit["register"],
+                    fit["commentary"],
+                    fit["catch"],
+                    fit["hidden_by_default"],
+                    fit["sort_order"],
+                    fit["source"],
+                    fit_id,
+                ),
+            )
+
+        # Slots. Primaries first so alternates can point at the row they swap for.
+        conn.execute("DELETE FROM fit_items WHERE fit_id = %s", (fit_id,))
+        primary_rows: dict[tuple[str, int], int] = {}
+        for item_id, role, position, is_alternate, note in fit["items"]:
+            if is_alternate:
+                continue
             row = db.fetch_one(
                 conn,
-                "INSERT INTO outfits (slug, name, register_code, rationale, "
-                "hidden_by_default, vetted, sort_order) "
-                "VALUES (%s, %s, %s, %s, %s, true, %s) RETURNING id",
-                (
-                    outfit["slug"],
-                    outfit["name"],
-                    outfit["register"],
-                    outfit["rationale"],
-                    outfit["hidden_by_default"],
-                    outfit["sort_order"],
-                ),
+                "INSERT INTO fit_items (fit_id, item_id, role, position, is_alternate, "
+                "note) VALUES (%s, %s, %s, %s, false, %s) RETURNING id",
+                (fit_id, item_id, role, position, note),
             )
-            outfit_id = row["id"]
-            changes.append(f"NEW      outfit {outfit['slug']}")
-        else:
-            outfit_id = existing["id"]
+            primary_rows[(role, position)] = row["id"]
+        for item_id, role, position, is_alternate, note in fit["items"]:
+            if not is_alternate:
+                continue
             conn.execute(
-                "UPDATE outfits SET name = %s, register_code = %s, rationale = %s, "
-                "hidden_by_default = %s, sort_order = %s WHERE id = %s",
-                (
-                    outfit["name"],
-                    outfit["register"],
-                    outfit["rationale"],
-                    outfit["hidden_by_default"],
-                    outfit["sort_order"],
-                    outfit_id,
-                ),
+                "INSERT INTO fit_items (fit_id, item_id, role, position, is_alternate, "
+                "alternate_for, note) VALUES (%s, %s, %s, %s, true, %s, %s)",
+                (fit_id, item_id, role, position, primary_rows.get((role, position)), note),
             )
 
-        conn.execute("DELETE FROM outfit_items WHERE outfit_id = %s", (outfit_id,))
-        for item_id, slot_role, position, is_alternate, note in outfit["items"]:
+        # Preconditions: upsert on the text, so a job already ticked off stays done.
+        for text, item_id in fit["preconditions"]:
+            found = db.fetch_one(
+                conn,
+                "SELECT id FROM fit_preconditions WHERE fit_id = %s AND text = %s",
+                (fit_id, text),
+            )
+            if found is None:
+                conn.execute(
+                    "INSERT INTO fit_preconditions (fit_id, text, item_id) "
+                    "VALUES (%s, %s, %s)",
+                    (fit_id, text, item_id),
+                )
+                changes.append(f"NEW      precondition on {fit_id}: {text}")
+
+        # Derived metadata.
+        garments = fit_garments(conn, fit_id)
+        bands = fit_derive.temp_bands(garments)
+
+        if "temp_bands" not in protected:
+            replace_set(conn, "fit_temp_bands", "band_code", fit_id, bands)
+        if "seasons" not in protected:
+            replace_set(
+                conn, "fit_seasons", "season_code", fit_id, fit_derive.seasons(bands)
+            )
+        if "good_for" not in protected:
             conn.execute(
-                "INSERT INTO outfit_items (outfit_id, item_id, slot_role, position, "
-                "is_alternate, note) VALUES (%s, %s, %s, %s, %s, %s)",
-                (outfit_id, item_id, slot_role, position, is_alternate, note),
+                "DELETE FROM fit_occasions WHERE fit_id = %s AND kind = 'good'", (fit_id,)
+            )
+            for code in fit_derive.good_for(garments):
+                conn.execute(
+                    "INSERT INTO fit_occasions (fit_id, occasion_code, kind) "
+                    "VALUES (%s, %s, 'good')",
+                    (fit_id, code),
+                )
+        if "rain_safe" not in protected:
+            conn.execute(
+                "UPDATE fits SET rain_safe = %s WHERE id = %s",
+                (fit_derive.rain_safe(garments), fit_id),
+            )
+        if "formality_rank" not in protected:
+            conn.execute(
+                "UPDATE fits SET formality_rank = %s WHERE id = %s",
+                (fit_derive.formality_rank(garments), fit_id),
+            )
+
+        for field in FIT_DERIVED_FIELDS:
+            conn.execute(
+                "INSERT INTO fit_field_sources (fit_id, field_name, source) "
+                "VALUES (%s, %s, 'derived') "
+                "ON CONFLICT (fit_id, field_name) DO NOTHING",
+                (fit_id, field),
+            )
+        for field in FIT_FIELDS_MAX_OWNS:
+            conn.execute(
+                "INSERT INTO fit_field_sources (fit_id, field_name, source) "
+                "VALUES (%s, %s, 'manual') "
+                "ON CONFLICT (fit_id, field_name) DO NOTHING",
+                (fit_id, field),
             )
 
 
@@ -314,20 +439,13 @@ def seed_wear_events(conn, changes: list[str]) -> None:
         if existing is not None:
             continue  # already seeded; never duplicate or overwrite the log
 
-        outfit_id = None
-        if event["outfit_slug"]:
-            row = db.fetch_one(
-                conn, "SELECT id FROM outfits WHERE slug = %s", (event["outfit_slug"],)
-            )
-            outfit_id = row["id"] if row else None
-
         row = db.fetch_one(
             conn,
-            "INSERT INTO wear_events (worn_on, outfit_id, context, temp_c, rain, "
+            "INSERT INTO wear_events (worn_on, fit_id, context, temp_c, rain, "
             "rating, note, tweak) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (
                 event["worn_on"],
-                outfit_id,
+                event["fit_id"],
                 event["context"],
                 event["temp_c"],
                 event["rain"],
@@ -360,9 +478,9 @@ def photo_prefix_report(items: list[dict]) -> tuple[list[str], bool]:
     try:
         root = config.photo_source_root()
     except SystemExit:
-        return ["PHOTO_SOURCE_ROOT not set — skipped the photo check"], [], False
+        return ["PHOTO_SOURCE_ROOT not set — skipped the photo check"], [], [], False
     if not root.exists():
-        return [f"{root} not reachable — skipped the photo check"], [], False
+        return [f"{root} not reachable — skipped the photo check"], [], [], False
 
     folders = {
         "Knitwear": "Knitwear",
@@ -376,6 +494,20 @@ def photo_prefix_report(items: list[dict]) -> tuple[list[str], bool]:
     for cat, folder in folders.items():
         path = root / folder
         listings[cat] = [p.name for p in path.iterdir()] if path.exists() else []
+
+    # photoPrefix is NOT unique: shoes_08a/b/c share one group prefix and
+    # shoes_09a/b share another, which is why they have never rendered
+    # individually. Warn rather than assume.
+    shared_prefixes: dict[str, list[str]] = {}
+    for item in items:
+        prefix = item.get("photoPrefix")
+        if prefix:
+            shared_prefixes.setdefault(prefix, []).append(item["id"])
+    duplicate_prefixes = [
+        f"{prefix!r} is shared by {len(ids)} items: {', '.join(sorted(ids))}"
+        for prefix, ids in sorted(shared_prefixes.items())
+        if len(ids) > 1
+    ]
 
     unmatched = []
     stale_no_photo = []
@@ -397,7 +529,7 @@ def photo_prefix_report(items: list[dict]) -> tuple[list[str], bool]:
                     f"{item['id']}: noPhoto is true but {len(own)} file(s) exist "
                     f"({', '.join(sorted(own)[:3])}{'…' if len(own) > 3 else ''})"
                 )
-    return unmatched, stale_no_photo, True
+    return unmatched, stale_no_photo, duplicate_prefixes, True
 
 
 def reconcile(items: list[dict]) -> list[str]:
@@ -474,7 +606,7 @@ def main() -> int:
                 derived_summary["occasions"][code] += 1
             upsert_item(conn, row, occasions, changes, source_of_derived(item))
 
-        seed_outfits(conn, changes)
+        seed_fits(conn, changes)
         seed_wear_events(conn, changes)
 
         # ---- report, read back from the database inside the transaction ----
@@ -492,17 +624,22 @@ def main() -> int:
         no_photo = db.fetch_one(
             conn, "SELECT count(*) AS n FROM items WHERE no_photo"
         )["n"]
-        outfits = db.fetch_one(conn, "SELECT count(*) AS n FROM outfits")["n"]
+        fits = db.fetch_one(conn, "SELECT count(*) AS n FROM fits")["n"]
         hidden = db.fetch_one(
-            conn, "SELECT count(*) AS n FROM outfits WHERE hidden_by_default"
+            conn, "SELECT count(*) AS n FROM fits WHERE hidden_by_default"
         )["n"]
-        outfit_items = db.fetch_one(conn, "SELECT count(*) AS n FROM outfit_items")["n"]
+        fit_items = db.fetch_one(conn, "SELECT count(*) AS n FROM fit_items")["n"]
         wear = db.fetch_one(conn, "SELECT count(*) AS n FROM wear_events")["n"]
+        killer = db.fetch_one(conn, "SELECT count(*) AS n FROM fits WHERE killer")["n"]
+        preconditions = db.fetch_one(
+            conn, "SELECT count(*) AS n FROM fit_preconditions WHERE NOT done"
+        )["n"]
         print(f"  {'total':9} {total} items · {no_photo} with no photo")
         print(
-            f"  {'outfits':9} {outfits} ({outfits - hidden} shown, {hidden} hidden by "
-            f"default) · {outfit_items} slot rows"
+            f"  {'fits':9} {fits} ({fits - hidden} shown, {hidden} hidden by "
+            f"default) · {fit_items} slot rows · {killer} killer"
         )
+        print(f"  {'jobs':9} {preconditions} unmet precondition(s)")
         print(f"  {'wear log':9} {wear} event(s)")
 
         db_problems = reconcile_db(conn)
@@ -513,7 +650,7 @@ def main() -> int:
             joined = " · ".join(f"{k}: {v}" for k, v in sorted(counts.items(), key=str))
             print(f"  {field:15} {joined}")
 
-        unmatched, stale_no_photo, checked = photo_prefix_report(items)
+        unmatched, stale_no_photo, duplicate_prefixes, checked = photo_prefix_report(items)
         print("\nPhoto prefixes with no file on disk")
         if not checked:
             print("  " + unmatched[0])
@@ -522,6 +659,15 @@ def main() -> int:
                 print("  *", line)
         else:
             print("  none — every photoPrefix matched at least one file")
+
+        if duplicate_prefixes:
+            print("\nphotoPrefix is shared by more than one item")
+            for line in duplicate_prefixes:
+                print("  *", line)
+            print(
+                "  Those items can never render individually — every match lands on\n"
+                "  all of them. They need individual prefixes and a reshoot."
+            )
 
         if stale_no_photo:
             print("\nNEEDS A DECISION — noPhoto says lost, but the files are there")
@@ -613,11 +759,11 @@ def reconcile_db(conn) -> list[str]:
 
     orphans = db.fetch_all(
         conn,
-        "SELECT oi.item_id FROM outfit_items oi "
+        "SELECT oi.item_id FROM fit_items oi "
         "LEFT JOIN items i ON i.id = oi.item_id WHERE i.id IS NULL",
     )
     if orphans:
-        problems.append(f"outfit_items referencing unknown ids: {orphans}")
+        problems.append(f"fit_items referencing unknown ids: {orphans}")
     return problems
 
 
