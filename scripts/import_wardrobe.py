@@ -78,6 +78,7 @@ DERIVED_FIELDS = [
     "weatherproof_rain",
     "weatherproof_wind",
     "rain_unsafe",
+    "bike_safe",
     "pattern",
     "occasions",
 ]
@@ -137,6 +138,7 @@ def build_row(item: dict) -> tuple[dict, list[str], list[str]]:
     row["weatherproof_rain"] = rain
     row["weatherproof_wind"] = wind
     row["rain_unsafe"] = derive.rain_unsafe(item)
+    row["bike_safe"] = derive.bike_safe(item)
     row["pattern"] = derive.pattern(item)
 
     return coerce_flags(row), derive.occasions(item, rank), warnings
@@ -754,7 +756,7 @@ def main() -> int:
         print(f"  {'jobs':9} {preconditions} unmet precondition(s)")
         print(f"  {'wear log':9} {wear} event(s)")
 
-        db_problems = reconcile_db(conn)
+        db_problems = reconcile_db(conn, items)
 
         print("\nDerived values (first pass — correct any of these by hand later)")
         for field in ("formality_rank", "warmth", "pattern", "rain_unsafe", "occasions"):
@@ -848,7 +850,7 @@ def main() -> int:
     return 0
 
 
-def reconcile_db(conn) -> list[str]:
+def reconcile_db(conn, source_items: list[dict]) -> list[str]:
     problems = []
     total = db.fetch_one(
         conn, "SELECT count(*) AS n FROM items WHERE retired_at IS NULL"
@@ -857,17 +859,37 @@ def reconcile_db(conn) -> list[str]:
         problems.append(f"items in DB: {total}, expected {EXPECTED['total']}")
 
     for key, column in (("cat", "cat_code"), ("verdict", "verdict_code"), ("scope", "scope_code")):
+        # The baseline describes wardrobe.json. A value Max has corrected by
+        # hand is *supposed* to differ from it, so it is counted out here
+        # rather than reported as corruption.
+        overridden = db.fetch_all(
+            conn,
+            "SELECT item_id FROM item_field_sources "
+            "WHERE field_name = %s AND source = 'manual'",
+            (column,),
+        )
+        override_ids = [r["item_id"] for r in overridden]
         rows = db.fetch_all(
             conn,
             f"SELECT {column} AS k, count(*) AS n FROM items "
-            "WHERE retired_at IS NULL GROUP BY 1",
+            "WHERE retired_at IS NULL AND NOT (id = ANY(%s)) GROUP BY 1",
+            (override_ids,),
         )
         counts = {r["k"]: r["n"] for r in rows}
-        for value, expected in EXPECTED[key].items():
+        source_counts = Counter(
+            i[CATALOGUE_FIELDS[column]] for i in source_items
+            if i["id"] not in set(override_ids)
+        )
+        for value, expected in source_counts.items():
             if counts.get(value, 0) != expected:
                 problems.append(
                     f"{column} {value}: {counts.get(value, 0)} in DB, expected {expected}"
                 )
+        if override_ids:
+            print(
+                f"  {len(override_ids)} item(s) carry a hand-set {column}; "
+                "counted out of the reconciliation"
+            )
 
     no_photo = db.fetch_one(
         conn,

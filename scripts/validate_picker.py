@@ -87,6 +87,23 @@ def main() -> int:
 
     # Reachability, measured against the work-outfits cohort on its own — the
     # set the guarantee was written to protect.
+    #
+    # Laundry is cleared for this sweep for the same reason outstanding jobs
+    # are: a garment being in the wash today says nothing about whether the port
+    # kept the look. Which fits are blocked right now is reported separately.
+    blocked_by_laundry = {
+        f.name: [
+            f"{i['name']} is {i['laundry_state'].replace('_', ' ')}"
+            for i in f.primary()
+            if i["laundry_state"] in ("in_wash", "at_tailor")
+        ]
+        for f in fits
+    }
+    blocked_by_laundry = {k: v for k, v in blocked_by_laundry.items() if v}
+    for fit in fits:
+        for item in fit.items:
+            item["laundry_state"] = "clean"
+
     reachable: Counter[str] = Counter()
     for offset in range(DAYS):
         day = start + timedelta(days=offset)
@@ -115,6 +132,14 @@ def main() -> int:
         )
         for fit_id, jobs in sorted(blocked_now.items()):
             print(f"  {fit_id}: {'; '.join(jobs)}")
+
+    if blocked_by_laundry:
+        print(
+            f"\nBlocked by laundry right now (swept as if clean) — "
+            f"{len(blocked_by_laundry)} fit(s):"
+        )
+        for name, reasons in sorted(blocked_by_laundry.items()):
+            print(f"  {name}: {'; '.join(reasons)}")
 
     problems = []
     for fit in must_reach:

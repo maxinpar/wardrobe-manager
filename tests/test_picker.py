@@ -172,6 +172,30 @@ def test_laundry_state_blocks_a_fit_and_names_the_garment():
     assert picker.staleness(fit) == ["grey polo is in the wash"]
 
 
+def test_worn_does_not_block_a_fit_but_the_wash_does():
+    """A base holds five days, so wearing a garment cannot take it out of play."""
+    worn = make_fit(
+        "fit_worn",
+        items=[
+            garment("polo", "grey polo", "top", 1, cat="Tops", laundry_state="worn"),
+            garment("jeans", "indigo jeans", "bottom", 2),
+        ],
+    )
+    assert isinstance(picker.evaluate(worn, MONDAY, temp_c=18), picker.Candidate)
+    assert picker.staleness(worn) == []
+
+    for blocking in ("in_wash", "at_tailor"):
+        fit = make_fit(
+            "fit_blocked_" + blocking,
+            items=[
+                garment("polo", "grey polo", "top", 1, cat="Tops", laundry_state=blocking),
+                garment("jeans", "indigo jeans", "bottom", 2),
+            ],
+        )
+        assert isinstance(picker.evaluate(fit, MONDAY, temp_c=18), picker.Rejection)
+        assert picker.staleness(fit), f"{blocking} should block"
+
+
 def test_staleness_names_binned_and_out_of_scope_items_without_hiding_the_fit():
     fit = make_fit(
         "fit_stale",

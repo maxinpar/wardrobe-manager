@@ -1,65 +1,196 @@
 {% extends "base.html" %}
-{% from "_macros.html" import chip %}
 {% block title %}Today — Wardrobe{% endblock %}
+{% block body_class %}today-page{% endblock %}
+
+{% macro tile(item_id, label, name, renders, klass='') %}
+  {% set r = renders.get(item_id) %}
+  <div class="tile {{ klass }}">
+    <span class="tile-label mono">{{ label }}</span>
+    <a class="tile-frame" href="{{ url_for('item_detail', item_id=item_id) }}">
+      {% if r and r.thumb %}
+        <img src="{{ url_for('photo', relative_path=r.thumb) }}" alt="" loading="lazy">
+      {% else %}
+        <span class="tile-swatch" style="background: {{ (r.hex if r else none) or '#DCD5C7' }}"></span>
+      {% endif %}
+    </a>
+    <span class="tile-name">{{ name }}</span>
+  </div>
+{% endmacro %}
 
 {% block content %}
-<form class="weather" method="get" action="{{ url_for('today_view') }}">
-  <label>Temp °C <input type="number" name="temp" value="{{ temp_c if temp_c is not none }}" step="1" inputmode="numeric"></label>
-  <label class="check"><input type="checkbox" name="rain" value="1" {{ 'checked' if rain }}> Rain</label>
-  <label class="check"><input type="checkbox" name="allow_disliked" value="1" {{ 'checked' if allow_disliked }}> Allow roll-necks</label>
-  <button type="submit">Update</button>
-  <span class="muted">{{ day.strftime('%a %d %b') }} · {{ band }}</span>
-</form>
+{% if not showing %}
+  <p class="muted">Nothing is wearable today — every fit is blocked. The Fits screen says why.</p>
+{% else %}
+<div class="today-grid">
 
-{% if best %}
-  <section class="pick">
-    <h2>{{ best.fit.name }}</h2>
-    <p class="muted">{{ best.fit.register|capitalize }} · {{ best.reasons|join(' · ') }}</p>
+  <aside class="today-hero">
+    {% if showing.fit.hero_path %}
+      <img src="{{ url_for('photo', relative_path=showing.fit.hero_path) }}" alt="{{ showing.fit.name }}">
+      <span class="hero-flag">Generated render — not a photo of this being worn</span>
+    {% else %}
+      <div class="hero-strip">
+        {% for p in pieces %}
+          {% set r = renders.get(p.item_id) %}
+          {% if r and r.thumb %}<img src="{{ url_for('photo', relative_path=r.thumb) }}" alt="">{% endif %}
+        {% endfor %}
+      </div>
+      <span class="hero-flag">Render pending — the pieces, as shot</span>
+    {% endif %}
+  </aside>
 
-    <div class="chips">
-      {% for item in best.chosen %}
-        {{ chip(item.item_id, item.name, thumbs, item.note) }}
+  <div class="today-pane">
+    <div class="context-line">
+      <span class="mono">
+        {{ day.strftime('%A %d %B')|upper }} · {{ selected_day.context_label|upper }}
+        {%- if selected_day.commutes %} · BIKE{% endif %} ·
+        {{ temp_c|round|int if temp_c is not none else '—' }}°C · {{ 'WET' if rain else 'DRY' }}
+      </span>
+      <span class="mono">
+        {{ selected_day.day|upper }} · DAY {{ day_index + 1 }} OF 5 ·
+        {{ 'BASE HOLDS' if adopted else 'NO BASE SET' }}
+      </span>
+    </div>
+
+    {# The base is chosen once a week; the top is the only thing that rotates,
+       which is why the top is deliberately absent from this card. #}
+    <section class="base-card">
+      <div class="base-head">
+        <span class="mono">The base · {{ 'locked Mon–Fri' if adopted else 'not adopted yet' }}</span>
+        <span class="mono">Day {{ day_index + 1 }} of 5 · only the top changes</span>
+      </div>
+      <div class="base-tiles">
+        {% for p in base %}
+          {{ tile(p.item_id, p.role, p.name, renders) }}
+        {% endfor %}
+      </div>
+      {% if not adopted %}
+        <form method="post" action="{{ url_for('adopt_fit') }}">
+          <input type="hidden" name="fit_id" value="{{ showing.fit.id }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="btn-ink" type="submit">Adopt as this week's base</button>
+        </form>
+      {% endif %}
+    </section>
+
+    <section class="week-strip">
+      {% for d in week_days %}
+        <a class="day-card {{ 'is-today' if d.is_today }} {{ 'is-past' if d.is_past }} {{ 'is-selected' if d.selected }}"
+           href="{{ url_for('today_view', day=d.weekday, rank=rank_index) }}">
+          <span class="day-name">{{ d.day }}</span>
+          <span class="mono">{{ d.context_label }}</span>
+          {% set r = renders.get(d.top_item_id) %}
+          <span class="day-tile">
+            {% if r and r.thumb %}
+              <img src="{{ url_for('photo', relative_path=r.thumb) }}" alt="" loading="lazy">
+            {% else %}
+              <span class="tile-swatch" style="background: {{ d.top_hex or '#DCD5C7' }}"></span>
+            {% endif %}
+          </span>
+          <span class="day-top">{{ d.top_name or '—' }}</span>
+          <span class="mono day-status">
+            {% if d.wear_event_id %}Worn ✓{% elif d.is_today %}Today{% elif d.is_past %}Not logged{% else %}Planned{% endif %}
+          </span>
+        </a>
+      {% endfor %}
+    </section>
+
+    <h1 class="today-name">{{ showing.fit.name }}</h1>
+    <p class="mono">
+      {{ selected_day.day|upper }}'S TOP — {{ (selected_day.top_name or 'none picked')|upper }}
+      {%- if selected_day.provisional %} · PROVISIONAL{% endif %}
+    </p>
+
+    <p class="commentary">{{ showing.fit.commentary }}</p>
+
+    <div class="piece-strip">
+      {% for p in pieces %}
+        {{ tile(p.item_id, p.role ~ (' · today' if p.item_id == day_top else ''), p.name, renders) }}
       {% endfor %}
     </div>
 
-    {% if best.substitutions %}
-      <p class="sub">Swapped: {{ best.substitutions|join('; ') }}</p>
+    {% if bike %}
+      <div class="info-cards">
+        <section class="info-card">
+          <span class="mono">On the bike</span>
+          {% if bike.rideable %}
+            <p>{{ bike.shoe.name if bike.shoe else 'No shoe in this fit' }} — rideable.</p>
+          {% else %}
+            <p>
+              {{ bike.shoe.name }} can't be ridden in.
+              {% if bike.substitute %}
+                Ride in the <strong>{{ bike.substitute.name }}</strong> and change at the other end.
+              {% else %}
+                Nothing clean and rideable to swap to.
+              {% endif %}
+            </p>
+          {% endif %}
+        </section>
+        <section class="info-card">
+          <span class="mono">Top-box</span>
+          {% if bike.top_box %}
+            <ul>{% for line in bike.top_box %}<li>{{ line }}</li>{% endfor %}</ul>
+          {% else %}
+            <p>Nothing to carry — you're wearing the ride layer.</p>
+          {% endif %}
+        </section>
+      </div>
     {% endif %}
 
-    <p class="rationale">{{ best.fit.commentary }}</p>
+    {% if showing.fit.catch %}
+      <div class="catch">
+        <span class="label">Catch</span>
+        <span class="text">{{ showing.fit.catch }}</span>
+      </div>
+    {% endif %}
 
-    <form method="post" action="{{ url_for('wear_today') }}">
-      <input type="hidden" name="fit_id" value="{{ best.fit.id }}">
-      {% for item in best.chosen %}
-        <input type="hidden" name="item_id" value="{{ item.item_id }}">
-      {% endfor %}
+    {% if rain and not meta.get('rain_safe', True) %}
+      <p class="rust-note">Wet day and this fit isn't rain-safe — suede or nubuck stays home.</p>
+    {% endif %}
+
+    <form class="today-action" method="post" action="{{ url_for('wear_today') }}">
+      <input type="hidden" name="fit_id" value="{{ showing.fit.id }}">
+      {% for p in pieces %}<input type="hidden" name="item_id" value="{{ p.item_id }}">{% endfor %}
       <input type="hidden" name="temp_c" value="{{ temp_c if temp_c is not none }}">
       <input type="hidden" name="rain" value="{{ '1' if rain else '0' }}">
-      <button class="primary big" type="submit">Wore this</button>
+      <input type="hidden" name="context"
+             value="{{ selected_day.context_label }}{% if temp_c is not none %} · {{ temp_c|round|int }}° {{ 'wet' if rain else 'dry' }}{% endif %}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button class="btn-ink big" type="submit">
+        Wearing this{{ ' · logged ' ~ wearings ~ '×' if wearings }}
+      </button>
     </form>
-  </section>
-{% else %}
-  <section class="pick empty">
-    <h2>Nothing is wearable today</h2>
-    <p>Every vetted look is blocked. The reasons are below — most likely the wash.</p>
-  </section>
-{% endif %}
 
-{% if ranked %}
-  <h3>Runners-up</h3>
-  <ul class="runners">
-    {% for c in ranked %}
-      <li>
-        <strong>{{ c.fit.name }}</strong> <span class="muted">{{ c.score }} · {{ c.reasons|join(' · ') }}</span>
-      </li>
-    {% endfor %}
-  </ul>
-{% endif %}
+    <div class="rank-line">
+      <span class="mono">
+        Ranked {{ rank_index + 1 }} of {{ rank_total }} wearable today · {{ band }}, {{ 'wet' if rain else 'dry' }}
+      </span>
+      {% if rank_index + 1 < rank_total %}
+        <a class="btn" href="{{ url_for('today_view', rank=rank_index + 1, day=day_index) }}">Next fit</a>
+      {% endif %}
+      {% if rank_index > 0 %}
+        <a class="btn" href="{{ url_for('today_view', rank=rank_index - 1, day=day_index) }}">Previous</a>
+      {% endif %}
+    </div>
 
-{% if rejected %}
-  <h3>Not today</h3>
-  <ul class="rejected">
-    {% for r in rejected %}<li>{{ r.reason }}</li>{% endfor %}
-  </ul>
+    <form class="weather" method="get" action="{{ url_for('today_view') }}">
+      <label>Temp °C <input type="number" name="temp" value="{{ temp_c if temp_c is not none }}" step="1" inputmode="numeric"></label>
+      <label class="check"><input type="checkbox" name="rain" value="1" {{ 'checked' if rain }}> Rain</label>
+      <label class="check"><input type="checkbox" name="allow_disliked" value="1" {{ 'checked' if allow_disliked }}> Allow roll-necks</label>
+      <button type="submit">Update</button>
+      <span class="mono">
+        {{ selected_day.day }} is {{ selected_day.context_label|lower }} —
+      </span>
+      {% for c in ['office', 'home'] if c != selected_day.context_code %}
+        <button form="ctx-{{ selected_day.weekday }}" type="submit" name="context" value="{{ c }}">
+          make it {{ c }}
+        </button>
+      {% endfor %}
+    </form>
+    <form id="ctx-{{ selected_day.weekday }}" method="post"
+          action="{{ url_for('set_day_context', weekday=selected_day.weekday) }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+    </form>
+  </div>
+</div>
 {% endif %}
 {% endblock %}

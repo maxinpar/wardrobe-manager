@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Closet — Wardrobe{% endblock %}
+
+{% macro chip_link(label, param, value) %}
+  {% set active = (filters[param] == value) or (value == '1' and filters[param]) %}
+  {% set q = dict(request.args) %}
+  {% set _ = q.pop(param, None) %}
+  {% set _ = q.pop('item', None) %}
+  {% if not active %}{% set _ = q.update({param: value}) %}{% endif %}
+  <a class="btn {{ 'on' if active }}" href="{{ url_for('catalogue', **q) }}">{{ label }}</a>
+{% endmacro %}
+
+{% block content %}
+<form class="filters" method="get" action="{{ url_for('catalogue') }}">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Search name, colour, material, notes">
+  <button type="submit">Search</button>
+</form>
+
+<div class="filters">
+  {{ chip_link('All', 'cat', '') }}
+  {% for c in lookups.categories %}{{ chip_link(c.label, 'cat', c.code) }}{% endfor %}
+  <span class="sep"></span>
+  {{ chip_link('In the wash', 'state', 'in_wash') }}
+  {{ chip_link('Needs a decision', 'decision', '1') }}
+  {{ chip_link('No render', 'no_render', '1') }}
+  {% if summary.gone %}{{ chip_link('Gone (' ~ summary.gone ~ ')', 'gone', '1') }}{% endif %}
+</div>
+
+<p class="mono count-line">
+  {{ summary.shown }} of {{ summary.total }} garments ·
+  {{ summary.no_render }} without a render · {{ summary.not_clean }} not clean
+</p>
+
+{# Multi-select lives in one form so the bulk bar can act on the selection. #}
+<form method="post" action="{{ url_for('closet_bulk') }}" id="closet-form">
+  <input type="hidden" name="next" value="{{ request.full_path }}">
+
+  <div class="bulk-bar">
+    <span class="mono" data-selected-count>Nothing selected</span>
+    {% for s in states if s.code != 'clean' %}
+      <button type="submit" name="state" value="{{ s.code }}">→ {{ s.label|lower }}</button>
+    {% endfor %}
+    <button type="submit" name="state" value="clean">→ clean</button>
+    <button type="button" data-clear-selection>Clear</button>
+  </div>
+
+  {% for cat, items in groups.items() %}
+    <h2>{{ cat }}
+      <span class="mono">{{ items|length }} · {{ items|rejectattr('thumb_is_render')|list|length }} without a render</span>
+    </h2>
+    <div class="closet-grid">
+      {% for item in items %}
+        <div class="garment {{ 'not-clean' if item.laundry_state != 'clean' }} {{ 'is-gone' if item.gone_at }}">
+          <label class="garment-pick">
+            <input type="checkbox" name="item_id" value="{{ item.id }}">
+          </label>
+          <a class="garment-frame" href="{{ url_for('catalogue', item=item.id, **filters_query) }}">
+            {% if item.thumb_path %}
+              <img src="{{ url_for('photo', relative_path=item.thumb_path) }}" alt="" loading="lazy">
+            {% else %}
+              <span class="tile-swatch" style="background: {{ item.hex or '#DCD5C7' }}"></span>
+              <span class="corner-badge">Reshoot</span>
+            {% endif %}
+          </a>
+          <a class="garment-name" href="{{ url_for('catalogue', item=item.id) }}">{{ item.name }}</a>
+          <span class="mono garment-state {{ 'rust' if item.laundry_state != 'clean' }}">
+            {{ item.laundry_label }} · {{ item.verdict_code }}
+          </span>
+          <span class="garment-usage">
+            {% set n = usage.get(item.id, 0) %}
+            {{ 'in ' ~ n ~ ' fit' ~ ('s' if n != 1 else '') if n else 'in no fit yet' }}
+          </span>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Nothing matches those filters.</p>
+  {% endfor %}
+</form>
+<script src="{{ url_for('static', filename='closet.js') }}"></script>
+{% endblock %}
+
+{% block drawer %}
+  {% if selected %}{% include "_garment_drawer.html" %}{% endif %}
+{% endblock %}

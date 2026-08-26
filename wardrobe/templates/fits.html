@@ -24,6 +24,11 @@
   {{ filter_link('Good for client', 'occasion', 'client', filters.occasion == 'client') }}
   {{ filter_link('Good for dinner', 'occasion', 'dinner', filters.occasion == 'dinner') }}
   {{ filter_link('Show roll-neck', 'hidden', '1', filters.hidden) }}
+{% set mode = 'details' %}
+  <span class="segmented mode-switch">
+    <a class="btn {{ 'on' if mode == 'details' }}" href="{{ url_for('fits_view') }}">Details</a>
+    <a class="btn {{ 'on' if mode == 'renders' }}" href="{{ url_for('looks_view') }}">Renders</a>
+  </span>
 </div>
 
 <p class="mono count-line">

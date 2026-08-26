@@ -29,7 +29,7 @@ from flask import (
     url_for,
 )
 
-from . import config, db, fit_derive, picker, seed_data
+from . import config, db, fit_derive, picker, seed_data, week
 
 app = Flask(__name__)
 app.secret_key = "wardrobe-local"  # only used for flash messages on localhost
@@ -219,13 +219,19 @@ def home():
 
 @app.route("/today")
 def today_view():
+    """What to wear today, in the week it belongs to.
+
+    A fit is a base plus a top: the base holds Monday to Friday and only the top
+    rotates, so this screen is a week with today marked, not a single day.
+    """
     with db.connect() as conn:
         temp_raw = request.args.get("temp") or get_setting(conn, "weather.temp_c", "18")
         rain_raw = request.args.get("rain")
-        if rain_raw is None:
-            rain = get_setting(conn, "weather.rain", "0") == "1"
-        else:
-            rain = rain_raw == "1"
+        rain = (
+            get_setting(conn, "weather.rain", "0") == "1"
+            if rain_raw is None
+            else rain_raw == "1"
+        )
         allow_disliked = request.args.get("allow_disliked") == "1"
 
         try:
@@ -233,33 +239,152 @@ def today_view():
         except (TypeError, ValueError):
             temp_c = None
 
-        if request.args:
+        if request.args.get("temp") is not None or rain_raw is not None:
             set_setting(conn, "weather.temp_c", str(temp_c if temp_c is not None else ""))
             set_setting(conn, "weather.rain", "1" if rain else "0")
             conn.commit()
 
-        fits = picker.load_fits(conn)
-        best, ranked, rejected = picker.pick(
-            fits, today(), temp_c=temp_c, rain=rain, allow_disliked=allow_disliked
+        now = today()
+        start = week.week_start(now)
+        today_index = week.weekday_index(now)
+        plan = week.get_or_create(conn, now)
+
+        fits = {f.id: f for f in picker.load_fits(conn)}
+        _, ranked, rejected = picker.pick(
+            list(fits.values()), now, temp_c=temp_c, rain=rain, allow_disliked=allow_disliked
         )
-        thumbs = photo_thumbs(conn)
+
+        # Which fit is showing: the adopted base if there is one, otherwise the
+        # picker's ranking, which `rank` steps through.
+        rank_index = request.args.get("rank", type=int) or 0
+        showing = None
+        adopted = plan["base_fit_id"] and fits.get(plan["base_fit_id"])
+        if adopted and not request.args.get("rank"):
+            showing = next((c for c in ranked if c.fit.id == adopted.id), None)
+        if showing is None and ranked:
+            rank_index = max(0, min(rank_index, len(ranked) - 1))
+            showing = ranked[rank_index]
+        if showing is not None:
+            rank_index = ranked.index(showing)
+
+        day_index = request.args.get("day", type=int)
+        day_index = today_index if day_index is None else max(0, min(day_index, 4))
+
+        week_days = week.days(conn, start)
+        rotation = week.rotation(conn, showing.fit) if showing else []
+
+        # A week nobody has planned still shows a plan — from the rotation of
+        # whatever fit is on screen — it just isn't stored until you adopt it.
+        for row in week_days:
+            if row["top_item_id"] is None and rotation:
+                row["top_item_id"] = rotation[row["weekday"] % len(rotation)]
+                row["provisional"] = True
+                item = db.fetch_one(
+                    conn, "SELECT name, hex FROM items WHERE id = %s", (row["top_item_id"],)
+                )
+                row["top_name"], row["top_hex"] = item["name"], item["hex"]
+            row["is_today"] = row["weekday"] == today_index
+            row["is_past"] = row["weekday"] < today_index
+            row["selected"] = row["weekday"] == day_index
+
+        selected_day = week_days[day_index]
+        day_top = selected_day["top_item_id"]
+
+        pieces = week.base_pieces(showing.fit, day_top) if showing else []
+        if showing and day_top and not any(p["item_id"] == day_top for p in pieces):
+            top = db.fetch_one(
+                conn,
+                "SELECT id AS item_id, name FROM items WHERE id = %s",
+                (day_top,),
+            )
+            pieces.insert(0, {**top, "role": "top", "note": None, "is_alternate": False})
+
+        bike = (
+            week.bike_notes(conn, showing.fit, pieces)
+            if showing and selected_day["commutes"]
+            else None
+        )
+        renders = item_renders(conn)
+        wearings = wearings_by_fit(conn).get(showing.fit.id, 0) if showing else 0
+        meta = fit_metadata(conn).get(showing.fit.id, {}) if showing else {}
 
     return render_template(
         "today.html",
-        best=best,
-        ranked=ranked[1:],
+        showing=showing,
+        pieces=pieces,
+        base=[p for p in pieces if p["role"] != "top"],
+        day_top=day_top,
+        week_days=week_days,
+        selected_day=selected_day,
+        today_index=today_index,
+        day_index=day_index,
+        adopted=bool(adopted and showing and adopted.id == showing.fit.id),
+        bike=bike,
+        renders=renders,
+        meta=meta,
+        wearings=wearings,
+        rank_index=rank_index,
+        rank_total=len(ranked),
         rejected=rejected,
         temp_c=temp_c,
         rain=rain,
         allow_disliked=allow_disliked,
         band=picker.weather_band(temp_c),
-        thumbs=thumbs,
-        day=today(),
+        day=now,
     )
+
+
+@app.route("/today/adopt", methods=["POST"])
+def adopt_fit():
+    """Adopting a fit sets this week's base and plans the tops over it."""
+    fit_id = request.form["fit_id"]
+    with db.connect() as conn:
+        fits = {f.id: f for f in picker.load_fits(conn)}
+        fit = fits.get(fit_id)
+        if fit is None:
+            abort(404)
+        start = week.week_start(today())
+        week.get_or_create(conn, today())
+        week.adopt(conn, start, fit)
+        conn.commit()
+    flash(f"“{fit.name}” is this week's base. Only the top changes now.")
+    return redirect(request.form.get("next") or url_for("today_view"))
+
+
+@app.route("/today/day/<int:weekday>/context", methods=["POST"])
+def set_day_context(weekday: int):
+    """Office or home. The default pattern is a starting point, not a rule."""
+    context = request.form["context"]
+    with db.connect() as conn:
+        week.get_or_create(conn, today())
+        conn.execute(
+            "UPDATE week_days SET context_code = %s WHERE week_start = %s AND weekday = %s",
+            (context, week.week_start(today()), weekday),
+        )
+        conn.commit()
+    return redirect(request.form.get("next") or url_for("today_view", day=weekday))
+
+
+@app.route("/today/day/<int:weekday>/top", methods=["POST"])
+def set_day_top(weekday: int):
+    with db.connect() as conn:
+        week.get_or_create(conn, today())
+        conn.execute(
+            "UPDATE week_days SET top_item_id = %s WHERE week_start = %s AND weekday = %s",
+            (request.form["item_id"], week.week_start(today()), weekday),
+        )
+        conn.commit()
+    return redirect(request.form.get("next") or url_for("today_view", day=weekday))
 
 
 @app.route("/today/wear", methods=["POST"])
 def wear_today():
+    """Log today's wearing, and record it against the day in the week.
+
+    Only the garments actually worn go to `worn` — and `worn` does not block a
+    fit, which is the point of a base that holds for five days. Only the wash
+    and the tailor block.
+    """
     fit_id = request.form["fit_id"]
     item_ids = request.form.getlist("item_id")
 
@@ -268,6 +393,7 @@ def wear_today():
         if fit is None:
             abort(404)
 
+        context = request.form.get("context") or None
         row = db.fetch_one(
             conn,
             "INSERT INTO wear_events (worn_on, fit_id, context, temp_c, rain) "
@@ -275,7 +401,7 @@ def wear_today():
             (
                 today(),
                 fit["id"],
-                request.form.get("context") or None,
+                context,
                 request.form.get("temp_c") or None,
                 request.form.get("rain") == "1",
             ),
@@ -287,51 +413,50 @@ def wear_today():
                 (event_id, item_id),
             )
             set_laundry(conn, item_id, "worn")
+
+        # Tie it to the day, so the week strip shows what actually happened.
+        week.get_or_create(conn, today())
+        conn.execute(
+            "UPDATE week_days SET wear_event_id = %s WHERE week_start = %s AND weekday = %s",
+            (event_id, week.week_start(today()), week.weekday_index(today())),
+        )
         conn.commit()
 
-    flash(f"Logged “{fit['name']}” for today. Those garments are now marked worn.")
-    return redirect(url_for("log_view", rate=event_id))
+    flash(f"Logged “{fit['name']}”. Those garments are marked worn — still wearable.")
+    return redirect(request.form.get("next") or url_for("today_view"))
 
 
+@app.route("/closet")
 @app.route("/catalogue")
 def catalogue():
+    """The closet: every garment, grouped, with what state it's in.
+
+    A binned garment drops out of here but is not deleted — it stays behind the
+    `Gone` filter, keeps its wear history, and stays in the fits that use it.
+    """
     filters = {
         "cat": request.args.get("cat") or "",
-        "verdict": request.args.get("verdict") or "",
-        "scope": request.args.get("scope") or "",
-        "role": request.args.get("role") or "",
-        "formality": request.args.get("formality") or "",
-        "occasion": request.args.get("occasion") or "",
         "state": request.args.get("state") or "",
+        "decision": request.args.get("decision") == "1",
+        "no_render": request.args.get("no_render") == "1",
+        "gone": request.args.get("gone") == "1",
         "q": (request.args.get("q") or "").strip(),
     }
+    selected_id = request.args.get("item") or ""
 
-    where = []
+    where = ["i.retired_at IS NULL"]
     params: list = []
+    where.append("i.gone_at IS NOT NULL" if filters["gone"] else "i.gone_at IS NULL")
+
     if filters["cat"]:
         where.append("i.cat_code = %s")
         params.append(filters["cat"])
-    if filters["verdict"]:
-        where.append("i.verdict_code = %s")
-        params.append(filters["verdict"])
-    if filters["scope"]:
-        where.append("i.scope_code = %s")
-        params.append(filters["scope"])
-    if filters["role"]:
-        where.append("i.role_code = %s")
-        params.append(filters["role"])
-    if filters["formality"]:
-        where.append("i.formality_rank = %s")
-        params.append(int(filters["formality"]))
-    if filters["occasion"]:
-        where.append(
-            "EXISTS (SELECT 1 FROM item_occasions io WHERE io.item_id = i.id "
-            "AND io.occasion_code = %s)"
-        )
-        params.append(filters["occasion"])
     if filters["state"]:
         where.append("COALESCE(l.state_code, 'clean') = %s")
         params.append(filters["state"])
+    if filters["decision"]:
+        # Anything carrying an unresolved judgement.
+        where.append("i.verdict_code IN ('Tailor', 'Replace', 'Bin')")
     if filters["q"]:
         where.append(
             "(i.name ILIKE %s OR i.colour ILIKE %s OR i.material ILIKE %s "
@@ -339,18 +464,81 @@ def catalogue():
         )
         params.extend([f"%{filters['q']}%"] * 4)
 
-    # A retired item is out of the catalogue, but still reachable by direct link
-    # so that a wear event referencing it can be followed.
-    where.insert(0, "i.retired_at IS NULL")
-    sql = ITEM_SELECT + " WHERE " + " AND ".join(where)
-    sql += " ORDER BY c.sort_order, i.name"
+    sql = ITEM_SELECT + " WHERE " + " AND ".join(where) + " ORDER BY c.sort_order, i.name"
 
     with db.connect() as conn:
         items = db.fetch_all(conn, sql, params)
         lookups = load_lookups(conn)
+        usage = {
+            r["item_id"]: r["n"]
+            for r in db.fetch_all(
+                conn,
+                "SELECT item_id, count(DISTINCT fit_id) AS n FROM fit_items GROUP BY item_id",
+            )
+        }
+        gone_count = db.fetch_one(
+            conn,
+            "SELECT count(*) AS n FROM items WHERE gone_at IS NOT NULL AND retired_at IS NULL",
+        )["n"]
+        total = db.fetch_one(
+            conn,
+            "SELECT count(*) AS n FROM items WHERE retired_at IS NULL AND gone_at IS NULL",
+        )["n"]
+
+        selected = None
+        if selected_id:
+            selected = db.fetch_one(conn, ITEM_SELECT + " WHERE i.id = %s", (selected_id,))
+            if selected is None:
+                abort(404)
+            selected = dict(selected)
+            selected["photos"] = db.fetch_all(
+                conn,
+                "SELECT p.*, a.label AS angle_label FROM photos p "
+                "LEFT JOIN photo_angles a ON a.code = p.angle_code "
+                "WHERE p.item_id = %s ORDER BY p.is_render DESC, p.sort_order",
+                (selected_id,),
+            )
+            selected["fits"] = db.fetch_all(
+                conn,
+                "SELECT DISTINCT f.id, f.name, fi.role, fi.is_alternate FROM fit_items fi "
+                "JOIN fits f ON f.id = fi.fit_id WHERE fi.item_id = %s ORDER BY f.name",
+                (selected_id,),
+            )
+            selected["occasions"] = db.fetch_all(
+                conn,
+                "SELECT o.label FROM item_occasions io JOIN occasions o "
+                "ON o.code = io.occasion_code WHERE io.item_id = %s ORDER BY o.sort_order",
+                (selected_id,),
+            )
+
+    if filters["no_render"]:
+        items = [i for i in items if not i["thumb_is_render"]]
+
+    groups: dict[str, list] = {}
+    for item in items:
+        groups.setdefault(item["cat_label"], []).append(item)
+
+    summary = {
+        "shown": len(items),
+        "total": total,
+        "no_render": sum(1 for i in items if not i["thumb_is_render"]),
+        "not_clean": sum(1 for i in items if i["laundry_state"] != "clean"),
+        "gone": gone_count,
+    }
+
+    filters_query = {k: v for k, v in request.args.items() if k != "item"}
 
     return render_template(
-        "catalogue.html", items=items, filters=filters, lookups=lookups
+        "closet.html",
+        filters_query=filters_query,
+        groups=groups,
+        filters=filters,
+        lookups=lookups,
+        usage=usage,
+        summary=summary,
+        selected=selected,
+        states=lookups["states"],
+        verdicts=lookups["verdicts"],
     )
 
 
@@ -368,61 +556,69 @@ def load_lookups(conn) -> dict:
 
 @app.route("/item/<item_id>")
 def item_detail(item_id: str):
-    with db.connect() as conn:
-        item = db.fetch_one(conn, ITEM_SELECT + " WHERE i.id = %s", (item_id,))
-        if item is None:
-            abort(404)
-        photos = db.fetch_all(
-            conn,
-            "SELECT p.*, a.label AS angle_label, "
-            "       (NOT p.is_render AND NOT starts_with(p.source_filename, i.id)) "
-            "         AS is_group_reference "
-            "FROM photos p JOIN items i ON i.id = p.item_id "
-            "LEFT JOIN photo_angles a ON a.code = p.angle_code "
-            "WHERE p.item_id = %s ORDER BY p.is_render DESC, p.sort_order",
-            (item_id,),
-        )
-        occasions = db.fetch_all(
-            conn,
-            "SELECT o.code, o.label FROM item_occasions io "
-            "JOIN occasions o ON o.code = io.occasion_code WHERE io.item_id = %s "
-            "ORDER BY o.sort_order",
-            (item_id,),
-        )
-        sources = {
-            r["field_name"]: r["source"]
-            for r in db.fetch_all(
-                conn,
-                "SELECT field_name, source FROM item_field_sources WHERE item_id = %s",
-                (item_id,),
-            )
-        }
-        in_fits = db.fetch_all(
-            conn,
-            "SELECT f.id, f.name, fi.role, fi.is_alternate FROM fit_items fi "
-            "JOIN fits f ON f.id = fi.fit_id WHERE fi.item_id = %s "
-            "ORDER BY f.sort_order",
-            (item_id,),
-        )
-        worn = db.fetch_all(
-            conn,
-            "SELECT w.id, w.worn_on, w.rating FROM wear_event_items wi "
-            "JOIN wear_events w ON w.id = wi.wear_event_id WHERE wi.item_id = %s "
-            "ORDER BY w.worn_on DESC",
-            (item_id,),
-        )
-        states = db.fetch_all(conn, "SELECT * FROM laundry_states ORDER BY sort_order")
+    """The garment detail is a drawer over the closet now."""
+    return redirect(url_for("catalogue", item=item_id))
 
-    return render_template(
-        "item.html",
-        item=item,
-        photos=photos,
-        occasions=occasions,
-        sources=sources,
-        in_fits=in_fits,
-        worn=worn,
-        states=states,
-    )
+
+@app.route("/closet/bulk", methods=["POST"])
+def closet_bulk():
+    """Move everything selected to one laundry state."""
+    state = request.form["state"]
+    item_ids = request.form.getlist("item_id")
+    with db.connect() as conn:
+        for item_id in item_ids:
+            set_laundry(conn, item_id, state)
+        conn.commit()
+    flash(f"{len(item_ids)} garment(s) → {state.replace('_', ' ')}.")
+    return redirect(request.form.get("next") or url_for("catalogue"))
+
+
+@app.route("/item/<item_id>/verdict", methods=["POST"])
+def item_verdict(item_id: str):
+    """Set the verdict by hand, and make it stick against the next import."""
+    verdict = request.form["verdict"]
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE items SET verdict_code = %s WHERE id = %s", (verdict, item_id)
+        )
+        conn.execute(
+            "INSERT INTO item_field_sources (item_id, field_name, source, note) "
+            "VALUES (%s, 'verdict_code', 'manual', 'set in the app') "
+            "ON CONFLICT (item_id, field_name) DO UPDATE SET source = 'manual', "
+            "updated_at = now()",
+            (item_id,),
+        )
+        conn.commit()
+    return redirect(request.form.get("next") or url_for("catalogue", item=item_id))
+
+
+@app.route("/item/<item_id>/gone", methods=["POST"])
+def item_gone(item_id: str):
+    """Binned: it has physically gone. Reversible, and nothing is deleted."""
+    gone = request.form.get("gone") == "1"
+    with db.connect() as conn:
+        row = db.fetch_one(conn, "SELECT name FROM items WHERE id = %s", (item_id,))
+        if row is None:
+            abort(404)
+        conn.execute(
+            "UPDATE items SET gone_at = %s WHERE id = %s",
+            (datetime.now(TZ) if gone else None, item_id),
+        )
+        affected = db.fetch_one(
+            conn,
+            "SELECT count(DISTINCT fit_id) AS n FROM fit_items WHERE item_id = %s",
+            (item_id,),
+        )["n"]
+        conn.commit()
+
+    if gone:
+        flash(
+            f"“{row['name']}” has gone. {affected} fit(s) that use it stay, marked as "
+            "needing a substitute — nothing was deleted."
+        )
+    else:
+        flash(f"“{row['name']}” is back in the closet.")
+    return redirect(request.form.get("next") or url_for("catalogue", item=item_id))
 
 
 @app.route("/item/<item_id>/state", methods=["POST"])
@@ -437,11 +633,15 @@ def item_state(item_id: str):
 # ------------------------------------------------------------------ fits --
 
 # Roles the builder offers, in the order the design lays them out, with the
-# categories eligible for each.
+# categories eligible for each. The builder's "knit" and "top" slots both land
+# in the `top` role, because that is how the data already models them: when a
+# fit has both, the knit is the top and the polo or tee goes underneath as the
+# `base`. See slot_roles().
 BUILDER_ROLES = [
     ("outer", "Outer", True, ("Outerwear",)),
     ("layer", "Layer", True, ("Knitwear",)),
-    ("top", "Top", False, ("Tops", "Knitwear")),
+    ("top", "Top", False, ("Tops",)),
+    ("knit", "Knit", True, ("Knitwear",)),
     ("bottom", "Bottom", False, ("Trousers",)),
     ("shoe", "Shoe", False, ("Shoes",)),
     ("belt", "Belt", False, ("Belts",)),
@@ -671,6 +871,9 @@ def fits_view():
             continue
         shown.append(c)
 
+    # A fit with a render sorts first — the picture is the fastest way in.
+    shown.sort(key=lambda c: (c["fit"].hero_path is None, c["fit"].sort_order))
+
     return render_template(
         "fits.html",
         cards=shown,
@@ -759,6 +962,30 @@ def fit_log_wear(fit_id: str):
     return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
 
 
+def slot_roles(picks: dict[str, str]) -> list[tuple[str, str]]:
+    """Turn the builder's slots into (item_id, role) pairs.
+
+    A knit and a top together mean the knit is worn over the top — knit takes
+    the `top` role and the lighter garment becomes the `base` under it. That
+    matches how fits-batch-2.md writes "knit + tee", and it is what keeps the
+    week's rotation working: only the rotating layer is a Tops item.
+    """
+    rows = []
+    knit, top = picks.get("knit"), picks.get("top")
+    for slot, item_id in picks.items():
+        if slot in ("knit", "top"):
+            continue
+        rows.append((item_id, slot))
+    if knit and top:
+        rows.append((knit, "top"))
+        rows.append((top, "base"))
+    elif knit:
+        rows.append((knit, "top"))
+    elif top:
+        rows.append((top, "top"))
+    return rows
+
+
 def slugify(name: str) -> str:
     cleaned = "".join(c.lower() if c.isalnum() else "_" for c in name)
     while "__" in cleaned:
@@ -775,12 +1002,13 @@ def fit_create():
     hand-correction is authoritative and an import never overwrites it.
     """
     name = (request.form.get("name") or "").strip()
-    picks = [
-        (role, request.form.get(role))
-        for role, _, _, _ in BUILDER_ROLES
-        if request.form.get(role)
-    ]
-    if not name or len(picks) < 3:
+    picks = {
+        slot: request.form.get(slot)
+        for slot, _, _, _ in BUILDER_ROLES
+        if request.form.get(slot)
+    }
+    rows = slot_roles(picks)
+    if not name or len(rows) < 3:
         flash("A fit needs a name and at least three pieces.")
         return redirect(url_for("fits_view", build=1))
 
@@ -794,7 +1022,7 @@ def fit_create():
             "VALUES (%s, %s, 'everyday', false, %s, 200)",
             (fit_id, name, f"built in the app {today().isoformat()}"),
         )
-        for position, (role, item_id) in enumerate(picks, start=1):
+        for position, (item_id, role) in enumerate(rows, start=1):
             conn.execute(
                 "INSERT INTO fit_items (fit_id, item_id, role, position) "
                 "VALUES (%s, %s, %s, %s)",

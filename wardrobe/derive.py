@@ -137,6 +137,20 @@ def weatherproof(item: dict) -> tuple[bool, bool]:
     return bool(wp.get("rain", False)), bool(wp.get("wind", False))
 
 
+# ------------------------------------------------------------ bike-safe --
+
+# A loafer or a moccasin comes off at speed. Those travel in the top-box and go
+# on at the other end; everything else can be ridden in.
+_NOT_RIDEABLE = re.compile(r"loafer|moc|moccasin|mocassin|slipper", re.I)
+
+
+def bike_safe(item: dict) -> bool:
+    if item.get("cat") != "Shoes":
+        return True
+    blob = " ".join(str(item.get(f) or "") for f in ("name", "cut", "notes"))
+    return not _NOT_RIDEABLE.search(blob)
+
+
 # --------------------------------------------------------------- pattern --
 
 # The wardrobe is essentially all plain. These are the only exceptions called

@@ -109,9 +109,10 @@ add it.
 
 ## The screens
 
-- **Today** — the picker. Enter the temperature and whether it's raining (both
-  remembered), and it picks one of the vetted looks for today. One tap on
-  "Wore this" logs it and marks those garments worn.
+- **Today** — the week, with today marked. The fit's full-look render fills the
+  left; the right has the day's context, the base card, the five-day strip, the
+  fit and its commentary, the piece strip, the bike and top-box cards on a day
+  you ride, and one action: `Wearing this`. See "The week is the unit" below.
 - **Catalogue** — every item, filterable by category, verdict, scope, colour
   role, formality, occasion and laundry state, plus free-text search across
   name, colour, material and notes. The detail view shows every field, all the
@@ -127,6 +128,11 @@ add it.
   opposite view. Every image on it is a generated render, labelled as such, and
   the full 1024px file is served rather than the thumbnail — lazily, so only
   what you scroll to loads.
+- **Closet** — every garment grouped by category, as 4/5 tiles with state,
+  verdict and how many fits use it. Filter by category, in-the-wash, needs-a-
+  decision, no-render or gone; multi-select for bulk laundry moves. The drawer
+  carries the state and verdict controls, the fits it appears in, the written
+  notes verbatim, and binning.
 - **Log** — what was worn, newest first, with rating and note.
 - **Laundry** — flip items between clean / worn / in the wash / at the tailor,
   with two bulk moves.
@@ -165,6 +171,48 @@ blazer open" is a catch.
 **Season is a browsing label only.** It filters the Fits list and is never read
 by the picker; temperature band and rain drive every decision. There is a test
 that changing a season leaves the picker's output identical.
+
+## The week is the unit
+
+**A fit is a base plus a top.** The base — knit, bottom, shoe, belt — is chosen
+once and holds Monday to Friday; only the top rotates. Adopting a fit *is*
+setting the week's base, which is why `week_plans` / `week_days` (migration 008)
+store it rather than deriving it:
+
+- What you wore on Monday is a fact. Re-deriving the week from whichever fit
+  ranks first this morning would rewrite history daily.
+- Thursday's top is a decision, and a plan you can't see tomorrow isn't a plan.
+- A day that has been worn is never re-planned, even if you adopt a different
+  base afterwards.
+
+The rotation itself *is* derived, and deliberately conservative: it prefers tops
+that another hand-reasoned fit already pairs with this same bottom, so each day
+is still a combination somebody thought about. A knit never rotates — it is base.
+
+**`worn` no longer blocks a fit.** It means *used since its last wash and still
+wearable*, which is the whole point of a base that holds five days. Only
+`in_wash` and `at_tailor` block, and then the app names the garment.
+
+**Days carry a context** — office or home, editable per day, defaulting to
+Mon–Wed office. On an office day you ride, so Today adds two cards: the
+ride-safe shoe (naming a clean substitute rather than silently swapping when the
+fit's own shoe is a loafer) and what goes in the top-box. `items.bike_safe` is
+derived from the garment's own words — a loafer or moccasin is arrival-only.
+
+## Binned is not the Bin verdict
+
+Three different things, deliberately kept apart:
+
+| | Means | Column |
+|---|---|---|
+| Verdict `Bin` | An audit judgement: this *should* go | `items.verdict_code` |
+| Binned / gone | The fact that it *has* gone | `items.gone_at` |
+| Retired | The id left `wardrobe.json` — a catalogue correction | `items.retired_at` |
+
+Binning removes a garment from the closet grid and stops it being offered, but
+deletes nothing: it keeps its wear history, stays in the fits that use it, sits
+behind the `Gone` filter, and comes back with Undo. There is no confirmation
+dialog — undo plus a visible filter beats a modal dismissed on reflex.
 
 ## The Fits design
 

@@ -132,14 +132,12 @@ def unavailable(item: dict) -> str | None:
     'wearable' boolean would go stale, which is the exact failure it would exist
     to prevent.
     """
+    # `worn` means used since its last wash and STILL WEARABLE. It does not
+    # block a fit — that is the whole point of a base that holds five days.
+    # Only the wash and the tailor make a garment unavailable.
     state = item.get("laundry_state")
-    if state and state != "clean":
-        labels = {
-            "worn": "already worn",
-            "in_wash": "in the wash",
-            "at_tailor": "at the tailor",
-        }
-        return labels.get(state, state)
+    if state in ("in_wash", "at_tailor"):
+        return {"in_wash": "in the wash", "at_tailor": "at the tailor"}[state]
     if item["verdict"] == "Bin":
         return "binned"
     if item["verdict"] == "Replace":

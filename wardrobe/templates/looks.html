@@ -3,6 +3,14 @@
 {% block title %}Looks — Wardrobe{% endblock %}
 
 {% block content %}
+<div class="filters">
+{% set mode = 'renders' %}
+  <span class="segmented mode-switch">
+    <a class="btn {{ 'on' if mode == 'details' }}" href="{{ url_for('fits_view') }}">Details</a>
+    <a class="btn {{ 'on' if mode == 'renders' }}" href="{{ url_for('looks_view') }}">Renders</a>
+  </span>
+</div>
+
 <p class="mono count-line">
   {{ cards|length }} fits with a full-look render · one per row, at size ·
   every image below is generated, not a photograph
