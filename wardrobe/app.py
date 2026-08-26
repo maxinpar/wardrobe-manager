@@ -29,7 +29,7 @@ from flask import (
     url_for,
 )
 
-from . import config, db, picker, seed_data
+from . import config, db, fit_derive, picker, seed_data
 
 app = Flask(__name__)
 app.secret_key = "wardrobe-local"  # only used for flash messages on localhost
@@ -45,6 +45,30 @@ def today() -> date:
 def require_login():
     """No auth in v1. Add it here if this ever leaves the LAN."""
     return None
+
+
+@app.context_processor
+def header_weather():
+    """The header's read-only weather chips. Today is where it's actually set."""
+    try:
+        with db.connect() as conn:
+            raw = get_setting(conn, "weather.temp_c", "18")
+            rain = get_setting(conn, "weather.rain", "0") == "1"
+    except Exception:
+        raw, rain = "18", False
+    try:
+        temp_c = float(raw)
+        label = f"{temp_c:g}°C"
+    except (TypeError, ValueError):
+        temp_c, label = None, "—"
+    return {
+        "weather": {
+            "temp_c": temp_c,
+            "temp_label": label,
+            "band": picker.weather_band(temp_c),
+            "rain": rain,
+        }
+    }
 
 
 # ------------------------------------------------------------- helpers --
@@ -68,12 +92,16 @@ SELECT i.*, c.label AS cat_label, c.sort_order AS cat_sort,
            AND (p.is_render OR starts_with(p.source_filename, i.id))
          ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS thumb_is_render,
        (SELECT count(*) FROM photos p WHERE p.item_id = i.id) AS photo_count,
-       -- noPhoto means "no INDIVIDUAL photo", which is two different problems.
-       -- A garment sharing a group shot has an image to look at; a garment with
-       -- nothing at all does not, and only the second is a lost photo.
+       -- "has an image" is not "has been photographed". Three states, badged
+       -- separately: photographed, render-only (the crew tees), and nothing.
        (SELECT count(*) FROM photos p
          WHERE p.item_id = i.id AND NOT p.is_render
            AND NOT starts_with(p.source_filename, i.id)) > 0 AS has_group_shot,
+       (SELECT count(*) FROM photos p
+         WHERE p.item_id = i.id AND p.is_render) > 0 AS has_render,
+       (SELECT count(*) FROM photos p
+         WHERE p.item_id = i.id AND NOT p.is_render
+           AND starts_with(p.source_filename, i.id)) > 0 AS photographed,
        (SELECT string_agg(o.occasion_code, ',' ORDER BY o.occasion_code)
           FROM item_occasions o WHERE o.item_id = i.id) AS occasions
 FROM items i
@@ -408,127 +436,422 @@ def item_state(item_id: str):
 
 # ------------------------------------------------------------------ fits --
 
+# Roles the builder offers, in the order the design lays them out, with the
+# categories eligible for each.
+BUILDER_ROLES = [
+    ("outer", "Outer", True, ("Outerwear",)),
+    ("layer", "Layer", True, ("Knitwear",)),
+    ("top", "Top", False, ("Tops", "Knitwear")),
+    ("bottom", "Bottom", False, ("Trousers",)),
+    ("shoe", "Shoe", False, ("Shoes",)),
+    ("belt", "Belt", False, ("Belts",)),
+]
+
+# Sort order for the pieces in the detail drawer.
+ROLE_ORDER = ["outer", "layer", "top", "base", "bottom", "shoe", "belt", "accessory"]
+
+
+class FitFilters:
+    """Gallery filter state. Query-side only — filters never mutate a fit."""
+
+    KEYS = ("register", "killer", "state", "band", "occasion", "hidden")
+
+    def __init__(self, args):
+        self.register = args.get("register") or ""
+        self.killer = args.get("killer") == "1"
+        self.state = args.get("state") or ""       # wearable | blocked
+        self.band = args.get("band") or ""
+        self.occasion = args.get("occasion") or ""
+        self.hidden = args.get("hidden") == "1"
+
+    def current(self) -> dict:
+        out = {}
+        if self.register:
+            out["register"] = self.register
+        if self.killer:
+            out["killer"] = "1"
+        if self.state:
+            out["state"] = self.state
+        if self.band:
+            out["band"] = self.band
+        if self.occasion:
+            out["occasion"] = self.occasion
+        if self.hidden:
+            out["hidden"] = "1"
+        return out
+
+    def toggled(self, param: str, value: str) -> dict:
+        """The query for clicking a filter chip: on if off, off if already on."""
+        out = self.current()
+        if param in ("killer", "hidden"):
+            if out.get(param):
+                out.pop(param)
+            else:
+                out[param] = "1"
+        elif not value:
+            out.pop(param, None)
+        elif out.get(param) == value:
+            out.pop(param)
+        else:
+            out[param] = value
+        return out
+
+
+def item_renders(conn) -> dict[str, dict]:
+    """item_id -> the image to show it with.
+
+    The retail render wins: they are all shot on white, which is why every photo
+    ground in this design is white. A real photo of the garment is the fallback,
+    and the hex swatch the fallback after that.
+    """
+    rows = db.fetch_all(
+        conn,
+        """
+        SELECT i.id, i.hex, i.name,
+               (SELECT p.thumb_path FROM photos p
+                 WHERE p.item_id = i.id
+                   AND (p.is_render OR starts_with(p.source_filename, i.id))
+                 ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS thumb
+        FROM items i WHERE i.retired_at IS NULL
+        """,
+    )
+    return {r["id"]: {"thumb": r["thumb"], "hex": r["hex"], "name": r["name"]} for r in rows}
+
+
+def fit_rows(conn) -> dict[str, dict]:
+    rows = db.fetch_all(
+        conn,
+        "SELECT id, source, formality_rank, rain_safe, hero_image_path, "
+        "hero_thumb_path, hero_is_generated, vetted FROM fits",
+    )
+    return {r["id"]: r for r in rows}
+
+
+def fit_sources(conn) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for row in db.fetch_all(
+        conn, "SELECT fit_id, field_name, source FROM fit_field_sources"
+    ):
+        out.setdefault(row["fit_id"], {})[row["field_name"]] = row["source"]
+    return out
+
+
+def wearings_by_fit(conn) -> dict[str, int]:
+    return {
+        r["fit_id"]: r["n"]
+        for r in db.fetch_all(
+            conn,
+            "SELECT fit_id, count(*) AS n FROM wear_events "
+            "WHERE fit_id IS NOT NULL GROUP BY fit_id",
+        )
+    }
+
+
+def build_cards(conn):
+    """Everything the gallery and the drawer need, in one pass."""
+    fits = picker.load_fits(conn)
+    meta = fit_metadata(conn)
+    rows = fit_rows(conn)
+    ratings = fit_ratings(conn)
+    wearings = wearings_by_fit(conn)
+
+    band_codes = {}
+    for r in db.fetch_all(conn, "SELECT fit_id, band_code FROM fit_temp_bands"):
+        band_codes.setdefault(r["fit_id"], []).append(r["band_code"])
+    occasion_codes = {}
+    for r in db.fetch_all(
+        conn, "SELECT fit_id, occasion_code FROM fit_occasions WHERE kind = 'good'"
+    ):
+        occasion_codes.setdefault(r["fit_id"], []).append(r["occasion_code"])
+    season_codes = {}
+    for r in db.fetch_all(conn, "SELECT fit_id, season_code FROM fit_seasons"):
+        season_codes.setdefault(r["fit_id"], []).append(r["season_code"])
+
+    cards = []
+    for fit in fits:
+        row = rows.get(fit.id, {})
+        m = dict(meta.get(fit.id, {"bands": [], "seasons": [], "good_for": [], "bad_for": [], "jobs": []}))
+        m["formality_rank"] = row.get("formality_rank")
+        m["rain_safe"] = row.get("rain_safe", True)
+        m["authored"] = (row.get("source") or "").startswith("killer-looks")
+        m["band_codes"] = band_codes.get(fit.id, [])
+        m["occasion_codes"] = occasion_codes.get(fit.id, [])
+        m["season_codes"] = season_codes.get(fit.id, [])
+
+        # The hero is a generated render; the template labels it as such.
+        fit.hero_path = row.get("hero_image_path")
+        fit.hero_thumb = row.get("hero_thumb_path")
+        fit.hero_is_generated = row.get("hero_is_generated", True)
+
+        cards.append(
+            {
+                "fit": fit,
+                "meta": m,
+                "problems": picker.staleness(fit),
+                "rating": ratings.get(fit.id),
+                "wearings": wearings.get(fit.id, 0),
+                "source": row.get("source"),
+            }
+        )
+    return cards
+
 
 @app.route("/fits")
 def fits_view():
-    show_hidden = request.args.get("show_hidden") == "1"
-    only_killer = request.args.get("killer") == "1"
-    season = request.args.get("season") or ""
-    blocked_only = request.args.get("blocked") == "1"
+    filters = FitFilters(request.args)
+    selected_id = request.args.get("fit") or ""
+    building = request.args.get("build") == "1"
 
     with db.connect() as conn:
-        fits = picker.load_fits(conn)
-        thumbs = photo_thumbs(conn)
-        meta = fit_metadata(conn)
-        ratings = fit_ratings(conn)
-        lookups = load_lookups(conn)
-        # Season is a browsing label: it filters this list and nothing else.
-        by_season = {
-            r["fit_id"]: r["codes"]
-            for r in db.fetch_all(
-                conn,
-                "SELECT fit_id, array_agg(season_code) AS codes "
-                "FROM fit_seasons GROUP BY fit_id",
+        cards = build_cards(conn)
+        renders = item_renders(conn)
+        sources = fit_sources(conn)
+        selected = None
+        builder = None
+
+        if selected_id:
+            match = next((c for c in cards if c["fit"].id == selected_id), None)
+            if match is None:
+                abort(404)
+            selected = dict(match)
+            selected["sources"] = sources.get(selected_id, {})
+            selected["pieces"] = sorted(
+                match["fit"].items,
+                key=lambda i: (ROLE_ORDER.index(i["role"]) if i["role"] in ROLE_ORDER else 99,
+                               i["is_alternate"], i["position"]),
             )
-        }
+            selected["jobs"] = db.fetch_all(
+                conn,
+                "SELECT id, text, done, done_at FROM fit_preconditions "
+                "WHERE fit_id = %s ORDER BY done, id",
+                (selected_id,),
+            )
+            selected["worn"] = db.fetch_all(
+                conn,
+                "SELECT worn_on, rating, note, context FROM wear_events "
+                "WHERE fit_id = %s ORDER BY worn_on DESC",
+                (selected_id,),
+            )
 
-    groups: dict[str, list] = {"everyday": [], "sharp": []}
-    blocked_count = 0
-    job_count = set()
+        if building:
+            builder = {"roles": [(r, label, opt) for r, label, opt, _ in BUILDER_ROLES],
+                       "candidates": {}}
+            for role, _, _, cats in BUILDER_ROLES:
+                builder["candidates"][role] = db.fetch_all(
+                    conn,
+                    "SELECT id, name, cat_code, hex, warmth, formality_rank, rain_unsafe "
+                    "FROM items WHERE retired_at IS NULL AND scope_code = 'core' "
+                    "AND verdict_code IN ('Keep', 'Tailor') AND cat_code = ANY(%s) "
+                    "ORDER BY name",
+                    (list(cats),),
+                )
 
-    for fit in fits:
-        problems = picker.staleness(fit)
-        if problems:
-            blocked_count += 1
-        for job in fit.blocked_by:
-            job_count.add(job)
+    counts = {
+        "total": len(cards),
+        "wearable": sum(1 for c in cards if not c["problems"]),
+        "blocked": sum(1 for c in cards if c["problems"]),
+    }
 
-        if fit.hidden_by_default and not show_hidden:
+    shown = []
+    for c in cards:
+        fit, m = c["fit"], c["meta"]
+        if fit.hidden_by_default and not filters.hidden:
             continue
-        if only_killer and not fit.killer:
+        if filters.register and fit.register != filters.register:
             continue
-        if season and season not in (by_season.get(fit.id) or []):
+        if filters.killer and not fit.killer:
             continue
-        if blocked_only and not problems:
+        if filters.state == "wearable" and c["problems"]:
             continue
-
-        groups.setdefault(fit.register, []).append((fit, problems))
+        if filters.state == "blocked" and not c["problems"]:
+            continue
+        if filters.band and filters.band not in m["band_codes"]:
+            continue
+        if filters.occasion and filters.occasion not in m["occasion_codes"]:
+            continue
+        shown.append(c)
 
     return render_template(
         "fits.html",
-        groups=groups,
-        show_hidden=show_hidden,
-        only_killer=only_killer,
-        season=season,
-        blocked_only=blocked_only,
-        thumbs=thumbs,
-        meta=meta,
-        ratings=ratings,
-        lookups=lookups,
-        blocked_count=blocked_count,
-        job_count=len(job_count),
-        total=len(fits),
+        cards=shown,
+        counts=counts,
+        filters=filters,
+        renders=renders,
+        selected=selected,
+        building=building,
+        builder=builder,
+        rules=seed_data.STYLING_RULES,
     )
+
+
+@app.route("/looks")
+def looks_view():
+    """The fits that have a full-look render, one per row, big.
+
+    The gallery is three-up and holds every fit; this is the opposite view —
+    only the ones with a render, stacked, at a size you can actually judge.
+    """
+    with db.connect() as conn:
+        cards = [c for c in build_cards(conn) if c["fit"].hero_path]
+        renders = item_renders(conn)
+
+    cards.sort(key=lambda c: c["fit"].sort_order)
+    return render_template("looks.html", cards=cards, renders=renders)
 
 
 @app.route("/fit/<fit_id>")
 def fit_detail(fit_id: str):
+    """The detail is a drawer over the gallery now, not its own page."""
+    return redirect(url_for("fits_view", fit=fit_id))
+
+
+@app.route("/fit/<fit_id>/rename", methods=["POST"])
+def fit_rename(fit_id: str):
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        abort(400)
     with db.connect() as conn:
-        fits = {f.id: f for f in picker.load_fits(conn)}
-        fit = fits.get(fit_id)
+        conn.execute("UPDATE fits SET name = %s WHERE id = %s", (name, fit_id))
+        # From here the name is his, and the importer stops refreshing it from
+        # the seed file.
+        conn.execute(
+            "INSERT INTO fit_field_sources (fit_id, field_name, source) "
+            "VALUES (%s, 'name', 'manual') "
+            "ON CONFLICT (fit_id, field_name) DO UPDATE SET source = 'manual', "
+            "updated_at = now()",
+            (fit_id,),
+        )
+        conn.commit()
+    return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
+
+
+@app.route("/fit/<fit_id>/wear", methods=["POST"])
+def fit_log_wear(fit_id: str):
+    """Log a wearing of this fit: today, with an optional rating and note.
+
+    The garments go to 'worn' the same way the Today screen does it.
+    """
+    rating = request.form.get("rating") or None
+    with db.connect() as conn:
+        fit = db.fetch_one(conn, "SELECT id, name FROM fits WHERE id = %s", (fit_id,))
         if fit is None:
             abort(404)
-        thumbs = photo_thumbs(conn)
-        meta = fit_metadata(conn).get(fit_id, {})
-        ratings = fit_ratings(conn).get(fit_id)
         row = db.fetch_one(
             conn,
-            "SELECT source, formality_rank, rain_safe, hero_image_path, "
-            "hero_thumb_path, hero_is_generated, vetted FROM fits WHERE id = %s",
+            "INSERT INTO wear_events (worn_on, fit_id, rating, note) "
+            "VALUES (%s, %s, %s, %s) RETURNING id",
+            (today(), fit_id, rating, request.form.get("note") or None),
+        )
+        items = db.fetch_all(
+            conn,
+            "SELECT item_id FROM fit_items WHERE fit_id = %s AND NOT is_alternate",
             (fit_id,),
         )
-        sources = {
-            r["field_name"]: r["source"]
-            for r in db.fetch_all(
-                conn,
-                "SELECT field_name, source FROM fit_field_sources WHERE fit_id = %s",
-                (fit_id,),
+        for item in items:
+            conn.execute(
+                "INSERT INTO wear_event_items (wear_event_id, item_id) VALUES (%s, %s)",
+                (row["id"], item["item_id"]),
             )
-        }
-        all_jobs = db.fetch_all(
-            conn,
-            "SELECT id, text, item_id, done, done_at FROM fit_preconditions "
-            "WHERE fit_id = %s ORDER BY done, id",
-            (fit_id,),
-        )
-        worn = db.fetch_all(
-            conn,
-            "SELECT id, worn_on, rating, note FROM wear_events WHERE fit_id = %s "
-            "ORDER BY worn_on DESC",
-            (fit_id,),
-        )
-        worn_photos = db.fetch_all(
-            conn,
-            "SELECT p.stored_path, p.thumb_path, w.worn_on FROM wear_event_photos p "
-            "JOIN wear_events w ON w.id = p.wear_event_id WHERE w.fit_id = %s "
-            "ORDER BY w.worn_on DESC, p.sort_order",
-            (fit_id,),
-        )
+            set_laundry(conn, item["item_id"], "worn")
+        conn.commit()
 
-    return render_template(
-        "fit.html",
-        fit=fit,
-        row=row,
-        meta=meta,
-        ratings=ratings,
-        sources=sources,
-        jobs=all_jobs,
-        worn=worn,
-        worn_photos=worn_photos,
-        thumbs=thumbs,
-        problems=picker.staleness(fit),
-        rules=seed_data.STYLING_RULES,
-    )
+    flash(f"Logged “{fit['name']}” for today. Those garments are now marked worn.")
+    return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
+
+
+def slugify(name: str) -> str:
+    cleaned = "".join(c.lower() if c.isalnum() else "_" for c in name)
+    while "__" in cleaned:
+        cleaned = cleaned.replace("__", "_")
+    return cleaned.strip("_") or "untitled"
+
+
+@app.route("/fits/new", methods=["POST"])
+def fit_create():
+    """Save a built fit.
+
+    The metadata is derived server-side with wardrobe/fit_derive.py — the same
+    rules the builder's strip previews — and recorded as 'derived', so a later
+    hand-correction is authoritative and an import never overwrites it.
+    """
+    name = (request.form.get("name") or "").strip()
+    picks = [
+        (role, request.form.get(role))
+        for role, _, _, _ in BUILDER_ROLES
+        if request.form.get(role)
+    ]
+    if not name or len(picks) < 3:
+        flash("A fit needs a name and at least three pieces.")
+        return redirect(url_for("fits_view", build=1))
+
+    with db.connect() as conn:
+        fit_id = "fit_" + slugify(name)
+        if db.fetch_one(conn, "SELECT id FROM fits WHERE id = %s", (fit_id,)):
+            fit_id = f"{fit_id}_{today().strftime('%m%d')}"
+
+        conn.execute(
+            "INSERT INTO fits (id, name, register_code, vetted, source, sort_order) "
+            "VALUES (%s, %s, 'everyday', false, %s, 200)",
+            (fit_id, name, f"built in the app {today().isoformat()}"),
+        )
+        for position, (role, item_id) in enumerate(picks, start=1):
+            conn.execute(
+                "INSERT INTO fit_items (fit_id, item_id, role, position) "
+                "VALUES (%s, %s, %s, %s)",
+                (fit_id, item_id, role, position),
+            )
+
+        garments = db.fetch_all(
+            conn,
+            """
+            SELECT fi.item_id, fi.role, fi.position, fi.is_alternate,
+                   i.cat_code AS cat, i.warmth, i.rain_unsafe, i.formality_rank,
+                   (SELECT array_agg(io.occasion_code) FROM item_occasions io
+                     WHERE io.item_id = i.id) AS occasions
+            FROM fit_items fi JOIN items i ON i.id = fi.item_id
+            WHERE fi.fit_id = %s
+            """,
+            (fit_id,),
+        )
+        bands = fit_derive.temp_bands(garments)
+        for band in bands:
+            conn.execute(
+                "INSERT INTO fit_temp_bands (fit_id, band_code) VALUES (%s, %s)",
+                (fit_id, band),
+            )
+        for season in fit_derive.seasons(bands):
+            conn.execute(
+                "INSERT INTO fit_seasons (fit_id, season_code) VALUES (%s, %s)",
+                (fit_id, season),
+            )
+        for occasion in fit_derive.good_for(garments):
+            conn.execute(
+                "INSERT INTO fit_occasions (fit_id, occasion_code, kind) "
+                "VALUES (%s, %s, 'good')",
+                (fit_id, occasion),
+            )
+        conn.execute(
+            "UPDATE fits SET rain_safe = %s, formality_rank = %s WHERE id = %s",
+            (fit_derive.rain_safe(garments), fit_derive.formality_rank(garments), fit_id),
+        )
+        for field in ("temp_bands", "seasons", "good_for", "rain_safe", "formality_rank"):
+            conn.execute(
+                "INSERT INTO fit_field_sources (fit_id, field_name, source) "
+                "VALUES (%s, %s, 'derived')",
+                (fit_id, field),
+            )
+        # score, killer and style are never derived: they are Max's to set.
+        for field in ("killer", "score"):
+            conn.execute(
+                "INSERT INTO fit_field_sources (fit_id, field_name, source) "
+                "VALUES (%s, %s, 'manual')",
+                (fit_id, field),
+            )
+        conn.commit()
+
+    flash(f"Saved “{name}”. Its metadata is a first guess — correct anything that's wrong.")
+    return redirect(url_for("fits_view", fit=fit_id))
+
 
 
 @app.route("/fit/<fit_id>/killer", methods=["POST"])
@@ -551,8 +874,7 @@ def fit_score(fit_id: str):
     with db.connect() as conn:
         conn.execute("UPDATE fits SET score = %s WHERE id = %s", (score, fit_id))
         conn.commit()
-    flash("Score saved." if score else "Score cleared.")
-    return redirect(url_for("fit_detail", fit_id=fit_id))
+    return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
 
 
 @app.route("/fit/<fit_id>/style", methods=["POST"])
@@ -572,7 +894,7 @@ def fit_style(fit_id: str):
             (fit_id,),
         )
         conn.commit()
-    return redirect(url_for("fit_detail", fit_id=fit_id))
+    return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
 
 
 @app.route("/precondition/<int:job_id>", methods=["POST"])

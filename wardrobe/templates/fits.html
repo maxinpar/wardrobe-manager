@@ -1,100 +1,95 @@
 {% extends "base.html" %}
-{% from "_macros.html" import chip %}
+{% from "_fit_macros.html" import fit_image, status_pill, fit_badges %}
 {% block title %}Fits — Wardrobe{% endblock %}
 
+{% macro filter_link(label, param, value, active) %}
+  {# Filters are query-side only: they never mutate a fit. #}
+  <a class="btn {{ 'on' if active }}" href="{{ url_for('fits_view', **filters.toggled(param, value)) }}">{{ label }}</a>
+{% endmacro %}
+
 {% block content %}
-<p class="muted">
-  {{ total }} fits — hand-reasoned, not generated.
-  {% if blocked_count %}
-    <strong>{{ blocked_count }}</strong> not wearable right now{% if job_count %},
-    {{ job_count }} blocked on a job{% endif %}.
-  {% else %}
-    All wearable right now.
-  {% endif %}
+<div class="filters">
+  {{ filter_link('All', 'register', '', not filters.register) }}
+  {{ filter_link('Everyday', 'register', 'everyday', filters.register == 'everyday') }}
+  {{ filter_link('Sharp', 'register', 'sharp', filters.register == 'sharp') }}
+  <span class="sep"></span>
+  {{ filter_link('Killer only', 'killer', '1', filters.killer) }}
+  {{ filter_link('Wearable now', 'state', 'wearable', filters.state == 'wearable') }}
+  {{ filter_link('Blocked', 'state', 'blocked', filters.state == 'blocked') }}
+  <span class="sep"></span>
+  {{ filter_link('Cold', 'band', 'cold', filters.band == 'cold') }}
+  {{ filter_link('Mild', 'band', 'mild', filters.band == 'mild') }}
+  {{ filter_link('Warm', 'band', 'warm', filters.band == 'warm') }}
+  <span class="sep"></span>
+  {{ filter_link('Good for client', 'occasion', 'client', filters.occasion == 'client') }}
+  {{ filter_link('Good for dinner', 'occasion', 'dinner', filters.occasion == 'dinner') }}
+  {{ filter_link('Show roll-neck', 'hidden', '1', filters.hidden) }}
+</div>
+
+<p class="mono count-line">
+  {{ counts.total }} fits · {{ counts.wearable }} wearable now · {{ counts.blocked }} blocked ·
+  showing {{ cards|length }}
 </p>
 
-<form class="filters" method="get">
-  <label class="check">
-    <input type="checkbox" name="killer" value="1" {{ 'checked' if only_killer }}> Killer only
-  </label>
-  <label class="check">
-    <input type="checkbox" name="blocked" value="1" {{ 'checked' if blocked_only }}> Not wearable
-  </label>
-  <label class="check">
-    <input type="checkbox" name="show_hidden" value="1" {{ 'checked' if show_hidden }}> Show roll-neck
-  </label>
-  {# Season is a browsing label only — it filters this list and nothing else. #}
-  <select name="season">
-    <option value="">Any season</option>
-    {% for s in lookups.seasons %}
-      <option value="{{ s.code }}" {{ 'selected' if season == s.code }}>{{ s.label }}</option>
-    {% endfor %}
-  </select>
-  <button type="submit">Filter</button>
-  <a class="clear" href="{{ url_for('fits_view') }}">Clear</a>
-</form>
+<div class="fit-grid">
+  {% for c in cards %}
+    {% set fit = c.fit %}
+    <a class="fit-card" href="{{ url_for('fits_view', fit=fit.id, **filters.current()) }}">
+      {% call fit_image(fit, renders) %}
+        {{ status_pill(c.problems, fit.blocked_by) }}
+      {% endcall %}
 
-{% for register, label in [('everyday', 'Everyday'), ('sharp', 'Sharp')] %}
-  {% if groups.get(register) %}
-    <h2>{{ label }}</h2>
-    {% for fit, problems in groups.get(register, []) %}
-      {% set m = meta.get(fit.id, {}) %}
-      <section class="look" id="{{ fit.id }}">
-        <h3>
-          <a href="{{ url_for('fit_detail', fit_id=fit.id) }}">{{ fit.name }}</a>
-          {% if fit.killer %}<span class="badge killer">killer</span>{% endif %}
-          {% if fit.score %}<span class="badge score">{{ fit.score }}/10</span>{% endif %}
-          {% if fit.hidden_by_default %}<span class="badge">hidden by default</span>{% endif %}
-          {% if problems %}
-            <span class="badge warn">not wearable now</span>
-          {% else %}
-            <span class="badge ok">wearable now</span>
-          {% endif %}
-        </h3>
+      <div class="fit-title-row">
+        <span class="fit-title">{{ fit.name }}</span>
+        <span class="fit-score">{{ (fit.score ~ '/10') if fit.score else 'unscored' }}</span>
+      </div>
 
-        <p class="muted">
-          {% if fit.style %}<em>{{ fit.style }}</em> · {% endif %}
-          {{ m.bands|join(' · ') if m.bands }}
-          {% if m.seasons %} · {{ m.seasons|join(', ') }}{% endif %}
-          {% if m.good_for %} · good for {{ m.good_for|join(', ') }}{% endif %}
-          {% if m.bad_for %} · <span class="warn-text">not for {{ m.bad_for|join(', ') }}</span>{% endif %}
-        </p>
+      {{ fit_badges(fit, c.meta) }}
 
-        <div class="chips">
-          {% for item in fit.primary() %}
-            {{ chip(item.item_id, item.name, thumbs, item.note) }}
-          {% endfor %}
+      <div class="fit-meta">
+        {{ c.meta.bands|join(' · ') }}
+        {% if c.meta.formality_rank %} · formality {{ c.meta.formality_rank }}/5{% endif %}
+        {% if c.meta.good_for %} · good for {{ c.meta.good_for|join(', ') }}{% endif %}
+      </div>
+
+      {% if fit.catch %}
+        <div class="catch">
+          <span class="label">Catch</span>
+          <span class="text">{{ fit.catch }}</span>
         </div>
+      {% endif %}
 
-        {% set alts = fit.items | selectattr('is_alternate') | list %}
-        {% if alts %}
-          <p class="muted">Or: {% for a in alts %}{{ a.name }}{{ ' (' ~ a.note ~ ')' if a.note }}{{ '; ' if not loop.last }}{% endfor %}</p>
-        {% endif %}
-
-        {# The catch is a wear-time warning: it belongs where the choice is made. #}
-        {% if fit.catch %}<p class="catch">⚠ {{ fit.catch }}</p>{% endif %}
-
-        {% if problems %}
-          {# Never hidden — named, so Max can see what is blocking what. #}
-          <p class="sub">{% for p in problems %}<span class="badge warn">{{ p }}</span>{% endfor %}</p>
-        {% endif %}
-
-        {% for job in m.jobs or [] %}
-          <form class="job" method="post" action="{{ url_for('precondition_done', job_id=job.id) }}">
+      {% for job in c.meta.jobs %}
+        <div class="job-row">
+          {# Inside a card: must not open the detail. #}
+          <form method="post" action="{{ url_for('precondition_done', job_id=job.id) }}"
+                onclick="event.stopPropagation()">
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <input type="hidden" name="done" value="1">
             <button type="submit">Mark done</button>
-            <span>{{ job.text }}</span>
           </form>
-        {% endfor %}
+          <span>{{ job.text }}</span>
+        </div>
+      {% endfor %}
 
-        <p class="rationale">{{ fit.commentary }}</p>
-      </section>
-    {% endfor %}
-  {% endif %}
-{% endfor %}
+      <div class="fit-footer">
+        <form method="post" action="{{ url_for('fit_log_wear', fit_id=fit.id) }}"
+              onclick="event.stopPropagation()">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="btn-brass" type="submit">
+            {{ 'Worn ' ~ c.wearings ~ '×' if c.wearings else 'Log worn' }}
+          </button>
+        </form>
+        <span class="btn">Open</span>
+      </div>
+    </a>
+  {% else %}
+    <p class="muted">Nothing matches those filters.</p>
+  {% endfor %}
+</div>
+{% endblock %}
 
-{% if not groups.everyday and not groups.sharp %}
-  <p class="muted">Nothing matches those filters.</p>
-{% endif %}
+{% block drawer %}
+  {% if selected %}{% include "_fit_drawer.html" %}{% endif %}
+  {% if building %}{% include "_fit_builder.html" %}{% endif %}
 {% endblock %}

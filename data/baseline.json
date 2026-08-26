@@ -15,26 +15,27 @@
     "trousers_11_black-coated-jeans, which now has five photos on disk. The remaining 12",
     "are two different problems: 7 with no image at all (6 belts + trousers_00), and 5",
     "sharing a group shot (shoes_08a/b/c, shoes_09a/b) that have no individual photo.",
-    "2026-08-26 rev 2: 69 -> 68 items. trousers_00_decathlon-stone was a phantom — the same Decathlon chino logged twice, caught when its 'new' photos turned out to be byte-identical to trousers_01's. Tailor 10 -> 9 and Trousers 12 -> 11 follow from that. noPhoto 12 -> 2: four belts and five shoes were photographed; belts_05 and belts_10 remain, marked not-located rather than deleted."
+    "2026-08-26 rev 2: 69 -> 68 items. trousers_00_decathlon-stone was a phantom — the same Decathlon chino logged twice, caught when its 'new' photos turned out to be byte-identical to trousers_01's. Tailor 10 -> 9 and Trousers 12 -> 11 follow from that. noPhoto 12 -> 2: four belts and five shoes were photographed; belts_05 and belts_10 remain, marked not-located rather than deleted.",
+    "2026-08-26 rev 3/4: 68 -> 73 items. Five crew tees added (tees_01..05) — they are render-only: three have a generated retail render, none has ever been photographed, so noPhoto stays true and their colour/fit/material remain unconfirmed. Keep 45 -> 50 and core 64 -> 69 follow. noPhoto 2 -> 7: the two not-located belts plus the five tees."
   ],
-  "total": 68,
+  "total": 73,
   "cat": {
     "Knitwear": 18,
     "Trousers": 11,
     "Shoes": 12,
     "Belts": 11,
-    "Tops": 10,
+    "Tops": 15,
     "Outerwear": 6
   },
   "verdict": {
-    "Keep": 45,
+    "Keep": 50,
     "Tailor": 9,
     "Bin": 8,
     "Replace": 6
   },
   "scope": {
-    "core": 64,
+    "core": 69,
     "out": 4
   },
-  "no_photo": 2
+  "no_photo": 7
 }

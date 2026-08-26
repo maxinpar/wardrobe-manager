@@ -23,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from wardrobe import config, db, derive, fit_derive, seed_data  # noqa: E402
+from wardrobe import config, db, derive, fit_derive, fits_batch2, seed_data  # noqa: E402
 
 SOURCE_JSON = config.REPO_ROOT / "data" / "wardrobe.json"
 
@@ -63,6 +63,7 @@ CATALOGUE_FIELDS = {
     "notes": "notes",
     "care_note": "careNote",
     "no_photo": "noPhoto",
+    "unconfirmed": "unconfirmed",
     "photo_ref": "photoRef",
     "photo_prefix": "photoPrefix",
     "retail_prefix": "retailPrefix",
@@ -88,6 +89,13 @@ ALL_ITEM_COLUMNS = list(CATALOGUE_FIELDS) + [
 
 def empty_to_none(value):
     return None if value == "" else value
+
+
+def coerce_flags(row: dict) -> dict:
+    """`unconfirmed` is absent on most items and NOT NULL in the schema."""
+    if row.get("unconfirmed") is None:
+        row["unconfirmed"] = False
+    return row
 
 
 def source_of_derived(item: dict) -> dict[str, str]:
@@ -131,7 +139,7 @@ def build_row(item: dict) -> tuple[dict, list[str], list[str]]:
     row["rain_unsafe"] = derive.rain_unsafe(item)
     row["pattern"] = derive.pattern(item)
 
-    return row, derive.occasions(item, rank), warnings
+    return coerce_flags(row), derive.occasions(item, rank), warnings
 
 
 def manual_fields(conn, item_id: str) -> set[str]:
@@ -330,8 +338,22 @@ def replace_set(conn, table: str, column: str, fit_id: str, values: list[str]) -
         )
 
 
+def all_seed_fits(conn) -> list[dict]:
+    """The hand-written fits, plus the 20 parsed out of fits-batch-2.md.
+
+    That file references garments by id, so it is read rather than transcribed;
+    the roles come from each item's category, which is why the categories are
+    read back from the database first.
+    """
+    categories = {
+        r["id"]: r["cat_code"]
+        for r in db.fetch_all(conn, "SELECT id, cat_code FROM items")
+    }
+    return list(seed_data.FITS) + fits_batch2.load(categories)
+
+
 def seed_fits(conn, changes: list[str]) -> None:
-    for fit in seed_data.FITS:
+    for fit in all_seed_fits(conn):
         for item_id, *_ in fit["items"]:
             resolve_item(conn, item_id)
         for _, item_id in fit["preconditions"]:
@@ -361,20 +383,23 @@ def seed_fits(conn, changes: list[str]) -> None:
             changes.append(f"NEW      fit {fit_id}")
         else:
             # killer, score and style are never in this UPDATE — they are Max's.
+            # `name` joins them the moment he renames a fit in the app: the
+            # design treats renaming as a first-class action, so an import must
+            # not quietly undo one.
+            columns = {
+                "register_code": fit["register"],
+                "commentary": fit["commentary"],
+                "catch": fit["catch"],
+                "hidden_by_default": fit["hidden_by_default"],
+                "sort_order": fit["sort_order"],
+                "source": fit["source"],
+            }
+            if "name" not in protected:
+                columns["name"] = fit["name"]
+            assignments = ", ".join(f"{c} = %s" for c in columns)
             conn.execute(
-                "UPDATE fits SET name = %s, register_code = %s, commentary = %s, "
-                "catch = %s, hidden_by_default = %s, sort_order = %s, source = %s "
-                "WHERE id = %s",
-                (
-                    fit["name"],
-                    fit["register"],
-                    fit["commentary"],
-                    fit["catch"],
-                    fit["hidden_by_default"],
-                    fit["sort_order"],
-                    fit["source"],
-                    fit_id,
-                ),
+                f"UPDATE fits SET {assignments} WHERE id = %s",
+                list(columns.values()) + [fit_id],
             )
 
         # Slots. Primaries first so alternates can point at the row they swap for.

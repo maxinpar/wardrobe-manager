@@ -64,16 +64,17 @@ Plain numbered `.sql` files in `migrations/`, applied once each and recorded in
 ```
 
 The first form is a dry run — it prints every change it would make and writes
-nothing. The second one commits. It also seeds the 18 fits (11 from
-`work-outfits.md` including the hidden roll-neck, 7 from `killer-looks.md`),
-both wear events, and retires any id that has left the catalogue.
+nothing. The second one commits. It also seeds the 38 fits (11 from `work-outfits.md`
+including the hidden roll-neck, 7 from `killer-looks.md`, 20 from
+`fits-batch-2.md`), both wear events, and retires any id that has left the
+catalogue.
 
 The importer prints a verification report: counts per category, verdict and
 scope, items with no photo, `photoPrefix` values that matched no file on disk,
 and anything it couldn't parse. If the numbers don't reconcile against the
-known-good baseline (68 items · Knitwear 18 / Shoes 12 / Belts 11 / Trousers 11
-/ Tops 10 / Outerwear 6 · Keep 45, Tailor 9, Bin 8, Replace 6 · core 64, out 4
-· 2 without a photo) it stops rather than papering over it. The
+known-good baseline (73 items · Knitwear 18 / Tops 15 / Shoes 12 / Belts 11 /
+Trousers 11 / Outerwear 6 · Keep 50, Tailor 9, Bin 8, Replace 6 · core 69, out 4
+· 7 without a photo) it stops rather than papering over it. The
 baseline lives in `data/baseline.json`, so a legitimate catalogue change is
 recorded as a data edit rather than buried in a code change.
 
@@ -115,12 +116,17 @@ add it.
   role, formality, occasion and laundry state, plus free-text search across
   name, colour, material and notes. The detail view shows every field, all the
   photos, and the `pairs` / `layer` / `avoid` prose exactly as written.
-- **Fits** — the seeded fits by register, each showing its temperature bands,
-  season, good-for occasions, catch, and whether it's wearable right now. Filter
-  by killer, by season, or to just the ones that are blocked. The roll-neck fit
-  is behind a toggle. A fit is **never hidden** when something is wrong with it —
-  it is badged with the specific problem ("Ecco sneaker is in the wash",
-  "Contains a binned item", "Blocked: clean the coating").
+- **Fits** — a 3-up gallery of fit cards, each showing the garment renders side
+  by side, its status, badges, catch, any blocking job, and `Log worn`. Filter by
+  register, killer, wearable/blocked, temperature band or occasion; the roll-neck
+  fit is behind a toggle. A fit is **never hidden** when something is wrong with
+  it — it is badged with the specific problem. Clicking a card opens the **detail
+  drawer**; `Build a fit` opens the **builder**. See "The Fits design" below.
+- **Looks** — the fits that have a full-look render, one per row, at a size you
+  can actually judge. The gallery is three-up and holds every fit; this is the
+  opposite view. Every image on it is a generated render, labelled as such, and
+  the full 1024px file is served rather than the thumbnail — lazily, so only
+  what you scroll to loads.
 - **Log** — what was worn, newest first, with rating and note.
 - **Laundry** — flip items between clean / worn / in the wash / at the tailor,
   with two bulk moves.
@@ -159,6 +165,30 @@ blazer open" is a catch.
 **Season is a browsing label only.** It filters the Fits list and is never read
 by the picker; temperature band and rain drive every decision. There is a test
 that changing a season leaves the picker's output identical.
+
+## The Fits design
+
+The Fits area implements the approved direction in `docs/DESIGN_FITS_HANDOFF.md`
+(design pack, 2026-08-26). Recreated inside the existing Flask + Jinja + one
+stylesheet — no SPA, no second styling system, no build step.
+
+- **Tokens** live at the top of `wardrobe/static/app.css`. Space Grotesk for UI,
+  IBM Plex Mono for labels and numbers. Borders do the work: no shadows anywhere,
+  and no motion beyond colour.
+- **Photo grounds are white** because every retail render is shot on white; a
+  tinted ground would show the render's box. A garment with no render is skipped
+  rather than left as an empty slot.
+- **The drawers are server-rendered**, not a client-side app: `?fit=<id>` opens
+  the detail, `?build=1` opens the builder. Filters are query-side only and never
+  mutate a fit.
+- **The builder is the one view with client-side state.** `wardrobe/static/builder.js`
+  is a port of `wardrobe/fit_derive.py` so the strip previews exactly what the
+  server will store on save. If those two ever disagree, the strip is lying.
+- A built fit is `vetted = false`, its metadata recorded as `derived`, and it
+  carries no style draft — the drafts belong to the seeded fits.
+- **Renaming a fit makes the name yours.** It is recorded as `manual`, so the
+  importer stops refreshing it from the seed file, exactly like `score`,
+  `killer` and `style`.
 
 ## The picker
 
@@ -236,6 +266,7 @@ page shows which is which.
 |---|---|---|---|
 | `data/work-outfits.md` | 11 (incl. the hidden roll-neck) | display name — **not unique**, so hand-mapped in `wardrobe/seed_data.py` and asserted to resolve to exactly one item | bands, rain-safety, formality and good-for are **derived** from the garments |
 | `data/killer-looks.md` | 7 | item id — unambiguous | authored in the document, so **imported** as written and never re-derived |
+| `data/fits-batch-2.md` | 20 | item id | authored; the document is **parsed** by `wardrobe/fits_batch2.py` rather than transcribed, because a slip in 20 fits of prose would be silent |
 
 `bad_for` is only ever imported. Deriving a negative claim would invent warnings
 nobody made, so the eleven work-outfits fits have none.

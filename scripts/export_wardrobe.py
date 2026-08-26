@@ -34,7 +34,8 @@ KEY_ORDER = [
     "slug", "cat", "name", "colour", "hex", "role", "neck", "cut", "material",
     "weight", "formality", "fit", "condition", "verdict", "verdictNote", "scope",
     "worksAlone", "pairs", "layer", "avoid", "notes", "warmth", "weatherproof",
-    "careNote", "noPhoto", "photoRef", "photoPrefix", "retailPrefix", "id",
+    "careNote", "noPhoto", "unconfirmed", "photoRef", "photoPrefix", "retailPrefix",
+    "id",
 ]
 
 # JSON field -> database column, for the fields that are a straight copy.
@@ -96,6 +97,10 @@ def build_payload(conn, generated: str) -> dict:
                 item[key] = row["works_alone"]  # genuinely nullable in the JSON
             elif key == "noPhoto":
                 item[key] = row["no_photo"]
+            elif key == "unconfirmed":
+                # Only the items catalogued from a description carry this.
+                if row["unconfirmed"]:
+                    item[key] = True
             elif key == "id":
                 item[key] = row["id"]
             elif key == "warmth":

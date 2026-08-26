@@ -8,14 +8,24 @@
 </head>
 <body>
 <header class="topbar">
-  <h1>Wardrobe</h1>
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <span class="brand-name">Wardrobe</span>
+  </div>
   <nav>
     <a href="{{ url_for('today_view') }}" class="{{ 'on' if request.endpoint == 'today_view' }}">Today</a>
-    <a href="{{ url_for('catalogue') }}" class="{{ 'on' if request.endpoint in ('catalogue', 'item_detail') }}">Catalogue</a>
     <a href="{{ url_for('fits_view') }}" class="{{ 'on' if request.endpoint in ('fits_view', 'fit_detail') }}">Fits</a>
-    <a href="{{ url_for('log_view') }}" class="{{ 'on' if request.endpoint == 'log_view' }}">Log</a>
+    <a href="{{ url_for('looks_view') }}" class="{{ 'on' if request.endpoint == 'looks_view' }}">Looks</a>
+    <a href="{{ url_for('catalogue') }}" class="{{ 'on' if request.endpoint in ('catalogue', 'item_detail') }}">Closet</a>
     <a href="{{ url_for('laundry_view') }}" class="{{ 'on' if request.endpoint == 'laundry_view' }}">Laundry</a>
+    <a href="{{ url_for('log_view') }}" class="{{ 'on' if request.endpoint == 'log_view' }}">Log</a>
   </nav>
+  <div class="topbar-right">
+    {# Read-only here: the picker's Today screen is where weather is set. #}
+    <span class="weather-chip">{{ weather.temp_label }} · {{ weather.band }}</span>
+    <span class="weather-chip">{{ 'Rain' if weather.rain else 'Dry' }}</span>
+    <a class="btn btn-ink" href="{{ url_for('fits_view', build=1) }}">Build a fit</a>
+  </div>
 </header>
 
 {% with messages = get_flashed_messages() %}
@@ -27,5 +37,6 @@
 <main>
   {% block content %}{% endblock %}
 </main>
+{% block drawer %}{% endblock %}
 </body>
 </html>
