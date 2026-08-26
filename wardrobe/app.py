@@ -92,12 +92,16 @@ SELECT i.*, c.label AS cat_label, c.sort_order AS cat_sort,
            AND (p.is_render OR starts_with(p.source_filename, i.id))
          ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS thumb_is_render,
        (SELECT count(*) FROM photos p WHERE p.item_id = i.id) AS photo_count,
-       -- noPhoto means "no INDIVIDUAL photo", which is two different problems.
-       -- A garment sharing a group shot has an image to look at; a garment with
-       -- nothing at all does not, and only the second is a lost photo.
+       -- "has an image" is not "has been photographed". Three states, badged
+       -- separately: photographed, render-only (the crew tees), and nothing.
        (SELECT count(*) FROM photos p
          WHERE p.item_id = i.id AND NOT p.is_render
            AND NOT starts_with(p.source_filename, i.id)) > 0 AS has_group_shot,
+       (SELECT count(*) FROM photos p
+         WHERE p.item_id = i.id AND p.is_render) > 0 AS has_render,
+       (SELECT count(*) FROM photos p
+         WHERE p.item_id = i.id AND NOT p.is_render
+           AND starts_with(p.source_filename, i.id)) > 0 AS photographed,
        (SELECT string_agg(o.occasion_code, ',' ORDER BY o.occasion_code)
           FROM item_occasions o WHERE o.item_id = i.id) AS occasions
 FROM items i

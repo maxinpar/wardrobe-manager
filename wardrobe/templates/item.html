@@ -10,6 +10,14 @@
   {% if item.scope_code == 'out' %}<span class="badge out">out of scope</span>{% endif %}
 </p>
 
+{% if item.unconfirmed %}
+  <p class="catch">
+    <span class="label">Unconfirmed</span>
+    This record has never been checked against the actual garment. Colour comes
+    from a generated render; fit, condition and material are still assumptions.
+  </p>
+{% endif %}
+
 {% if item.retired_at %}
   <p class="catch">
     ⚠ No longer in the catalogue — retired {{ item.retired_at.strftime('%d %b %Y') }}.
@@ -31,6 +39,10 @@
         {% if p.is_render %}<span class="badge render">generated illustration, not a photo of this garment</span>{% endif %}
         {% if p.is_group_reference %}
           <span class="badge warn">group reference shot — not an individual photo of this garment</span>
+        {% endif %}
+        {% if p.is_render and item.no_photo and not item.photographed %}
+          <span class="badge warn">this garment has never been photographed — colour measured
+            from the render, fit and material still unconfirmed</span>
         {% endif %}
       </figcaption>
     </figure>

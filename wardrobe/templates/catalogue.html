@@ -58,11 +58,20 @@
     <a class="card" href="{{ url_for('item_detail', item_id=item.id) }}">
       {% if item.thumb_path %}
         <img src="{{ url_for('photo', relative_path=item.thumb_path) }}" alt="" loading="lazy">
-        {% if item.thumb_is_render %}<span class="badge render">illustration</span>{% endif %}
+        {% if item.thumb_is_render %}
+          {# "has an image" is not "has been photographed". #}
+          {% if item.no_photo and not item.photographed %}
+            <span class="badge render">render only — never photographed</span>
+          {% else %}
+            <span class="badge render">illustration</span>
+          {% endif %}
+        {% endif %}
       {% else %}
         <span class="swatch big" style="background: {{ item.hex or '#ccc' }}"></span>
         {% if item.no_photo %}
-          {% if item.has_group_shot %}
+          {% if item.has_render %}
+            <span class="badge render">render only — never photographed</span>
+          {% elif item.has_group_shot %}
             <span class="badge warn">needs an individual shot</span>
           {% else %}
             <span class="badge reshoot">no image at all</span>
