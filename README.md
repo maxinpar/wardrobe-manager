@@ -122,6 +122,11 @@ add it.
   fit is behind a toggle. A fit is **never hidden** when something is wrong with
   it — it is badged with the specific problem. Clicking a card opens the **detail
   drawer**; `Build a fit` opens the **builder**. See "The Fits design" below.
+- **Looks** — the fits that have a full-look render, one per row, at a size you
+  can actually judge. The gallery is three-up and holds every fit; this is the
+  opposite view. Every image on it is a generated render, labelled as such, and
+  the full 1024px file is served rather than the thumbnail — lazily, so only
+  what you scroll to loads.
 - **Log** — what was worn, newest first, with rating and note.
 - **Laundry** — flip items between clean / worn / in the wash / at the tailor,
   with two bulk moves.

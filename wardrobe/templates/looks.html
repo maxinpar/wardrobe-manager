@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% from "_fit_macros.html" import fit_badges %}
+{% block title %}Looks — Wardrobe{% endblock %}
+
+{% block content %}
+<p class="mono count-line">
+  {{ cards|length }} fits with a full-look render · one per row, at size ·
+  every image below is generated, not a photograph
+</p>
+
+<div class="look-list">
+  {% for c in cards %}
+    {% set fit = c.fit %}
+    <section class="look-row" id="{{ fit.id }}">
+      <figure class="look-figure">
+        {# Full render rather than the thumbnail: this view exists to be looked
+           at. Lazy, so only what you scroll to is fetched. #}
+        <img src="{{ url_for('photo', relative_path=fit.hero_path) }}"
+             alt="{{ fit.name }}" loading="lazy">
+        <figcaption class="pill-generated">Generated · never worn</figcaption>
+      </figure>
+
+      <div class="look-body">
+        <div class="fit-title-row">
+          <a class="fit-title" href="{{ url_for('fits_view', fit=fit.id) }}">{{ fit.name }}</a>
+          <span class="fit-score">{{ (fit.score ~ '/10') if fit.score else 'unscored' }}</span>
+        </div>
+
+        <div class="badges">
+          {% if c.problems %}
+            <span class="badge problem">{{ 'blocked on a job' if fit.blocked_by else 'not wearable' }}</span>
+          {% else %}
+            <span class="badge ok">wearable now</span>
+          {% endif %}
+        </div>
+        {{ fit_badges(fit, c.meta) }}
+
+        <div class="fit-meta">
+          {{ c.meta.bands|join(' · ') }}
+          {% if c.meta.formality_rank %} · formality {{ c.meta.formality_rank }}/5{% endif %}
+          {% if c.meta.good_for %} · good for {{ c.meta.good_for|join(', ') }}{% endif %}
+          {% if c.meta.bad_for %} · <span class="warn-text">not for {{ c.meta.bad_for|join(', ') }}</span>{% endif %}
+        </div>
+
+        <p class="commentary">{{ fit.commentary }}</p>
+
+        {% if fit.catch %}
+          <div class="catch">
+            <span class="label">Catch</span>
+            <span class="text">{{ fit.catch }}</span>
+          </div>
+        {% endif %}
+
+        {% if c.problems %}
+          <p class="sub">{% for p in c.problems %}<span class="badge problem">{{ p }}</span>{% endfor %}</p>
+        {% endif %}
+
+        <div class="chips">
+          {% for item in fit.primary() %}
+            {% set r = renders.get(item.item_id) %}
+            <a class="chip" href="{{ url_for('item_detail', item_id=item.item_id) }}">
+              {% if r and r.thumb %}
+                <img src="{{ url_for('photo', relative_path=r.thumb) }}" alt="" loading="lazy">
+              {% else %}
+                <span class="swatch" style="background: {{ (r.hex if r else none) or '#ccc' }}"></span>
+              {% endif %}
+              <span>{{ item.name }}</span>
+            </a>
+          {% endfor %}
+        </div>
+
+        <div class="fit-footer">
+          <form method="post" action="{{ url_for('fit_log_wear', fit_id=fit.id) }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button class="btn-brass" type="submit">
+              {{ 'Worn ' ~ c.wearings ~ '×' if c.wearings else 'Log worn' }}
+            </button>
+          </form>
+          <a class="btn" href="{{ url_for('fits_view', fit=fit.id) }}">Open</a>
+        </div>
+      </div>
+    </section>
+  {% else %}
+    <p class="muted">No fit has a full-look render yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

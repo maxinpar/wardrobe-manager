@@ -684,6 +684,21 @@ def fits_view():
     )
 
 
+@app.route("/looks")
+def looks_view():
+    """The fits that have a full-look render, one per row, big.
+
+    The gallery is three-up and holds every fit; this is the opposite view —
+    only the ones with a render, stacked, at a size you can actually judge.
+    """
+    with db.connect() as conn:
+        cards = [c for c in build_cards(conn) if c["fit"].hero_path]
+        renders = item_renders(conn)
+
+    cards.sort(key=lambda c: c["fit"].sort_order)
+    return render_template("looks.html", cards=cards, renders=renders)
+
+
 @app.route("/fit/<fit_id>")
 def fit_detail(fit_id: str):
     """The detail is a drawer over the gallery now, not its own page."""

@@ -473,3 +473,39 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
   .piece-role { width: 84px; }
   .derived-strip { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* -------------------------------------------------------------- looks --- */
+/* The vertical counterpart to the Fits gallery: only the fits that have a
+   full-look render, one per row, big enough to actually judge. */
+
+.look-list { display: flex; flex-direction: column; gap: 16px; max-width: 1080px; }
+
+.look-row {
+  display: grid; grid-template-columns: 420px 1fr; gap: 20px;
+  background: var(--surface); border: 1px solid transparent;
+  border-radius: 20px; padding: 16px;
+}
+.look-row:hover { border-color: var(--brass); }
+
+.look-figure {
+  position: relative; margin: 0; align-self: start;
+  background: var(--surface); border: 1px solid var(--line-card);
+  border-radius: 14px; overflow: hidden;
+}
+.look-figure img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; }
+.look-figure figcaption { position: absolute; bottom: 10px; left: 10px; }
+
+.look-body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.look-body .fit-title { color: inherit; }
+.look-body .fit-title:hover { color: var(--brass-text); }
+.look-body .commentary { font-size: 13px; }
+.look-body .chips { gap: 6px; }
+.look-body .chip { width: 84px; font-size: 10.5px; }
+.look-body .fit-footer { margin-top: auto; padding-top: 4px; }
+.look-body .fit-footer form, .look-body .fit-footer .btn { flex: 0 0 auto; }
+.look-body .fit-footer .btn { padding: 8px 22px; }
+
+@media (max-width: 900px) {
+  .look-row { grid-template-columns: 1fr; }
+  .look-figure { max-width: 520px; }
+}
