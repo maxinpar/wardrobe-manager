@@ -1,0 +1,50 @@
+{# Shared bits between the gallery card and the detail drawer. #}
+
+{#
+  A fit's image: the generated full-look render if there is one, otherwise the
+  garment renders laid side by side. Garments with no render are SKIPPED — never
+  an empty slot. A generated render carries its label without exception: it must
+  never imply a wearing.
+#}
+{% macro fit_image(fit, renders, klass='ground', height_class='') %}
+  {% set pieces = fit.primary() | map(attribute='item_id') | select('in', renders) | list %}
+  {% if fit.hero_thumb or fit.hero_path %}
+    <div class="{{ klass }} full">
+      <img class="look" src="{{ url_for('photo', relative_path=fit.hero_thumb or fit.hero_path) }}" alt="">
+      {% if fit.hero_is_generated %}
+        <span class="pill-generated">Generated · never worn</span>
+      {% endif %}
+      {{ caller() if caller is defined }}
+    </div>
+  {% else %}
+    <div class="{{ klass }}">
+      {% for item in fit.primary() %}
+        {% set r = renders.get(item.item_id) %}
+        {% if r and r.thumb %}
+          <img class="piece" src="{{ url_for('photo', relative_path=r.thumb) }}" alt="{{ item.name }}">
+        {% endif %}
+      {% endfor %}
+      {{ caller() if caller is defined }}
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro status_pill(problems, blocked_by) %}
+  {% if not problems %}
+    <span class="pill-status">wearable now</span>
+  {% elif blocked_by %}
+    <span class="pill-status bad">blocked on a job</span>
+  {% else %}
+    <span class="pill-status bad">not wearable</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro fit_badges(fit, meta) %}
+  <div class="badges">
+    {% if fit.killer %}<span class="badge killer">killer</span>{% endif %}
+    {% if fit.hidden_by_default %}<span class="badge">hidden by default</span>{% endif %}
+    <span class="badge">{{ fit.register }}</span>
+    {% if not meta.rain_safe %}<span class="badge dry">dry days only</span>{% endif %}
+    {% if meta.authored %}<span class="badge">authored</span>{% endif %}
+  </div>
+{% endmacro %}

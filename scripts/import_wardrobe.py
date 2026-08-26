@@ -361,20 +361,23 @@ def seed_fits(conn, changes: list[str]) -> None:
             changes.append(f"NEW      fit {fit_id}")
         else:
             # killer, score and style are never in this UPDATE — they are Max's.
+            # `name` joins them the moment he renames a fit in the app: the
+            # design treats renaming as a first-class action, so an import must
+            # not quietly undo one.
+            columns = {
+                "register_code": fit["register"],
+                "commentary": fit["commentary"],
+                "catch": fit["catch"],
+                "hidden_by_default": fit["hidden_by_default"],
+                "sort_order": fit["sort_order"],
+                "source": fit["source"],
+            }
+            if "name" not in protected:
+                columns["name"] = fit["name"]
+            assignments = ", ".join(f"{c} = %s" for c in columns)
             conn.execute(
-                "UPDATE fits SET name = %s, register_code = %s, commentary = %s, "
-                "catch = %s, hidden_by_default = %s, sort_order = %s, source = %s "
-                "WHERE id = %s",
-                (
-                    fit["name"],
-                    fit["register"],
-                    fit["commentary"],
-                    fit["catch"],
-                    fit["hidden_by_default"],
-                    fit["sort_order"],
-                    fit["source"],
-                    fit_id,
-                ),
+                f"UPDATE fits SET {assignments} WHERE id = %s",
+                list(columns.values()) + [fit_id],
             )
 
         # Slots. Primaries first so alternates can point at the row they swap for.

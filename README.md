@@ -115,12 +115,12 @@ add it.
   role, formality, occasion and laundry state, plus free-text search across
   name, colour, material and notes. The detail view shows every field, all the
   photos, and the `pairs` / `layer` / `avoid` prose exactly as written.
-- **Fits** — the seeded fits by register, each showing its temperature bands,
-  season, good-for occasions, catch, and whether it's wearable right now. Filter
-  by killer, by season, or to just the ones that are blocked. The roll-neck fit
-  is behind a toggle. A fit is **never hidden** when something is wrong with it —
-  it is badged with the specific problem ("Ecco sneaker is in the wash",
-  "Contains a binned item", "Blocked: clean the coating").
+- **Fits** — a 3-up gallery of fit cards, each showing the garment renders side
+  by side, its status, badges, catch, any blocking job, and `Log worn`. Filter by
+  register, killer, wearable/blocked, temperature band or occasion; the roll-neck
+  fit is behind a toggle. A fit is **never hidden** when something is wrong with
+  it — it is badged with the specific problem. Clicking a card opens the **detail
+  drawer**; `Build a fit` opens the **builder**. See "The Fits design" below.
 - **Log** — what was worn, newest first, with rating and note.
 - **Laundry** — flip items between clean / worn / in the wash / at the tailor,
   with two bulk moves.
@@ -159,6 +159,30 @@ blazer open" is a catch.
 **Season is a browsing label only.** It filters the Fits list and is never read
 by the picker; temperature band and rain drive every decision. There is a test
 that changing a season leaves the picker's output identical.
+
+## The Fits design
+
+The Fits area implements the approved direction in `docs/DESIGN_FITS_HANDOFF.md`
+(design pack, 2026-08-26). Recreated inside the existing Flask + Jinja + one
+stylesheet — no SPA, no second styling system, no build step.
+
+- **Tokens** live at the top of `wardrobe/static/app.css`. Space Grotesk for UI,
+  IBM Plex Mono for labels and numbers. Borders do the work: no shadows anywhere,
+  and no motion beyond colour.
+- **Photo grounds are white** because every retail render is shot on white; a
+  tinted ground would show the render's box. A garment with no render is skipped
+  rather than left as an empty slot.
+- **The drawers are server-rendered**, not a client-side app: `?fit=<id>` opens
+  the detail, `?build=1` opens the builder. Filters are query-side only and never
+  mutate a fit.
+- **The builder is the one view with client-side state.** `wardrobe/static/builder.js`
+  is a port of `wardrobe/fit_derive.py` so the strip previews exactly what the
+  server will store on save. If those two ever disagree, the strip is lying.
+- A built fit is `vetted = false`, its metadata recorded as `derived`, and it
+  carries no style draft — the drafts belong to the seeded fits.
+- **Renaming a fit makes the name yours.** It is recorded as `manual`, so the
+  importer stops refreshing it from the seed file, exactly like `score`,
+  `killer` and `style`.
 
 ## The picker
 

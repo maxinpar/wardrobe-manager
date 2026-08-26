@@ -1,0 +1,61 @@
+{# Build a fit. The only view with client-side state: the derived strip updates
+   as pieces are picked, using the same rules as wardrobe/fit_derive.py. It is
+   progressive enhancement — with JS off the form still submits and the server
+   derives exactly the same values. #}
+<aside class="drawer wide" id="builder">
+  <form method="post" action="{{ url_for('fit_create') }}" id="builder-form">
+    <div class="drawer-head">
+      <h2 class="drawer-title" style="border:none">Build a fit</h2>
+      <a class="btn drawer-close" href="{{ url_for('fits_view', **filters.current()) }}" title="Close">×</a>
+    </div>
+    <p class="mono" style="margin:6px 0 0">Pick a piece per role · metadata derives as you go</p>
+
+    <section>
+      <div class="builder-summary">
+        <div class="row">
+          <input name="name" placeholder="Name this fit" required>
+          <button class="btn-brass" type="submit">Save fit</button>
+        </div>
+        <div class="derived-strip">
+          <div class="derived-cell"><span class="k">Temperature</span><span class="v" data-derived="bands">—</span></div>
+          <div class="derived-cell"><span class="k">Rain</span><span class="v" data-derived="rain">—</span></div>
+          <div class="derived-cell"><span class="k">Formality</span><span class="v" data-derived="formality">—</span></div>
+          <div class="derived-cell"><span class="k">Season</span><span class="v" data-derived="season">—</span></div>
+        </div>
+        <p class="builder-footnote">
+          Everything above is a first guess, recorded as derived. Your edits win and are
+          never overwritten by an import.
+        </p>
+      </div>
+    </section>
+
+    {% for role, label, optional in builder.roles %}
+      <div class="role-row" data-role="{{ role }}">
+        <div class="role-head">
+          <span class="mono">{{ label }}{{ ' · optional' if optional }}</span>
+          <span class="name" data-picked-name="{{ role }}">nothing picked</span>
+        </div>
+        <input type="hidden" name="{{ role }}" value="" data-slot="{{ role }}">
+        <div class="candidates">
+          {% for item in builder.candidates[role] %}
+            <button type="button" class="candidate" data-role="{{ role }}" data-item="{{ item.id }}"
+                    data-name="{{ item.name }}" data-cat="{{ item.cat_code }}"
+                    data-warmth="{{ item.warmth or 3 }}"
+                    data-formality="{{ item.formality_rank or 3 }}"
+                    data-rain-unsafe="{{ 1 if item.rain_unsafe else 0 }}">
+              {% set r = renders.get(item.id) %}
+              {% if r and r.thumb %}
+                <img src="{{ url_for('photo', relative_path=r.thumb) }}" alt="">
+              {% else %}
+                <span class="swatch-piece" style="background: {{ item.hex or '#ccc' }}"></span>
+              {% endif %}
+              <span class="cname">{{ item.name }}</span>
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </form>
+</aside>
+
+<script src="{{ url_for('static', filename='builder.js') }}"></script>
