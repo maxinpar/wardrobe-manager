@@ -83,7 +83,9 @@ def build_payload(conn, generated: str) -> dict:
 
     items = []
     for row in db.fetch_all(
-        conn, "SELECT * FROM items ORDER BY created_at, id"
+        conn,
+        # Retired ids have left the catalogue; the export is the catalogue.
+        "SELECT * FROM items WHERE retired_at IS NULL ORDER BY created_at, id",
     ):
         item = {}
         for key in KEY_ORDER:

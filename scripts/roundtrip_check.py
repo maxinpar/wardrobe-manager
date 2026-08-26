@@ -53,15 +53,31 @@ def admin_url(base_url: str) -> str:
     return scratch_url(base_url, "postgres")
 
 
+# Tables keyed by item_id. A retired item is deliberately absent from the
+# export, so the scratch database rebuilt from it will not have those rows —
+# counting them on the live side would compare the catalogue against the
+# catalogue plus its history and always disagree.
+ITEM_SCOPED = ("item_occasions", "item_field_sources", "item_laundry")
+
+OTHER_TABLES = (
+    "fits", "fit_items", "fit_temp_bands", "fit_seasons", "fit_occasions",
+    "fit_preconditions", "wear_events", "wear_event_items",
+)
+
+
 def counts(url: str) -> dict[str, int]:
-    tables = [
-        "items", "item_occasions", "item_field_sources", "fits", "fit_items",
-        "fit_temp_bands", "fit_seasons", "fit_occasions", "fit_preconditions",
-        "wear_events", "wear_event_items", "item_laundry",
-    ]
     out = {}
     with db.connect(url) as conn:
-        for table in tables:
+        out["items"] = db.fetch_one(
+            conn, "SELECT count(*) AS n FROM items WHERE retired_at IS NULL"
+        )["n"]
+        for table in ITEM_SCOPED:
+            out[table] = db.fetch_one(
+                conn,
+                f"SELECT count(*) AS n FROM {table} t JOIN items i ON i.id = t.item_id "
+                "WHERE i.retired_at IS NULL",
+            )["n"]
+        for table in OTHER_TABLES:
             out[table] = db.fetch_one(conn, f"SELECT count(*) AS n FROM {table}")["n"]
     return out
 

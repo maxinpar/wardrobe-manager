@@ -324,6 +324,39 @@ def main() -> int:
                 "    fit_<slug>_NN_<angle>.jpg     real worn photo"
             )
 
+        # ---- prune rows whose file no longer belongs to the item ---------
+        # The five group-shot shoes were given individual prefixes on
+        # 2026-08-26, which orphans their rows against the old group stems.
+        # Photo rows are derived from disk, so dropping a stale one destroys
+        # nothing: the file itself is untouched, in Drive and in the store.
+        stale = db.fetch_all(
+            conn,
+            """
+            SELECT p.id, p.item_id, p.source_filename, i.photo_prefix, i.retail_prefix
+            FROM photos p JOIN items i ON i.id = p.item_id
+            """,
+        )
+        pruned = []
+        for row in stale:
+            prefixes = [
+                row["photo_prefix"],
+                row["retail_prefix"],
+                f"{row['item_id']}_retail",
+                row["item_id"],
+            ]
+            if not any(
+                p and row["source_filename"].startswith(p) for p in prefixes
+            ):
+                pruned.append(f"{row['item_id']}  {row['source_filename']}")
+                if args.commit:
+                    conn.execute("DELETE FROM photos WHERE id = %s", (row["id"],))
+
+        if pruned:
+            print(f"\nPhoto rows no longer matching their item ({len(pruned)}):")
+            for line in pruned:
+                print("   ", line)
+            print("    The files are untouched — only the index rows go.")
+
         no_photo_rows = db.fetch_all(
             conn,
             "SELECT i.id FROM items i LEFT JOIN photos p ON p.item_id = i.id "

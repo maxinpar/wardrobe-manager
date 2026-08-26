@@ -146,6 +146,8 @@ def unavailable(item: dict) -> str | None:
         return "on the way out (Replace)"
     if item.get("scope") == "out":
         return "out of scope"
+    if item.get("retired"):
+        return "no longer in the catalogue"
     return None
 
 
@@ -306,6 +308,7 @@ SELECT f.id, f.name, f.register_code, f.commentary, f.catch, f.style, f.score,
        fi.item_id, i.name AS item_name, i.material, i.cat_code,
        fi.role, fi.position, fi.is_alternate, fi.note,
        i.warmth, i.rain_unsafe, i.weatherproof_rain, i.verdict_code, i.scope_code,
+       (i.retired_at IS NOT NULL) AS retired,
        COALESCE(l.state_code, 'clean') AS laundry_state
 FROM fits f
 JOIN fit_items fi ON fi.fit_id = f.id
@@ -372,6 +375,7 @@ def load_fits(conn) -> list[Fit]:
                 "verdict": row["verdict_code"],
                 "scope": row["scope_code"],
                 "laundry_state": row["laundry_state"],
+                "retired": row["retired"],
             }
         )
     return list(fits.values())

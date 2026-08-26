@@ -10,6 +10,14 @@
   {% if item.scope_code == 'out' %}<span class="badge out">out of scope</span>{% endif %}
 </p>
 
+{% if item.retired_at %}
+  <p class="catch">
+    ⚠ No longer in the catalogue — retired {{ item.retired_at.strftime('%d %b %Y') }}.
+    {{ item.retired_note }}. The record is kept because things may still reference it;
+    it is excluded from the catalogue, the picker and the export.
+  </p>
+{% endif %}
+
 <div class="photos">
   {% for p in photos %}
     <figure>

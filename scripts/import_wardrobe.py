@@ -231,6 +231,38 @@ def upsert_item(
     )
 
 
+def retire_missing(conn, live_ids: set[str], changes: list[str]) -> None:
+    """An id that has left wardrobe.json is retired, never deleted.
+
+    Deleting would take a wear event's garment with it, and a wear event records
+    something that actually happened. Retiring keeps the row and everything
+    pointing at it, and is undone by clearing one column.
+    """
+    rows = db.fetch_all(
+        conn, "SELECT id, name, retired_at FROM items ORDER BY id"
+    )
+    for row in rows:
+        gone = row["id"] not in live_ids
+        if gone and row["retired_at"] is None:
+            conn.execute(
+                "UPDATE items SET retired_at = now(), retired_note = %s WHERE id = %s",
+                ("no longer in wardrobe.json", row["id"]),
+            )
+            used_by = db.fetch_all(
+                conn, "SELECT fit_id FROM fit_items WHERE item_id = %s", (row["id"],)
+            )
+            changes.append(
+                f"RETIRED  {row['id']} — gone from the catalogue"
+                + (f", still referenced by {len(used_by)} fit(s)" if used_by else "")
+            )
+        elif not gone and row["retired_at"] is not None:
+            conn.execute(
+                "UPDATE items SET retired_at = NULL, retired_note = NULL WHERE id = %s",
+                (row["id"],),
+            )
+            changes.append(f"RESTORED {row['id']} — back in the catalogue")
+
+
 # --------------------------------------------------------------- fit seeds --
 
 
@@ -660,23 +692,24 @@ def main() -> int:
                 derived_summary["occasions"][code] += 1
             upsert_item(conn, row, occasions, changes, source_of_derived(item))
 
+        retire_missing(conn, {i["id"] for i in items}, changes)
         seed_fits(conn, changes)
         seed_wear_events(conn, changes)
 
         # ---- report, read back from the database inside the transaction ----
         print("Imported counts (read back from the database)")
         for label, sql in (
-            ("category", "SELECT cat_code AS k, count(*) AS n FROM items GROUP BY 1 ORDER BY 1"),
-            ("verdict", "SELECT verdict_code AS k, count(*) AS n FROM items GROUP BY 1 ORDER BY 1"),
-            ("scope", "SELECT scope_code AS k, count(*) AS n FROM items GROUP BY 1 ORDER BY 1"),
+            ("category", "SELECT cat_code AS k, count(*) AS n FROM items WHERE retired_at IS NULL GROUP BY 1 ORDER BY 1"),
+            ("verdict", "SELECT verdict_code AS k, count(*) AS n FROM items WHERE retired_at IS NULL GROUP BY 1 ORDER BY 1"),
+            ("scope", "SELECT scope_code AS k, count(*) AS n FROM items WHERE retired_at IS NULL GROUP BY 1 ORDER BY 1"),
         ):
             rows = db.fetch_all(conn, sql)
             joined = " · ".join(f"{r['k']} {r['n']}" for r in rows)
             print(f"  {label:9} {joined}")
 
-        total = db.fetch_one(conn, "SELECT count(*) AS n FROM items")["n"]
+        total = db.fetch_one(conn, "SELECT count(*) AS n FROM items WHERE retired_at IS NULL")["n"]
         no_photo = db.fetch_one(
-            conn, "SELECT count(*) AS n FROM items WHERE no_photo"
+            conn, "SELECT count(*) AS n FROM items WHERE no_photo AND retired_at IS NULL"
         )["n"]
         fits = db.fetch_one(conn, "SELECT count(*) AS n FROM fits")["n"]
         hidden = db.fetch_one(
@@ -743,7 +776,7 @@ def main() -> int:
         stale = db.fetch_all(
             conn,
             "SELECT id, name FROM items WHERE cat_code = 'Trousers' "
-            "AND verdict_code = 'Tailor' ORDER BY id",
+            "AND verdict_code = 'Tailor' AND retired_at IS NULL ORDER BY id",
         )
         if stale:
             print(
@@ -792,13 +825,17 @@ def main() -> int:
 
 def reconcile_db(conn) -> list[str]:
     problems = []
-    total = db.fetch_one(conn, "SELECT count(*) AS n FROM items")["n"]
+    total = db.fetch_one(
+        conn, "SELECT count(*) AS n FROM items WHERE retired_at IS NULL"
+    )["n"]
     if total != EXPECTED["total"]:
         problems.append(f"items in DB: {total}, expected {EXPECTED['total']}")
 
     for key, column in (("cat", "cat_code"), ("verdict", "verdict_code"), ("scope", "scope_code")):
         rows = db.fetch_all(
-            conn, f"SELECT {column} AS k, count(*) AS n FROM items GROUP BY 1"
+            conn,
+            f"SELECT {column} AS k, count(*) AS n FROM items "
+            "WHERE retired_at IS NULL GROUP BY 1",
         )
         counts = {r["k"]: r["n"] for r in rows}
         for value, expected in EXPECTED[key].items():
@@ -807,7 +844,10 @@ def reconcile_db(conn) -> list[str]:
                     f"{column} {value}: {counts.get(value, 0)} in DB, expected {expected}"
                 )
 
-    no_photo = db.fetch_one(conn, "SELECT count(*) AS n FROM items WHERE no_photo")["n"]
+    no_photo = db.fetch_one(
+        conn,
+        "SELECT count(*) AS n FROM items WHERE no_photo AND retired_at IS NULL",
+    )["n"]
     if no_photo != EXPECTED["no_photo"]:
         problems.append(f"no_photo in DB: {no_photo}, expected {EXPECTED['no_photo']}")
 
