@@ -311,9 +311,10 @@ def catalogue():
         )
         params.extend([f"%{filters['q']}%"] * 4)
 
-    sql = ITEM_SELECT
-    if where:
-        sql += " WHERE " + " AND ".join(where)
+    # A retired item is out of the catalogue, but still reachable by direct link
+    # so that a wear event referencing it can be followed.
+    where.insert(0, "i.retired_at IS NULL")
+    sql = ITEM_SELECT + " WHERE " + " AND ".join(where)
     sql += " ORDER BY c.sort_order, i.name"
 
     with db.connect() as conn:
@@ -641,7 +642,9 @@ def laundry_view():
     with db.connect() as conn:
         states = db.fetch_all(conn, "SELECT * FROM laundry_states ORDER BY sort_order")
         items = db.fetch_all(
-            conn, ITEM_SELECT + " WHERE i.scope_code = 'core' ORDER BY c.sort_order, i.name"
+            conn,
+            ITEM_SELECT + " WHERE i.scope_code = 'core' AND i.retired_at IS NULL"
+            " ORDER BY c.sort_order, i.name",
         )
     by_state: dict[str, list] = {s["code"]: [] for s in states}
     for item in items:

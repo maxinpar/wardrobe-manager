@@ -24,3 +24,6 @@ export/
 # Patch artefacts — the pre-patch original is in git history
 *.bak
 *.new
+
+# Unzipped drops — the files that matter are copied into data/ and docs/
+.incoming/

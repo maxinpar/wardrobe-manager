@@ -65,15 +65,15 @@ Plain numbered `.sql` files in `migrations/`, applied once each and recorded in
 
 The first form is a dry run — it prints every change it would make and writes
 nothing. The second one commits. It also seeds the 18 fits (11 from
-`work-outfits.md` including the hidden roll-neck, 7 from `killer-looks.md`) and
-both wear events.
+`work-outfits.md` including the hidden roll-neck, 7 from `killer-looks.md`),
+both wear events, and retires any id that has left the catalogue.
 
 The importer prints a verification report: counts per category, verdict and
 scope, items with no photo, `photoPrefix` values that matched no file on disk,
 and anything it couldn't parse. If the numbers don't reconcile against the
-known-good baseline (69 items · Knitwear 18 / Trousers 12 / Shoes 12 / Belts 11
-/ Tops 10 / Outerwear 6 · Keep 45, Tailor 10, Bin 8, Replace 6 · core 65, out 4
-· 12 without an individual photo) it stops rather than papering over it. The
+known-good baseline (68 items · Knitwear 18 / Shoes 12 / Belts 11 / Trousers 11
+/ Tops 10 / Outerwear 6 · Keep 45, Tailor 9, Bin 8, Replace 6 · core 64, out 4
+· 2 without a photo) it stops rather than papering over it. The
 baseline lives in `data/baseline.json`, so a legitimate catalogue change is
 recorded as a data edit rather than buried in a code change.
 
@@ -253,18 +253,15 @@ and the importer stops offering a draft for it.
   `item_field_sources` is what makes the correction stick — the importer never
   overwrites a manual value. Knitwear `Tailor` items are unconfirmed and
   untouched.
-- **12 items have no individual photo, and that is two different problems.**
-  Six belts have **no image at all** — those photos are gone for good, and the
-  app shows a colour swatch with the prefix to reuse. Five shoes
-  (`shoes_08a/b/c`, `shoes_09a/b`) **share a group shot**: there is an image to
-  look at, it just isn't an individual one, so they are badged "needs an
-  individual shot" instead. `trousers_00_decathlon-stone` has a retail render
-  but no source photograph at all — that render was made from a written
-  description and has never been checked against the garment.
-- **`photoPrefix` is not unique.** The five group-shot shoes share two prefixes,
-  which is why they have never rendered individually. The importer warns about
-  it every run; renders are matched by `<item_id>_retail` so one can never
-  attach to three garments at once.
+- **The catalogue is photo-complete as of 2026-08-26 rev 2.** All 68 items have
+  a source photo and a retail render except `belts_05` and `belts_10`, which are
+  marked **not located** — Max gathered every belt he owns and neither turned
+  up. They are kept in the catalogue with a note rather than deleted, because
+  absence is weaker evidence than the proof that retired `trousers_00`.
+- **`photoPrefix` is still not guaranteed unique** in older data, so the
+  importer warns rather than assumes. The five group-shot shoes now have
+  individual prefixes, which orphans two group `.webp` files in Drive — they are
+  parked, not deleted, and their index rows were pruned.
 - **Generated catalogue renders** (`Retail/`) are the preferred image
   everywhere: the catalogue grid, the outfit chips and the top of the item
   detail page all lead with the render where one exists, falling back to a real
@@ -287,6 +284,26 @@ Out of scope for v1, deliberately, and not built:
 - the SVG illustration set (`wardrobe-kit.js`)
 - migrating the old 17 MB `Wardrobe_Manager.html` — superseded, left alone
 - logging the missing categories: tees, shirts, shorts, socks
+
+## When an item leaves the catalogue
+
+`trousers_00_decathlon-stone` turned out to be a phantom — the same Decathlon
+chino logged twice, caught when its "new" photos proved byte-identical to
+`trousers_01`'s. rev 2 of the patch removes it from `wardrobe.json`.
+
+The importer follows that by **retiring, never deleting**:
+
+- `items.retired_at` is set; the row and everything referencing it stay put
+- it drops out of the catalogue, the laundry board, the picker and the export
+- its own page still resolves, with a notice saying when and why
+- a fit containing a retired garment is badged "no longer in the catalogue"
+- clearing the column brings it back, and an id that reappears in the JSON
+  un-retires itself automatically
+
+Deleting would be the wrong mechanism: a wear event records something that
+actually happened, and an item may already be referenced by a fit. The
+round-trip check compares catalogue rows only, so a retired row doesn't make it
+disagree with itself.
 
 ## Fit photos
 

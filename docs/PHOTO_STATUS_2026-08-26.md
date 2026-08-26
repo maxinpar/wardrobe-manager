@@ -26,7 +26,42 @@ python patch_wardrobe_20260826.py data/wardrobe.json --commit  # writes .new, ba
 - **Self-verifying.** Reconciles to 69 items / 12 noPhoto / Keep 45, Tailor 10, Bin 8, Replace 6 /
   core 65, out 4 and **exits non-zero rather than committing** if anything mismatches.
 
-**Baseline moves from 13 to 12.** `trousers_11_black-coated-jeans` was filed 2026-08-25.
+**Baseline moves from 13 to 11 items without an individual photo, and the catalogue drops from
+69 items to 68.** Two separate reasons:
+- `trousers_11_black-coated-jeans` was filed 2026-08-25 (13 -> 12).
+- `trousers_00_decathlon-stone` is deleted as a phantom (12 -> 11, and 69 -> 68). See below.
+
+New expected counts, enforced by the script:
+
+```
+items 68 | noPhoto 11 | Keep 45, Tailor 9, Bin 8, Replace 6 | core 64, out 4
+Trousers category: 12 -> 11
+```
+
+## The deletion — read this before running --commit
+
+`trousers_00_decathlon-stone` **is not a real garment.** Max physically counted on 2026-08-26 and
+confirmed he owns ONE beige/stone Decathlon chino, not two. It was the same pair logged twice.
+
+How it was caught: he re-sent photos of what he thought was the unphotographed pair. They turned out
+to be byte-identical to `trousers_01_decathlon-beige_label.jpg` and `_flatlay.jpg`, already on Drive
+since 5 August. The label reads **US W33 L33** — but `trousers_01` was recorded as *"US W31 L33"*.
+That W31 was a transcription error, and the size was the *only* field distinguishing the two records.
+
+Everything else lines up: same brand, same 98% cotton / 2% elastane, same L33. `trousers_00` never
+had a photograph in its life, and its retail render was generated from a written description with no
+visual reference. The verdict conflict (`Tailor` "4–5cm too long" vs `Keep` "length correct") is one
+garment logged either side of the 2026-08-20 hemming.
+
+The patch deletes it, fixes `trousers_01`'s size, and reports one orphaned file:
+
+```
+Retail/trousers_00_decathlon-stone_retail.jpeg   <- park it, don't silently delete
+```
+
+**Side benefit for your name-mapping table:** there are now only TWO items called "Decathlon chino"
+(`trousers_01` beige, `trousers_03` cobalt), not three. Neither `work-outfits.md` nor
+`killer-looks.md` references `trousers_00`, so nothing downstream breaks.
 
 ## Two corrections you couldn't have known about
 
@@ -84,3 +119,69 @@ have no recorded negatives, and inventing them would be the thing you correctly 
 - 5 retail renders exist for items that can never appear in a fit (`shoes_01` Replace, `shoes_05`
   Bin, `shoes_06` out, `anko-black-quarterzip-fleece` out, `belts_01` Replace). Harmless.
 - 50 retail renders now exist. Any doc saying "only the brogue has been generated" is stale.
+
+## Unlogged categories — not blocking, don't wait for them
+
+Zero items exist in the catalogue for: **t-shirts, dress shirts, shorts, socks, golf apparel,
+accessories.** Two consequences worth building for:
+
+- **Both wear events include a plain tee with no id.** Free-text item on the wear event is not an
+  edge case, it's the current normal.
+- **Golf apparel is deliberately deferred** — Max's call, 2026-08-26. He owns at least one Callaway
+  golf polo that isn't logged. Don't model a `golf` split beyond the existing `occasions` value;
+  when it lands it's just more rows.
+
+Tees are the one that matters: 9 V-neck knits are unwearable without one, which is why not a single
+one of the 17 fits uses a V-neck.
+
+---
+
+# REV 2 — 2026-08-26, after the belt and shoe reshoots
+
+`patch_wardrobe_20260826.py` has been **replaced with a rev-2 superset**. It is idempotent and safe
+to run whether or not you already applied rev 1 — already-applied edits are skipped. 49 changes from
+a clean original; 0 on a second run. Verified against a 69-item fixture.
+
+## The catalogue is now photo-complete
+
+Every one of the 68 items has both a source photograph and a retail render, except two belts that no
+longer physically exist. New reconciliation target:
+
+```
+items 68 | noPhoto 2 | Keep 45, Tailor 9, Bin 8, Replace 6 | core 64, out 4
+```
+
+## What rev 2 adds
+
+**Four belts photographed and rendered** — `belts_06`, `belts_07`, `belts_09`, `belts_11` all flip to
+`noPhoto: false` with real `photoRef` values.
+
+**`belts_11` brand identified.** The underside stamp, recorded as "gone faint / unreadable", reads
+**H&M, size M, 85-95, article 304970**.
+
+**Five shoes get individual prefixes.** `shoes_08a/b/c` all shared `shoes_08_loafers-group_reference`
+and `shoes_09a/b` shared `shoes_09_nike-trainers-group_reference` — that shared stem is precisely why
+none of them ever rendered individually. Each now has its own `photoPrefix` and `retailPrefix` and
+its own frames. **This orphans the two group `.webp` files** — park them, don't delete.
+
+**🔴 `shoes_08b` had two record errors**, both corrected:
+- It is **not a penny loafer.** The vamp is a single unbroken panel — no strap, no saddle band, no
+  keyhole. It's a plain-vamp venetian slip-on moccasin with a hand-stitched apron seam and a small
+  raised tab at the throat.
+- It is **not tan.** Dark chocolate brown, pebbled. `colour` and `hex` corrected.
+
+The id and `photoPrefix` deliberately keep the `-tan-loafer` stem: the photos are already filed under
+it, and ids are never renumbered.
+
+**Two belts marked not located, NOT deleted.** `belts_05` and `belts_10` did not appear when Max
+gathered every belt he owns. Both were already `Replace`. Absence is weaker evidence than the proof
+that removed `trousers_00`, so they stay in the catalogue with a note. Confirm with Max before
+removing them.
+
+## Two observations for Max, not applied
+
+- **`shoes_08c` may be wrongly scoped.** Its `scope='out'` (holiday only) was set from a group photo.
+  The individual shots show deep even nap, clean cream stitching, a barely-worn sole. A navy suede
+  driving moc is not obviously wrong for a casual office. Left unchanged — his call.
+- **`shoes_09b` was shot and rendered without being cleaned.** Grey scuffing on the toe and midsole
+  is in both the photo and the render. Honest, but unflattering for a Keep/core shoe.
