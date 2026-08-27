@@ -163,8 +163,10 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 }
 .fit-card:hover { border-color: var(--brass); color: inherit; }
 
+/* 5/8 portrait, per the handoff: a full-look render is a standing figure, and
+   a fixed-height letterbox cut the head and the shoes off it. */
 .ground {
-  position: relative; height: 208px; background: var(--surface);
+  position: relative; aspect-ratio: 5 / 8; background: var(--surface);
   border: 1px solid var(--line-card); border-radius: 13px; overflow: hidden;
   display: flex; gap: 2px; padding: 12px;
 }
@@ -251,7 +253,7 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 }
 .drawer section { margin-top: 22px; }
 .drawer .hero {
-  height: 300px; border: 1px solid var(--line-card); border-radius: 14px;
+  aspect-ratio: 5 / 8; border: 1px solid var(--line-card); border-radius: 14px;
   overflow: hidden; display: flex; gap: 4px; padding: 14px; background: var(--surface);
 }
 .drawer .hero.full { padding: 0; }
@@ -478,36 +480,36 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 /* The vertical counterpart to the Fits gallery: only the fits that have a
    full-look render, one per row, big enough to actually judge. */
 
-.look-list { display: flex; flex-direction: column; gap: 16px; max-width: 1080px; }
+.look-list {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px;
+}
 
-.look-row {
-  display: grid; grid-template-columns: 420px 1fr; gap: 20px;
+/* Renders mode, to the handoff: the same three-up grid as Details, a larger
+   radius, and nothing under the picture but the name, the score and one line.
+   Everything else about the fit is a click away in the drawer. */
+.look-card {
+  display: flex; flex-direction: column; gap: 14px;
   background: var(--surface); border: 1px solid transparent;
-  border-radius: 20px; padding: 16px;
+  border-radius: 22px; padding: 16px; color: inherit;
 }
-.look-row:hover { border-color: var(--brass); }
+.look-card:hover { border-color: var(--brass); color: inherit; }
 
-.look-figure {
-  position: relative; margin: 0; align-self: start;
+.look-frame {
+  position: relative; margin: 0; aspect-ratio: 5 / 8;
   background: var(--surface); border: 1px solid var(--line-card);
-  border-radius: 14px; overflow: hidden;
+  border-radius: 15px; overflow: hidden;
 }
-.look-figure img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; }
-.look-figure figcaption { position: absolute; bottom: 10px; left: 10px; }
+.look-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.look-frame figcaption { position: absolute; bottom: 10px; left: 10px; }
+.look-frame .pill-status { position: absolute; top: 10px; right: 10px; }
 
-.look-body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.look-body .fit-title { color: inherit; }
-.look-body .fit-title:hover { color: var(--brass-text); }
-.look-body .commentary { font-size: 13px; }
-.look-body .chips { gap: 6px; }
-.look-body .chip { width: 84px; font-size: 10.5px; }
-.look-body .fit-footer { margin-top: auto; padding-top: 4px; }
-.look-body .fit-footer form, .look-body .fit-footer .btn { flex: 0 0 auto; }
-.look-body .fit-footer .btn { padding: 8px 22px; }
+.look-card .fit-title { font-size: 18px; }
 
-@media (max-width: 900px) {
-  .look-row { grid-template-columns: 1fr; }
-  .look-figure { max-width: 520px; }
+@media (max-width: 1180px) {
+  .look-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 820px) {
+  .look-list { grid-template-columns: 1fr; }
 }
 
 /* -------------------------------------------------------------- today --- */
