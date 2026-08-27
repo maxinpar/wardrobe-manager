@@ -14,8 +14,9 @@
   </div>
   <nav>
     <a href="{{ url_for('today_view') }}" class="{{ 'on' if request.endpoint == 'today_view' }}">Today</a>
-    <a href="{{ url_for('fits_view') }}" class="{{ 'on' if request.endpoint in ('fits_view', 'fit_detail') }}">Fits</a>
-    <a href="{{ url_for('looks_view') }}" class="{{ 'on' if request.endpoint == 'looks_view' }}">Looks</a>
+    {# Looks was its own tab for a day. The renders are a way of drawing fits,
+       not a separate set of things, so they live behind Fits' mode switch. #}
+    <a href="{{ url_for('fits_view') }}" class="{{ 'on' if request.endpoint in ('fits_view', 'fit_detail', 'looks_view') }}">Fits</a>
     <a href="{{ url_for('catalogue') }}" class="{{ 'on' if request.endpoint in ('catalogue', 'item_detail') }}">Closet</a>
     <a href="{{ url_for('laundry_view') }}" class="{{ 'on' if request.endpoint == 'laundry_view' }}">Laundry</a>
     <a href="{{ url_for('log_view') }}" class="{{ 'on' if request.endpoint == 'log_view' }}">Log</a>

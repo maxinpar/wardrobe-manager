@@ -24,18 +24,27 @@
   {{ filter_link('Good for client', 'occasion', 'client', filters.occasion == 'client') }}
   {{ filter_link('Good for dinner', 'occasion', 'dinner', filters.occasion == 'dinner') }}
   {{ filter_link('Show roll-neck', 'hidden', '1', filters.hidden) }}
-{% set mode = 'details' %}
   <span class="segmented mode-switch">
-    <a class="btn {{ 'on' if mode == 'details' }}" href="{{ url_for('fits_view') }}">Details</a>
-    <a class="btn {{ 'on' if mode == 'renders' }}" href="{{ url_for('looks_view') }}">Renders</a>
+    <a class="btn {{ 'on' if mode == 'details' }}"
+       href="{{ url_for('fits_view', **filters.in_mode('details')) }}">Details</a>
+    <a class="btn {{ 'on' if mode == 'renders' }}"
+       href="{{ url_for('fits_view', **filters.in_mode('renders')) }}">Renders</a>
   </span>
 </div>
 
 <p class="mono count-line">
   {{ counts.total }} fits · {{ counts.wearable }} wearable now · {{ counts.blocked }} blocked ·
-  showing {{ cards|length }}
+  {{ counts.rendered }} with a render ·
+  {% if mode == 'renders' %}
+    showing {{ cards|length }} at size · every image below is generated, not a photograph
+  {% else %}
+    showing {{ cards|length }}
+  {% endif %}
 </p>
 
+{% if mode == 'renders' %}
+  {% include "_renders.html" %}
+{% else %}
 <div class="fit-grid">
   {% for c in cards %}
     {% set fit = c.fit %}
@@ -92,6 +101,7 @@
     <p class="muted">Nothing matches those filters.</p>
   {% endfor %}
 </div>
+{% endif %}
 {% endblock %}
 
 {% block drawer %}

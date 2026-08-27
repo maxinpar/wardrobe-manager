@@ -1,20 +1,10 @@
-{% extends "base.html" %}
+{# Fits, drawn as pictures: one per row, at a size you can actually judge.
+
+   This was the Looks tab. It is the same set of fits and the same filters as
+   Details — only the ones with a full-look render, stacked rather than
+   three-up — so it is a mode of Fits rather than a place of its own. Opening
+   one still opens the drawer over this view, not somewhere else. #}
 {% from "_fit_macros.html" import fit_badges %}
-{% block title %}Looks — Wardrobe{% endblock %}
-
-{% block content %}
-<div class="filters">
-{% set mode = 'renders' %}
-  <span class="segmented mode-switch">
-    <a class="btn {{ 'on' if mode == 'details' }}" href="{{ url_for('fits_view') }}">Details</a>
-    <a class="btn {{ 'on' if mode == 'renders' }}" href="{{ url_for('looks_view') }}">Renders</a>
-  </span>
-</div>
-
-<p class="mono count-line">
-  {{ cards|length }} fits with a full-look render · one per row, at size ·
-  every image below is generated, not a photograph
-</p>
 
 <div class="look-list">
   {% for c in cards %}
@@ -30,7 +20,7 @@
 
       <div class="look-body">
         <div class="fit-title-row">
-          <a class="fit-title" href="{{ url_for('fits_view', fit=fit.id) }}">{{ fit.name }}</a>
+          <a class="fit-title" href="{{ url_for('fits_view', fit=fit.id, **filters.current()) }}">{{ fit.name }}</a>
           <span class="fit-score">{{ (fit.score ~ '/10') if fit.score else 'unscored' }}</span>
         </div>
 
@@ -84,12 +74,14 @@
               {{ 'Worn ' ~ c.wearings ~ '×' if c.wearings else 'Log worn' }}
             </button>
           </form>
-          <a class="btn" href="{{ url_for('fits_view', fit=fit.id) }}">Open</a>
+          <a class="btn" href="{{ url_for('fits_view', fit=fit.id, **filters.current()) }}">Open</a>
         </div>
       </div>
     </section>
   {% else %}
-    <p class="muted">No fit has a full-look render yet.</p>
+    <p class="muted">
+      No fit with a full-look render matches those filters.
+      {% if filters.current()|length > 1 %}Clear a filter, or switch to Details.{% endif %}
+    </p>
   {% endfor %}
 </div>
-{% endblock %}

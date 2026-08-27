@@ -670,7 +670,7 @@ ROLE_ORDER = ["outer", "layer", "top", "base", "bottom", "shoe", "belt", "access
 class FitFilters:
     """Gallery filter state. Query-side only — filters never mutate a fit."""
 
-    KEYS = ("register", "killer", "state", "band", "occasion", "hidden")
+    KEYS = ("register", "killer", "state", "band", "occasion", "hidden", "mode")
 
     def __init__(self, args):
         self.register = args.get("register") or ""
@@ -679,9 +679,15 @@ class FitFilters:
         self.band = args.get("band") or ""
         self.occasion = args.get("occasion") or ""
         self.hidden = args.get("hidden") == "1"
+        # Not a filter: which way the same set of fits is drawn. It rides in the
+        # query with them so that changing a chip doesn't throw you back to
+        # Details, and so a view can be linked to.
+        self.mode = "renders" if args.get("mode") == "renders" else "details"
 
     def current(self) -> dict:
         out = {}
+        if self.mode != "details":
+            out["mode"] = self.mode
         if self.register:
             out["register"] = self.register
         if self.killer:
@@ -710,6 +716,14 @@ class FitFilters:
             out.pop(param)
         else:
             out[param] = value
+        return out
+
+    def in_mode(self, mode: str) -> dict:
+        """The same filters, drawn the other way."""
+        out = self.current()
+        out.pop("mode", None)
+        if mode != "details":
+            out["mode"] = mode
         return out
 
 
@@ -869,6 +883,7 @@ def fits_view():
         "total": len(cards),
         "wearable": sum(1 for c in cards if not c["problems"]),
         "blocked": sum(1 for c in cards if c["problems"]),
+        "rendered": sum(1 for c in cards if c["fit"].hero_path),
     }
 
     shown = []
@@ -890,6 +905,12 @@ def fits_view():
             continue
         shown.append(c)
 
+    # Renders is the same set of fits drawn at size, so it can only show the
+    # ones that have an image — that is the whole point of the view, not a
+    # filter you can clear.
+    if filters.mode == "renders":
+        shown = [c for c in shown if c["fit"].hero_path]
+
     # A fit with a render sorts first — the picture is the fastest way in.
     shown.sort(key=lambda c: (c["fit"].hero_path is None, c["fit"].sort_order))
 
@@ -898,6 +919,7 @@ def fits_view():
         cards=shown,
         counts=counts,
         filters=filters,
+        mode=filters.mode,
         renders=renders,
         selected=selected,
         building=building,
@@ -908,17 +930,13 @@ def fits_view():
 
 @app.route("/looks")
 def looks_view():
-    """The fits that have a full-look render, one per row, big.
+    """Kept as a redirect. Looks is a mode of Fits, not a place of its own.
 
-    The gallery is three-up and holds every fit; this is the opposite view —
-    only the ones with a render, stacked, at a size you can actually judge.
+    It was briefly its own tab — that is where the renders view came from — but
+    a fit and its picture are the same thing, so having both in the nav meant
+    two doors into one room. The route stays so old links still land.
     """
-    with db.connect() as conn:
-        cards = [c for c in build_cards(conn) if c["fit"].hero_path]
-        renders = item_renders(conn)
-
-    cards.sort(key=lambda c: c["fit"].sort_order)
-    return render_template("looks.html", cards=cards, renders=renders)
+    return redirect(url_for("fits_view", mode="renders"))
 
 
 @app.route("/fit/<fit_id>")
