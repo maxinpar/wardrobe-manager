@@ -504,6 +504,12 @@ def catalogue():
                 "JOIN fits f ON f.id = fi.fit_id WHERE fi.item_id = %s ORDER BY f.name",
                 (selected_id,),
             )
+            selected["actions"] = db.fetch_all(
+                conn,
+                "SELECT id, required, status, note FROM item_actions "
+                "WHERE item_id = %s ORDER BY status, id",
+                (selected_id,),
+            )
             selected["occasions"] = db.fetch_all(
                 conn,
                 "SELECT o.label FROM item_occasions io JOIN occasions o "
@@ -722,7 +728,8 @@ def fit_rows(conn) -> dict[str, dict]:
     rows = db.fetch_all(
         conn,
         "SELECT id, source, formality_rank, rain_safe, hero_image_path, "
-        "hero_thumb_path, hero_is_generated, vetted FROM fits",
+        "hero_thumb_path, hero_is_generated, vetted, composition_known, "
+        "category_code FROM fits",
     )
     return {r["id"]: r for r in rows}
 
@@ -774,6 +781,8 @@ def build_cards(conn):
         m["formality_rank"] = row.get("formality_rank")
         m["rain_safe"] = row.get("rain_safe", True)
         m["authored"] = (row.get("source") or "").startswith("killer-looks")
+        m["composition_known"] = row.get("composition_known", True)
+        m["category"] = row.get("category_code")
         m["band_codes"] = band_codes.get(fit.id, [])
         m["occasion_codes"] = occasion_codes.get(fit.id, [])
         m["season_codes"] = season_codes.get(fit.id, [])

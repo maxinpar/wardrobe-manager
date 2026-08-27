@@ -8,7 +8,7 @@
     "the new wardrobe.json and say why in _changes. Editing it is how you record a",
     "deliberate change; the importer failing is how you find out about an accidental one."
   ],
-  "_matches_wardrobe_json_generated": "2026-08-26",
+  "_matches_wardrobe_json_generated": "2026-08-27",
   "_changes": [
     "2026-08-25: first baseline, from the wardrobe.json delivered with the port brief.",
     "2026-08-26: no_photo 13 -> 12. scripts/patch_wardrobe_20260826.py filed",
@@ -16,26 +16,28 @@
     "are two different problems: 7 with no image at all (6 belts + trousers_00), and 5",
     "sharing a group shot (shoes_08a/b/c, shoes_09a/b) that have no individual photo.",
     "2026-08-26 rev 2: 69 -> 68 items. trousers_00_decathlon-stone was a phantom — the same Decathlon chino logged twice, caught when its 'new' photos turned out to be byte-identical to trousers_01's. Tailor 10 -> 9 and Trousers 12 -> 11 follow from that. noPhoto 12 -> 2: four belts and five shoes were photographed; belts_05 and belts_10 remain, marked not-located rather than deleted.",
-    "2026-08-26 rev 3/4: 68 -> 73 items. Five crew tees added (tees_01..05) — they are render-only: three have a generated retail render, none has ever been photographed, so noPhoto stays true and their colour/fit/material remain unconfirmed. Keep 45 -> 50 and core 64 -> 69 follow. noPhoto 2 -> 7: the two not-located belts plus the five tees."
+    "2026-08-26 rev 3/4: 68 -> 73 items. Five crew tees added (tees_01..05) — they are render-only: three have a generated retail render, none has ever been photographed, so noPhoto stays true and their colour/fit/material remain unconfirmed. Keep 45 -> 50 and core 64 -> 69 follow. noPhoto 2 -> 7: the two not-located belts plus the five tees.",
+    "2026-08-27: 73 -> 113 items, from the Drive export. Three weeks of shirt cataloguing (Tops 15 -> 53) plus two blazers (Outerwear 6 -> 8). New scope value 'occasional' on four print shirts: wearable, in scope, not in the daily rotation. Bin 8 -> 17 and Keep 50 -> 79 follow from the new shirts."
   ],
-  "total": 73,
+  "total": 113,
   "cat": {
     "Knitwear": 18,
-    "Trousers": 11,
+    "Tops": 53,
     "Shoes": 12,
+    "Trousers": 11,
     "Belts": 11,
-    "Tops": 15,
-    "Outerwear": 6
+    "Outerwear": 8
   },
   "verdict": {
-    "Keep": 50,
-    "Tailor": 9,
-    "Bin": 8,
+    "Keep": 79,
+    "Tailor": 11,
+    "Bin": 17,
     "Replace": 6
   },
   "scope": {
-    "core": 69,
-    "out": 4
+    "core": 103,
+    "out": 6,
+    "occasional": 4
   },
   "no_photo": 7
 }

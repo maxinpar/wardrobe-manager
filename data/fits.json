@@ -1,0 +1,1528 @@
+{
+  "generated": "2026-08-27",
+  "owner": "Max",
+  "schemaNote": "Fits are ordered slots, matching the outfits/outfit_items model in db-port-brief.md section 3. Roles: outer, top, base (tee worn under a V-neck), bottom, shoe, belt. 'position' is the layering/display order. itemId references wardrobe.json items[].id.",
+  "renderNote": "Renders live in Google Drive: Wardrobe Photos\\Fits\\. They are GENERATED IMAGES, not photographs of Max wearing the clothes - flag them as such per db-port-brief.md section 3. Extensions are a mix of .png and .jpg and are exact as given; do not assume.",
+  "workOutfitsNote": "work-outfits.md references items by DISPLAY NAME, and names are not unique (two 'Zara Man V-neck', three 'Decathlon chino'). Per db-port-brief.md section 4 these must be re-keyed to ids by hand in an explicit mapping table, asserting each resolves to exactly one item. They are NOT included here as id-keyed fits for that reason - seed them from work-outfits.md as the brief specifies.",
+  "counts": {
+    "total": 35,
+    "withComposition": 27,
+    "renderOnly": 8,
+    "withRender": 28,
+    "byCategory": {
+      "casual": 11,
+      "smart": 6,
+      "warm": 9,
+      "cold": 9
+    }
+  },
+  "fits": [
+    {
+      "code": "kl1",
+      "name": "The Shawl - everyday, elevated",
+      "source": "killer-looks.md",
+      "category": "casual",
+      "temp": [
+        "cold",
+        "mild"
+      ],
+      "rainSafe": false,
+      "formalityRank": 3,
+      "goodFor": [
+        "casual",
+        "weekend",
+        "dinner"
+      ],
+      "badFor": [
+        "gym",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "ben-sherman-aubergine-shawl"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_11_black-coated-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_03_ecco-black-nubuck"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_11_black-classic-pin-buckle"
+        }
+      ],
+      "render": null,
+      "commentary": "Shawl-collar is the trimmest-fitting garment in the audit - best silhouette owned, currently unworn. All-black bottom half lets the proportions work.",
+      "catch": "Coated jeans greying at thigh/seat. Check in daylight; swap to trousers_09_celio-indigo-jeans if the wear reads.",
+      "alternate": "Optional outer layer: outerwear_02_indindustrie-black-waxed-biker",
+      "vetted": true
+    },
+    {
+      "code": "kl2",
+      "name": "Oatmeal & Navy Wool - sharp",
+      "source": "killer-looks.md",
+      "category": "smart",
+      "temp": [
+        "cold",
+        "mild"
+      ],
+      "rainSafe": true,
+      "formalityRank": 4,
+      "goodFor": [
+        "work",
+        "client",
+        "dinner"
+      ],
+      "badFor": [
+        "gym",
+        "weekend"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "fedeli-cashmere-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_08_tyrwhitt-navy-wool"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_04_churchs-apron-derby"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_02_tan-vera-pelle"
+        }
+      ],
+      "render": null,
+      "commentary": "Best knit + best trouser + best shoe, never yet combined. Pale over dark at full strength.",
+      "catch": "Repair the Fedeli cuff hole and neck mark first. No black leather with navy wool.",
+      "vetted": true
+    },
+    {
+      "code": "kl3",
+      "name": "Blazer Over Burgundy - sharp",
+      "source": "killer-looks.md",
+      "category": "smart",
+      "temp": [
+        "cold",
+        "mild"
+      ],
+      "rainSafe": true,
+      "formalityRank": 4,
+      "goodFor": [
+        "work",
+        "client",
+        "dinner"
+      ],
+      "badFor": [
+        "gym"
+      ],
+      "items": [
+        {
+          "role": "outer",
+          "position": 1,
+          "itemId": "outerwear_03_grey-unbranded-blazer"
+        },
+        {
+          "role": "top",
+          "position": 2,
+          "itemId": "polo-rl-burgundy-cashmere-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_09_celio-indigo-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_04_churchs-apron-derby"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_02_tan-vera-pelle"
+        }
+      ],
+      "render": null,
+      "commentary": "The blazer is already the reflex jacket, but over trousers. Over jeans it reads made-an-effort instead of bank.",
+      "catch": "Blazer is full through the body - wear open, never buttoned.",
+      "vetted": true
+    },
+    {
+      "code": "kl4",
+      "name": "Cardigan & Brioni - everyday, elevated",
+      "source": "killer-looks.md",
+      "category": "casual",
+      "temp": [
+        "cold",
+        "mild"
+      ],
+      "rainSafe": false,
+      "formalityRank": 3,
+      "goodFor": [
+        "work",
+        "casual",
+        "dinner"
+      ],
+      "badFor": [
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "outer",
+          "position": 1,
+          "itemId": "hm-black-cardigan"
+        },
+        {
+          "role": "top",
+          "position": 2,
+          "itemId": "tops_02_brioni-white-blue-collar-polo"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_09_celio-indigo-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_03_ecco-black-nubuck"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_11_black-classic-pin-buckle"
+        }
+      ],
+      "render": null,
+      "commentary": "Pale-blue chambray collar out of a black cardigan is the best small detail owned, currently buried.",
+      "catch": "Brioni white has gone creamy - whiten-wash first. Cardigan open.",
+      "vetted": true
+    },
+    {
+      "code": "kl5",
+      "name": "Navy Knit & Stone - everyday",
+      "source": "killer-looks.md",
+      "category": "warm",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": true,
+      "formalityRank": 3,
+      "goodFor": [
+        "work",
+        "casual",
+        "client",
+        "dinner"
+      ],
+      "badFor": [
+        "gym"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "tops_10_navy-knit-polo"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_04_oxford-stone"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_04_churchs-apron-derby"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_02_tan-vera-pelle"
+        }
+      ],
+      "render": null,
+      "commentary": "Only dark polo owned, knitted not pique so it reads a step smarter. Lowest-effort good outfit on the list.",
+      "catch": "Polo is size S - check it is not pulling. Never over navy bottoms.",
+      "vetted": true
+    },
+    {
+      "code": "kl6",
+      "name": "The Vest, Done Right - daily uniform, upgraded",
+      "source": "killer-looks.md",
+      "category": "cold",
+      "temp": [
+        "cold"
+      ],
+      "rainSafe": true,
+      "formalityRank": 3,
+      "goodFor": [
+        "work",
+        "casual",
+        "weekend"
+      ],
+      "badFor": [
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "outer",
+          "position": 1,
+          "itemId": "outerwear_06_anko-slate-puffer-vest"
+        },
+        {
+          "role": "top",
+          "position": 2,
+          "itemId": "polo-rl-burgundy-cashmere-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_09_celio-indigo-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_07_oxford-brown-chelsea"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_04_distressed-brown-everyday"
+        }
+      ],
+      "render": null,
+      "commentary": "Highest-leverage change available - the vest goes on every winter day anyway. Cashmere under it instead of a polo; leather boot instead of a sneaker.",
+      "catch": "The boot is what stops this reading dad-at-the-hardware-store. With a sneaker it flattens.",
+      "vetted": true
+    },
+    {
+      "code": "kl7",
+      "name": "Sage & Tan - everyday, warm",
+      "source": "killer-looks.md",
+      "category": "warm",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": true,
+      "formalityRank": 3,
+      "goodFor": [
+        "work",
+        "casual",
+        "weekend"
+      ],
+      "badFor": [
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "tops_05_sage-pique-polo"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_09_celio-indigo-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_02_andre-tan-brogue"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_03_oxford-arlen-tan"
+        }
+      ],
+      "render": null,
+      "commentary": "Sage is the most flattering polo colour and the fit benchmark of the synthetic set. The brogue blue sole caps the formality.",
+      "catch": "Nothing olive nearby - sage and olive go muddy. No-show socks.",
+      "vetted": true
+    },
+    {
+      "code": "W1",
+      "name": "White polo & sage",
+      "source": "fits-batch-2.md",
+      "category": "warm",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": false,
+      "formalityRank": 3,
+      "goodFor": [
+        "work",
+        "casual"
+      ],
+      "badFor": [
+        "gym",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "tops_09_white-pique-polo"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_07_oxford-sage"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_08a_suede-penny-loafer"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_03_oxford-arlen-tan"
+        }
+      ],
+      "render": "fit_w1_white-polo-and-sage_render.png",
+      "commentary": "The cleanest warm-weather answer you own. Sage is a muted mid-tone, so white on top still has somewhere to sit.",
+      "catch": "No-show socks, and keep the loafers out of the wet - suede.",
+      "vetted": true
+    },
+    {
+      "code": "W2",
+      "name": "Grey V-neck & cobalt",
+      "source": "fits-batch-2.md",
+      "category": "warm",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": false,
+      "formalityRank": 2,
+      "goodFor": [
+        "work",
+        "casual",
+        "weekend"
+      ],
+      "badFor": [
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "amazon-essentials-grey-vneck"
+        },
+        {
+          "role": "base",
+          "position": 2,
+          "itemId": "tees_01_white-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_03_decathlon-cobalt"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_03_ecco-black-nubuck"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_11_black-classic-pin-buckle"
+        }
+      ],
+      "render": "fit_w2_grey-vneck-and-cobalt_render.png",
+      "commentary": "The cobalt chino has been sitting unused because nothing obvious went with it. Grey is the one neutral that does not fight a saturated blue.",
+      "catch": "White tee, not grey - a grey tee under a grey V-neck reads like you got dressed in the dark.",
+      "vetted": true
+    },
+    {
+      "code": "W3",
+      "name": "Blue V-neck & beige",
+      "source": "fits-batch-2.md",
+      "category": "warm",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": true,
+      "formalityRank": 3,
+      "goodFor": [
+        "work",
+        "casual",
+        "client"
+      ],
+      "badFor": [
+        "gym"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "tissaia-blue-vneck"
+        },
+        {
+          "role": "base",
+          "position": 2,
+          "itemId": "tees_01_white-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_01_decathlon-beige"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_02_andre-tan-brogue"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_03_oxford-arlen-tan"
+        }
+      ],
+      "render": "fit_w3_blue-vneck-and-beige_render.png",
+      "commentary": "Beige is the best-fitting chino and underused. Mid-blue over it is the most conventional good-looking thing in this list, which is the point.",
+      "catch": "The brogue blue sole stops this reading country-English. Do not swap for the Church for this weather.",
+      "vetted": true
+    },
+    {
+      "code": "W4",
+      "name": "Brioni & Air Max",
+      "source": "fits-batch-2.md",
+      "category": "casual",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": false,
+      "formalityRank": 3,
+      "goodFor": [
+        "work",
+        "casual",
+        "weekend"
+      ],
+      "badFor": [
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "tops_02_brioni-white-blue-collar-polo"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_09_celio-indigo-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_09b_nike-airmax-1"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_04_distressed-brown-everyday"
+        }
+      ],
+      "render": "fit_w4_brioni-and-air-max_render.png",
+      "commentary": "Best polo with sneakers and denim. High-low done deliberately - the Brioni collar carries the fit, the trainers stop it looking like you tried.",
+      "catch": "Whiten-wash the Brioni first; it has gone slightly creamy. Clean the Air Max - the toes are grubby.",
+      "vetted": true
+    },
+    {
+      "code": "W5",
+      "name": "Brown cashmere & stone gingham",
+      "source": "fits-batch-2.md",
+      "category": "warm",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": true,
+      "formalityRank": 3,
+      "goodFor": [
+        "work",
+        "client",
+        "dinner"
+      ],
+      "badFor": [
+        "gym",
+        "golf"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "zara-brown-cashmere-vneck"
+        },
+        {
+          "role": "base",
+          "position": 2,
+          "itemId": "tees_01_white-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_06_stone-gingham"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_04_churchs-apron-derby"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_02_tan-vera-pelle"
+        }
+      ],
+      "render": "fit_w5_brown-cashmere-and-gingham_render.png",
+      "commentary": "Brown over pale stone with chestnut on the feet is a tonal fit that does not look like you were trying to make one.",
+      "catch": "Brown-on-brown needs the tones to differ. V-neck is warm mid-brown, the Church are chestnut - that gap is what makes it work. Do not use the brown Chelsea instead.",
+      "vetted": true
+    },
+    {
+      "code": "W6",
+      "name": "Red V-neck & stone",
+      "source": "fits-batch-2.md",
+      "category": "warm",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": true,
+      "formalityRank": 2,
+      "goodFor": [
+        "work",
+        "casual",
+        "weekend"
+      ],
+      "badFor": [
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "zara-red-vneck"
+        },
+        {
+          "role": "base",
+          "position": 2,
+          "itemId": "tees_01_white-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_04_oxford-stone"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_07_oxford-brown-chelsea"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_04_distressed-brown-everyday"
+        }
+      ],
+      "render": "fit_w6_red-vneck-and-stone_render.png",
+      "commentary": "You own three reds and wear none. Red over pale stone is the easiest way in - the trouser is quiet enough that the colour does the work.",
+      "catch": "White tee only. A red tee under a red V-neck flattens both.",
+      "vetted": true
+    },
+    {
+      "code": "C1",
+      "name": "Slate & black, under the biker",
+      "source": "fits-batch-2.md",
+      "category": "cold",
+      "temp": [
+        "cold"
+      ],
+      "rainSafe": false,
+      "formalityRank": 2,
+      "goodFor": [
+        "work",
+        "casual",
+        "weekend"
+      ],
+      "badFor": [
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "outer",
+          "position": 1,
+          "itemId": "outerwear_02_indindustrie-black-waxed-biker"
+        },
+        {
+          "role": "top",
+          "position": 2,
+          "itemId": "banana-republic-slate-vneck"
+        },
+        {
+          "role": "base",
+          "position": 3,
+          "itemId": "tees_02_grey-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 4,
+          "itemId": "trousers_11_black-coated-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 5,
+          "itemId": "shoes_03_ecco-black-nubuck"
+        },
+        {
+          "role": "belt",
+          "position": 6,
+          "itemId": "belts_11_black-classic-pin-buckle"
+        }
+      ],
+      "render": "fit_c1_slate-and-biker_render.png",
+      "commentary": "Slate blue is the only cool mid-tone in the knitwear and it disappears under black well. All-dark from the waist down, one muted colour at the chest.",
+      "catch": "The coated jeans are greying at the thigh - check in daylight, swap to indigo if it reads.",
+      "vetted": true
+    },
+    {
+      "code": "C2",
+      "name": "Raspberry & navy wool",
+      "source": "fits-batch-2.md",
+      "category": "cold",
+      "temp": [
+        "cold"
+      ],
+      "rainSafe": true,
+      "formalityRank": 4,
+      "goodFor": [
+        "work",
+        "client",
+        "dinner"
+      ],
+      "badFor": [
+        "gym",
+        "weekend"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "irish-house-raspberry-cashmere-vneck"
+        },
+        {
+          "role": "base",
+          "position": 2,
+          "itemId": "tees_01_white-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_08_tyrwhitt-navy-wool"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_04_churchs-apron-derby"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_02_tan-vera-pelle"
+        }
+      ],
+      "render": "fit_c2_raspberry-and-navy-wool_render.png",
+      "commentary": "Raspberry cashmere over navy wool is the most grown-up colour pairing available, and neither piece gets used.",
+      "catch": "Brown leather only with navy wool - no black. The raspberry is a Tailor item; check it sits right before committing.",
+      "vetted": true
+    },
+    {
+      "code": "C3",
+      "name": "Blue V-neck, vest, stone",
+      "source": "fits-batch-2.md",
+      "category": "cold",
+      "temp": [
+        "cold"
+      ],
+      "rainSafe": true,
+      "formalityRank": 2,
+      "goodFor": [
+        "work",
+        "casual",
+        "weekend"
+      ],
+      "badFor": [
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "outer",
+          "position": 1,
+          "itemId": "outerwear_06_anko-slate-puffer-vest"
+        },
+        {
+          "role": "top",
+          "position": 2,
+          "itemId": "zara-basic-blue-vneck"
+        },
+        {
+          "role": "base",
+          "position": 3,
+          "itemId": "tees_01_white-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 4,
+          "itemId": "trousers_04_oxford-stone"
+        },
+        {
+          "role": "shoe",
+          "position": 5,
+          "itemId": "shoes_07_oxford-brown-chelsea"
+        },
+        {
+          "role": "belt",
+          "position": 6,
+          "itemId": "belts_04_distressed-brown-everyday"
+        }
+      ],
+      "render": "fit_c3_blue-vneck-vest-and-stone_render.png",
+      "commentary": "Your actual winter habit - vest over knit - but with a real colour under it instead of a grey polo, and a leather boot rather than a sneaker.",
+      "catch": "Slate vest over blue V-neck is two blues. If they read as one colour on you, swap the knit for the raspberry.",
+      "vetted": true
+    },
+    {
+      "code": "C4",
+      "name": "Red under black",
+      "source": "fits-batch-2.md",
+      "category": "cold",
+      "temp": [
+        "cold"
+      ],
+      "rainSafe": false,
+      "formalityRank": 3,
+      "goodFor": [
+        "work",
+        "casual",
+        "dinner"
+      ],
+      "badFor": [
+        "gym",
+        "golf"
+      ],
+      "items": [
+        {
+          "role": "outer",
+          "position": 1,
+          "itemId": "hm-black-cardigan"
+        },
+        {
+          "role": "top",
+          "position": 2,
+          "itemId": "celio-red-cashmere-vneck"
+        },
+        {
+          "role": "base",
+          "position": 3,
+          "itemId": "tees_03_black-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 4,
+          "itemId": "trousers_09_celio-indigo-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 5,
+          "itemId": "shoes_03_ecco-black-nubuck"
+        },
+        {
+          "role": "belt",
+          "position": 6,
+          "itemId": "belts_11_black-classic-pin-buckle"
+        }
+      ],
+      "render": "fit_c4_red-under-black_render.png",
+      "commentary": "Red cashmere framed by an open black cardigan, with a black tee closing the V. Three layers, one colour, held in a frame rather than shouted.",
+      "catch": "Cardigan open, always. Black tee, not white - white would cut the red into two pieces.",
+      "vetted": true
+    },
+    {
+      "code": "C5",
+      "name": "Oatmeal & cobalt",
+      "source": "fits-batch-2.md",
+      "category": "cold",
+      "temp": [
+        "cold"
+      ],
+      "rainSafe": true,
+      "formalityRank": 4,
+      "goodFor": [
+        "work",
+        "client",
+        "dinner"
+      ],
+      "badFor": [
+        "gym",
+        "weekend"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "fedeli-cashmere-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_03_decathlon-cobalt"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_04_churchs-apron-derby"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_02_tan-vera-pelle"
+        }
+      ],
+      "render": "fit_c5_oatmeal-and-cobalt_render.png",
+      "commentary": "Best knit against the boldest thing in the wardrobe. Pale cashmere over saturated blue is a proper colour decision rather than a safe one.",
+      "catch": "Repair the Fedeli cuff and the neck mark first - this fit lives or dies on the knit looking expensive.",
+      "vetted": true
+    },
+    {
+      "code": "C6",
+      "name": "Pale blue, vest, black",
+      "source": "fits-batch-2.md",
+      "category": "cold",
+      "temp": [
+        "cold"
+      ],
+      "rainSafe": false,
+      "formalityRank": 2,
+      "goodFor": [
+        "work",
+        "casual",
+        "weekend"
+      ],
+      "badFor": [
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "outer",
+          "position": 1,
+          "itemId": "outerwear_06_anko-slate-puffer-vest"
+        },
+        {
+          "role": "top",
+          "position": 2,
+          "itemId": "tops_01_pale-blue-pique-polo"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_11_black-coated-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_03_ecco-black-nubuck"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_11_black-classic-pin-buckle"
+        }
+      ],
+      "render": "fit_c6_pale-blue-vest-and-black_render.png",
+      "commentary": "Pale blue over black is a sharper contrast than the pale-on-pale combinations the polo usually ends up in. The slate vest sits between the two tones.",
+      "catch": "The fit most likely to read generic. The black bottom half is what saves it - with a stone chino it is just another office polo.",
+      "vetted": true
+    },
+    {
+      "code": "K1",
+      "name": "Burgundy & black",
+      "source": "fits-batch-2.md",
+      "category": "casual",
+      "temp": [
+        "cold",
+        "mild"
+      ],
+      "rainSafe": false,
+      "formalityRank": 2,
+      "goodFor": [
+        "casual",
+        "weekend",
+        "dinner"
+      ],
+      "badFor": [
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "polo-rl-burgundy-cashmere-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_11_black-coated-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_09b_nike-airmax-1"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_11_black-classic-pin-buckle"
+        }
+      ],
+      "render": "fit_k1_burgundy-and-black_render.png",
+      "commentary": "Cashmere and trainers. The burgundy is the only colour in frame and the black bottom half makes it the whole point.",
+      "catch": "Clean the Air Max. On this fit the shoes are visible and the grubbiness shows.",
+      "vetted": true
+    },
+    {
+      "code": "K2",
+      "name": "Club navy & loafers",
+      "source": "fits-batch-2.md",
+      "category": "casual",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": false,
+      "formalityRank": 2,
+      "goodFor": [
+        "casual",
+        "weekend",
+        "dinner"
+      ],
+      "badFor": [
+        "work",
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "lyle-scott-club-navy-vneck"
+        },
+        {
+          "role": "base",
+          "position": 2,
+          "itemId": "tees_01_white-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_09_celio-indigo-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_08a_suede-penny-loafer"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_03_oxford-arlen-tan"
+        }
+      ],
+      "render": "fit_k2_club-navy-and-loafers_render.png",
+      "commentary": "The club crest is why this knit is excluded from work fits. Off duty that stops mattering and it is just a good navy V-neck.",
+      "catch": "Navy over indigo is close. Without the white tee showing at the V it would read as one flat colour.",
+      "vetted": true
+    },
+    {
+      "code": "K3",
+      "name": "Mustard & black",
+      "source": "fits-batch-2.md",
+      "category": "casual",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": false,
+      "formalityRank": 2,
+      "goodFor": [
+        "casual",
+        "weekend"
+      ],
+      "badFor": [
+        "work",
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "tops_08_manfinity-blue-mustard-polo"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_11_black-coated-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_03_ecco-black-nubuck"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_11_black-classic-pin-buckle"
+        }
+      ],
+      "render": "fit_k3_mustard-and-black_render.png",
+      "commentary": "The mustard tipping is the loudest thing you own and it is wasted against pale chinos. On black it becomes a deliberate accent.",
+      "catch": "Nothing else patterned. This polo is the pattern.",
+      "vetted": true
+    },
+    {
+      "code": "K4",
+      "name": "Navy knit & beige",
+      "source": "fits-batch-2.md",
+      "category": "casual",
+      "temp": [
+        "mild"
+      ],
+      "rainSafe": true,
+      "formalityRank": 3,
+      "goodFor": [
+        "casual",
+        "dinner",
+        "weekend",
+        "client"
+      ],
+      "badFor": [
+        "gym"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "tops_10_navy-knit-polo"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_01_decathlon-beige"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_07_oxford-brown-chelsea"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_04_distressed-brown-everyday"
+        }
+      ],
+      "render": "fit_k4_navy-knit-and-beige_render.png",
+      "commentary": "The knit polo reads smart without a jacket, so it carries a bar or a dinner on its own. Beige and brown keep it warm rather than corporate.",
+      "catch": "Size S - check it is not pulling across the chest before you leave.",
+      "vetted": true
+    },
+    {
+      "code": "K5",
+      "name": "Sage & black",
+      "source": "fits-batch-2.md",
+      "category": "casual",
+      "temp": [
+        "mild",
+        "warm"
+      ],
+      "rainSafe": false,
+      "formalityRank": 2,
+      "goodFor": [
+        "casual",
+        "weekend"
+      ],
+      "badFor": [
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "top",
+          "position": 1,
+          "itemId": "tops_05_sage-pique-polo"
+        },
+        {
+          "role": "bottom",
+          "position": 2,
+          "itemId": "trousers_11_black-coated-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 3,
+          "itemId": "shoes_03_ecco-black-nubuck"
+        },
+        {
+          "role": "belt",
+          "position": 4,
+          "itemId": "belts_11_black-classic-pin-buckle"
+        }
+      ],
+      "render": "fit_k5_sage-and-black_render.png",
+      "commentary": "Sage is the most flattering colour in the polo set. Against black it stops being a summer colour and becomes a year-round one.",
+      "catch": "Nothing olive nearby - sage and olive go muddy. That rules out the Air Max on this fit.",
+      "vetted": true
+    },
+    {
+      "code": "K6",
+      "name": "Biker & blue",
+      "source": "fits-batch-2.md",
+      "category": "casual",
+      "temp": [
+        "cold",
+        "mild"
+      ],
+      "rainSafe": false,
+      "formalityRank": 2,
+      "goodFor": [
+        "casual",
+        "weekend",
+        "dinner"
+      ],
+      "badFor": [
+        "work",
+        "client",
+        "formal"
+      ],
+      "items": [
+        {
+          "role": "outer",
+          "position": 1,
+          "itemId": "outerwear_02_indindustrie-black-waxed-biker"
+        },
+        {
+          "role": "top",
+          "position": 2,
+          "itemId": "tissaia-blue-vneck"
+        },
+        {
+          "role": "base",
+          "position": 3,
+          "itemId": "tees_01_white-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 4,
+          "itemId": "trousers_11_black-coated-jeans"
+        },
+        {
+          "role": "shoe",
+          "position": 5,
+          "itemId": "shoes_03_ecco-black-nubuck"
+        },
+        {
+          "role": "belt",
+          "position": 6,
+          "itemId": "belts_11_black-classic-pin-buckle"
+        }
+      ],
+      "render": "fit_k6_biker-and-blue_render.png",
+      "commentary": "The evening version of the jacket. All black except one clean blue at the chest - simpler than the burgundy pairing.",
+      "catch": "Wipe the jacket down. Worn open, always.",
+      "alternate": "tees_04_green-crew worn alone in place of the V-neck and tee, for a warmer evening",
+      "vetted": true
+    },
+    {
+      "code": "S1",
+      "name": "Blazer over a V-neck",
+      "source": "fits-batch-2.md",
+      "category": "smart",
+      "temp": [
+        "cold",
+        "mild"
+      ],
+      "rainSafe": true,
+      "formalityRank": 4,
+      "goodFor": [
+        "work",
+        "client",
+        "dinner"
+      ],
+      "badFor": [
+        "gym",
+        "weekend"
+      ],
+      "items": [
+        {
+          "role": "outer",
+          "position": 1,
+          "itemId": "outerwear_03_grey-unbranded-blazer"
+        },
+        {
+          "role": "top",
+          "position": 2,
+          "itemId": "tissaia-blue-vneck"
+        },
+        {
+          "role": "base",
+          "position": 3,
+          "itemId": "tees_01_white-crew"
+        },
+        {
+          "role": "bottom",
+          "position": 4,
+          "itemId": "trousers_08_tyrwhitt-navy-wool"
+        },
+        {
+          "role": "shoe",
+          "position": 5,
+          "itemId": "shoes_04_churchs-apron-derby"
+        },
+        {
+          "role": "belt",
+          "position": 6,
+          "itemId": "belts_02_tan-vera-pelle"
+        }
+      ],
+      "render": "fit_s1_blazer-over-a-vneck_render.png",
+      "commentary": "Every existing blazer fit puts a crew neck under it. A V-neck with a white tee showing is a different register - softer, more Italian.",
+      "catch": "Blazer open. The white tee must sit clean at the V - if the neckline is stretched, this falls apart at the one point everyone looks.",
+      "vetted": true
+    },
+    {
+      "code": "S2",
+      "name": "Overcoat over the shawl",
+      "source": "fits-batch-2.md",
+      "category": "smart",
+      "temp": [
+        "cold"
+      ],
+      "rainSafe": true,
+      "formalityRank": 4,
+      "goodFor": [
+        "client",
+        "dinner",
+        "formal"
+      ],
+      "badFor": [
+        "work",
+        "gym",
+        "weekend"
+      ],
+      "items": [
+        {
+          "role": "outer",
+          "position": 1,
+          "itemId": "outerwear_04_indaco-brown-wool-overcoat"
+        },
+        {
+          "role": "top",
+          "position": 2,
+          "itemId": "ben-sherman-aubergine-shawl"
+        },
+        {
+          "role": "bottom",
+          "position": 3,
+          "itemId": "trousers_08_tyrwhitt-navy-wool"
+        },
+        {
+          "role": "shoe",
+          "position": 4,
+          "itemId": "shoes_04_churchs-apron-derby"
+        },
+        {
+          "role": "belt",
+          "position": 5,
+          "itemId": "belts_02_tan-vera-pelle"
+        }
+      ],
+      "render": "fit_s2_overcoat-over-shawl_render.png",
+      "commentary": "Texture on texture - chunky shawl collar inside a wool overcoat, aubergine just visible at the opening. Too formal for a normal office day, which is why it belongs here.",
+      "catch": "Spot-clean the mark near the left hip of the overcoat. Brown leather only with navy wool.",
+      "vetted": true
+    },
+    {
+      "code": "C7",
+      "name": "Navy blazer and blue stripe",
+      "source": "session 2026-08-27 (batch 3, undocumented)",
+      "category": "cold",
+      "temp": null,
+      "rainSafe": null,
+      "formalityRank": null,
+      "goodFor": null,
+      "badFor": null,
+      "items": null,
+      "render": "fit_c7_navy-blazer-and-blue-stripe_render.jpg",
+      "commentary": null,
+      "catch": null,
+      "vetted": true,
+      "compositionKnown": false,
+      "importNote": "RENDER ONLY - DO NOT GUESS THE GARMENTS. This fit was designed and rendered on 2026-08-27 but its garment list was lost when the session context was compacted. The render file is real and correct; the item list is genuinely unknown. Import the render and the code, leave outfit_items empty, and flag it in the UI as 'composition to confirm'. Max can read the garments off the render and supply them. Any list inferred from the filename slug would be a guess presented as data."
+    },
+    {
+      "code": "C8",
+      "name": "Charcoal shirt and burgundy",
+      "source": "session 2026-08-27 (batch 3, undocumented)",
+      "category": "cold",
+      "temp": null,
+      "rainSafe": null,
+      "formalityRank": null,
+      "goodFor": null,
+      "badFor": null,
+      "items": null,
+      "render": "fit_c8_charcoal-shirt-and-burgundy_render.jpg",
+      "commentary": null,
+      "catch": null,
+      "vetted": true,
+      "compositionKnown": false,
+      "importNote": "RENDER ONLY - DO NOT GUESS THE GARMENTS. This fit was designed and rendered on 2026-08-27 but its garment list was lost when the session context was compacted. The render file is real and correct; the item list is genuinely unknown. Import the render and the code, leave outfit_items empty, and flag it in the UI as 'composition to confirm'. Max can read the garments off the render and supply them. Any list inferred from the filename slug would be a guess presented as data."
+    },
+    {
+      "code": "W7",
+      "name": "Linen blazer and indigo",
+      "source": "session 2026-08-27 (batch 3, undocumented)",
+      "category": "warm",
+      "temp": null,
+      "rainSafe": null,
+      "formalityRank": null,
+      "goodFor": null,
+      "badFor": null,
+      "items": null,
+      "render": "fit_w7_linen-blazer-and-indigo_render.jpg",
+      "commentary": null,
+      "catch": null,
+      "vetted": true,
+      "compositionKnown": false,
+      "importNote": "RENDER ONLY - DO NOT GUESS THE GARMENTS. This fit was designed and rendered on 2026-08-27 but its garment list was lost when the session context was compacted. The render file is real and correct; the item list is genuinely unknown. Import the render and the code, leave outfit_items empty, and flag it in the UI as 'composition to confirm'. Max can read the garments off the render and supply them. Any list inferred from the filename slug would be a guess presented as data."
+    },
+    {
+      "code": "W8",
+      "name": "Bulls and beige",
+      "source": "session 2026-08-27 (batch 3, undocumented)",
+      "category": "warm",
+      "temp": null,
+      "rainSafe": null,
+      "formalityRank": null,
+      "goodFor": null,
+      "badFor": null,
+      "items": null,
+      "render": "fit_w8_bulls-and-beige_render.jpg",
+      "commentary": null,
+      "catch": null,
+      "vetted": true,
+      "compositionKnown": false,
+      "importNote": "RENDER ONLY - DO NOT GUESS THE GARMENTS. This fit was designed and rendered on 2026-08-27 but its garment list was lost when the session context was compacted. The render file is real and correct; the item list is genuinely unknown. Import the render and the code, leave outfit_items empty, and flag it in the UI as 'composition to confirm'. Max can read the garments off the render and supply them. Any list inferred from the filename slug would be a guess presented as data."
+    },
+    {
+      "code": "K7",
+      "name": "Paisley and black",
+      "source": "session 2026-08-27 (batch 3, undocumented)",
+      "category": "casual",
+      "temp": null,
+      "rainSafe": null,
+      "formalityRank": null,
+      "goodFor": null,
+      "badFor": null,
+      "items": null,
+      "render": "fit_k7_paisley-and-black_render.jpg",
+      "commentary": null,
+      "catch": null,
+      "vetted": true,
+      "compositionKnown": false,
+      "importNote": "RENDER ONLY - DO NOT GUESS THE GARMENTS. This fit was designed and rendered on 2026-08-27 but its garment list was lost when the session context was compacted. The render file is real and correct; the item list is genuinely unknown. Import the render and the code, leave outfit_items empty, and flag it in the UI as 'composition to confirm'. Max can read the garments off the render and supply them. Any list inferred from the filename slug would be a guess presented as data."
+    },
+    {
+      "code": "K8",
+      "name": "Thirty-year shirt and beige",
+      "source": "session 2026-08-27 (batch 3, undocumented)",
+      "category": "casual",
+      "temp": null,
+      "rainSafe": null,
+      "formalityRank": null,
+      "goodFor": null,
+      "badFor": null,
+      "items": null,
+      "render": "fit_k8_thirty-year-shirt-and-beige_render.jpg",
+      "commentary": null,
+      "catch": null,
+      "vetted": true,
+      "compositionKnown": false,
+      "importNote": "RENDER ONLY - DO NOT GUESS THE GARMENTS. This fit was designed and rendered on 2026-08-27 but its garment list was lost when the session context was compacted. The render file is real and correct; the item list is genuinely unknown. Import the render and the code, leave outfit_items empty, and flag it in the UI as 'composition to confirm'. Max can read the garments off the render and supply them. Any list inferred from the filename slug would be a guess presented as data."
+    },
+    {
+      "code": "S3",
+      "name": "Grey blazer and pink stripe",
+      "source": "session 2026-08-27 (batch 3, undocumented)",
+      "category": "smart",
+      "temp": null,
+      "rainSafe": null,
+      "formalityRank": null,
+      "goodFor": null,
+      "badFor": null,
+      "items": null,
+      "render": "fit_s3_grey-blazer-and-pink-stripe_render.jpg",
+      "commentary": null,
+      "catch": null,
+      "vetted": true,
+      "compositionKnown": false,
+      "importNote": "RENDER ONLY - DO NOT GUESS THE GARMENTS. This fit was designed and rendered on 2026-08-27 but its garment list was lost when the session context was compacted. The render file is real and correct; the item list is genuinely unknown. Import the render and the code, leave outfit_items empty, and flag it in the UI as 'composition to confirm'. Max can read the garments off the render and supply them. Any list inferred from the filename slug would be a guess presented as data."
+    },
+    {
+      "code": "S4",
+      "name": "Overcoat over navy",
+      "source": "session 2026-08-27 (batch 3, undocumented)",
+      "category": "smart",
+      "temp": null,
+      "rainSafe": null,
+      "formalityRank": null,
+      "goodFor": null,
+      "badFor": null,
+      "items": null,
+      "render": "fit_s4_overcoat-over-navy_render.jpg",
+      "commentary": null,
+      "catch": null,
+      "vetted": true,
+      "compositionKnown": false,
+      "importNote": "RENDER ONLY - DO NOT GUESS THE GARMENTS. This fit was designed and rendered on 2026-08-27 but its garment list was lost when the session context was compacted. The render file is real and correct; the item list is genuinely unknown. Import the render and the code, leave outfit_items empty, and flag it in the UI as 'composition to confirm'. Max can read the garments off the render and supply them. Any list inferred from the filename slug would be a guess presented as data."
+    }
+  ]
+}

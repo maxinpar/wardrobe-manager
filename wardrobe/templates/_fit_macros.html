@@ -46,5 +46,9 @@
     <span class="badge">{{ fit.register }}</span>
     {% if not meta.rain_safe %}<span class="badge dry">dry days only</span>{% endif %}
     {% if meta.authored %}<span class="badge">authored</span>{% endif %}
+    {% if meta.composition_known is defined and not meta.composition_known %}
+      <span class="badge warn">composition to confirm</span>
+    {% endif %}
+    {% if meta.category %}<span class="badge">{{ meta.category }}</span>{% endif %}
   </div>
 {% endmacro %}

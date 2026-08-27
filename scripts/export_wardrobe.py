@@ -34,8 +34,8 @@ KEY_ORDER = [
     "slug", "cat", "name", "colour", "hex", "role", "neck", "cut", "material",
     "weight", "formality", "fit", "condition", "verdict", "verdictNote", "scope",
     "worksAlone", "pairs", "layer", "avoid", "notes", "warmth", "weatherproof",
-    "careNote", "noPhoto", "unconfirmed", "photoRef", "photoPrefix", "retailPrefix",
-    "id",
+    "careNote", "noPhoto", "unconfirmed", "actionRequired", "actionStatus",
+    "actionNote", "photoRef", "photoPrefix", "retailPrefix", "id",
 ]
 
 # JSON field -> database column, for the fields that are a straight copy.
@@ -45,7 +45,7 @@ COLUMN_FOR = {
     "name": "name",
     "colour": "colour",
     "hex": "hex",
-    "role": "role_code",
+    "role": "role_raw",
     "neck": "neck_raw",
     "cut": "cut",
     "material": "material",
@@ -59,7 +59,6 @@ COLUMN_FOR = {
     "pairs": "pairs",
     "layer": "layer",
     "avoid": "avoid",
-    "notes": "notes",
     "photoRef": "photo_ref",
     "photoPrefix": "photo_prefix",
     "retailPrefix": "retail_prefix",
@@ -82,6 +81,16 @@ def build_payload(conn, generated: str) -> dict:
     ):
         sources.setdefault(row["item_id"], {})[row["field_name"]] = row["source"]
 
+    # One open job per item at most today; the export carries it inline.
+    actions = {
+        r["item_id"]: r
+        for r in db.fetch_all(
+            conn,
+            "SELECT item_id, required, status, note FROM item_actions "
+            "WHERE status <> 'done' ORDER BY id",
+        )
+    }
+
     items = []
     for row in db.fetch_all(
         conn,
@@ -97,6 +106,20 @@ def build_payload(conn, generated: str) -> dict:
                 item[key] = row["works_alone"]  # genuinely nullable in the JSON
             elif key == "noPhoto":
                 item[key] = row["no_photo"]
+            elif key == "notes":
+                # Two items genuinely have no notes key; no item has an empty
+                # one, so a null here means absent rather than blank.
+                if row["notes"] is not None:
+                    item[key] = row["notes"]
+            elif key in ("actionRequired", "actionStatus", "actionNote"):
+                # These live in item_actions, not on the item.
+                action = actions.get(row["id"])
+                if action:
+                    item[key] = {
+                        "actionRequired": action["required"],
+                        "actionStatus": action["status"],
+                        "actionNote": action["note"],
+                    }[key]
             elif key == "unconfirmed":
                 # Only the items catalogued from a description carry this.
                 if row["unconfirmed"]:

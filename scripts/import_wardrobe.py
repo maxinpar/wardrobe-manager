@@ -23,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from wardrobe import config, db, derive, fit_derive, fits_batch2, seed_data  # noqa: E402
+from wardrobe import config, db, derive, fit_derive, fits_json, seed_data  # noqa: E402
 
 SOURCE_JSON = config.REPO_ROOT / "data" / "wardrobe.json"
 
@@ -45,7 +45,7 @@ CATALOGUE_FIELDS = {
     "name": "name",
     "colour": "colour",
     "hex": "hex",
-    "role_code": "role",
+    "role_raw": "role",
     "neck_raw": "neck",
     "cut": "cut",
     "material": "material",
@@ -71,6 +71,7 @@ CATALOGUE_FIELDS = {
 
 # Guessed on import, overridable by hand.
 DERIVED_FIELDS = [
+    "role_code",
     "neck_code",
     "formality_rank",
     "formality_note",
@@ -86,6 +87,9 @@ DERIVED_FIELDS = [
 ALL_ITEM_COLUMNS = list(CATALOGUE_FIELDS) + [
     f for f in DERIVED_FIELDS if f != "occasions"
 ]
+
+# Carried through build_row but written to item_actions, not to items.
+ACTION_FIELDS = ("action_required", "action_status", "action_note")
 
 
 def empty_to_none(value):
@@ -129,9 +133,18 @@ def build_row(item: dict) -> tuple[dict, list[str], list[str]]:
 
     row["formality_rank"] = rank
     row["formality_note"] = note
+    row["role_code"] = derive.role_code(item.get("role"))
+    if item.get("role") and row["role_code"] is None:
+        warnings.append(f"{item['id']}: unrecognised colour role {item['role']!r}")
+
     row["neck_code"] = derive.neck_code(item.get("neck"))
     if item.get("neck") and row["neck_code"] is None:
         warnings.append(f"{item['id']}: unrecognised neck {item['neck']!r}")
+
+    # Not columns on items — they become item_actions rows.
+    row["action_required"] = item.get("actionRequired")
+    row["action_status"] = item.get("actionStatus")
+    row["action_note"] = item.get("actionNote")
 
     row["warmth"] = derive.warmth(item)
     rain, wind = derive.weatherproof(item)
@@ -232,6 +245,28 @@ def upsert_item(
                     f"UPDATE   {item_id}.occasions: "
                     f"{sorted(current)} -> {sorted(wanted)}"
                 )
+
+    # A job the garment needs. The importer creates it and refreshes its text,
+    # but never reopens one that has been marked done.
+    if row.get("action_required"):
+        existing_action = db.fetch_one(
+            conn,
+            "SELECT id, status FROM item_actions WHERE item_id = %s AND required = %s",
+            (item_id, row["action_required"]),
+        )
+        if existing_action is None:
+            conn.execute(
+                "INSERT INTO item_actions (item_id, required, status, note) "
+                "VALUES (%s, %s, %s, %s)",
+                (item_id, row["action_required"], row.get("action_status") or "pending",
+                 row.get("action_note")),
+            )
+            changes.append(f"NEW      action on {item_id}: {row['action_required']}")
+        elif existing_action["status"] != "done":
+            conn.execute(
+                "UPDATE item_actions SET note = %s WHERE id = %s",
+                (row.get("action_note"), existing_action["id"]),
+            )
 
     # App-owned laundry row: created once, never reset by a re-import.
     conn.execute(
@@ -341,21 +376,43 @@ def replace_set(conn, table: str, column: str, fit_id: str, values: list[str]) -
 
 
 def all_seed_fits(conn) -> list[dict]:
-    """The hand-written fits, plus the 20 parsed out of fits-batch-2.md.
+    """The ten hand-mapped work-outfits looks, plus the 35 in data/fits.json.
 
-    That file references garments by id, so it is read rather than transcribed;
-    the roles come from each item's category, which is why the categories are
-    read back from the database first.
+    fits.json references every garment by id and carries its own metadata, so it
+    is read rather than transcribed. Eight of its fits are render-only: their
+    garment lists were lost, and this importer will not invent one.
     """
-    categories = {
-        r["id"]: r["cat_code"]
-        for r in db.fetch_all(conn, "SELECT id, cat_code FROM items")
-    }
-    return list(seed_data.FITS) + fits_batch2.load(categories)
+    known = {r["id"] for r in db.fetch_all(conn, "SELECT id FROM items")}
+    return list(seed_data.FITS) + fits_json.load(known)
+
+
+def prune_preconditions(conn, seeded: list[dict], changes: list[str]) -> None:
+    """Drop jobs a superseded source left behind.
+
+    When fits.json reworded a job — "Whiten-wash the Brioni — it has gone creamy"
+    became "Brioni white has gone creamy - whiten-wash first" — the old row stays
+    and the app shows the same job twice. Only OPEN jobs on seeded fits are
+    pruned: one marked done is a record that the work happened, and is kept.
+    """
+    wanted = {(f["id"], text) for f in seeded for text, _ in f["preconditions"]}
+    seeded_ids = [f["id"] for f in seeded]
+    for row in db.fetch_all(
+        conn,
+        "SELECT id, fit_id, text FROM fit_preconditions "
+        "WHERE NOT done AND fit_id = ANY(%s)",
+        (seeded_ids,),
+    ):
+        if (row["fit_id"], row["text"]) not in wanted:
+            conn.execute("DELETE FROM fit_preconditions WHERE id = %s", (row["id"],))
+            changes.append(
+                f"PRUNED   job on {row['fit_id']} no longer in any source: "
+                f"{row['text'][:60]}"
+            )
 
 
 def seed_fits(conn, changes: list[str]) -> None:
-    for fit in all_seed_fits(conn):
+    seeded = all_seed_fits(conn)
+    for fit in seeded:
         for item_id, *_ in fit["items"]:
             resolve_item(conn, item_id)
         for _, item_id in fit["preconditions"]:
@@ -369,8 +426,9 @@ def seed_fits(conn, changes: list[str]) -> None:
         if existing is None:
             conn.execute(
                 "INSERT INTO fits (id, name, register_code, commentary, catch, "
-                "hidden_by_default, vetted, sort_order, source) "
-                "VALUES (%s, %s, %s, %s, %s, %s, true, %s, %s)",
+                "hidden_by_default, vetted, sort_order, source, category_code, "
+                "composition_known) "
+                "VALUES (%s, %s, %s, %s, %s, %s, true, %s, %s, %s, %s)",
                 (
                     fit_id,
                     fit["name"],
@@ -380,6 +438,8 @@ def seed_fits(conn, changes: list[str]) -> None:
                     fit["hidden_by_default"],
                     fit["sort_order"],
                     fit["source"],
+                    fit.get("category"),
+                    fit.get("composition_known", True),
                 ),
             )
             changes.append(f"NEW      fit {fit_id}")
@@ -395,6 +455,8 @@ def seed_fits(conn, changes: list[str]) -> None:
                 "hidden_by_default": fit["hidden_by_default"],
                 "sort_order": fit["sort_order"],
                 "source": fit["source"],
+                "category_code": fit.get("category"),
+                "composition_known": fit.get("composition_known", True),
             }
             if "name" not in protected:
                 columns["name"] = fit["name"]
@@ -403,6 +465,18 @@ def seed_fits(conn, changes: list[str]) -> None:
                 f"UPDATE fits SET {assignments} WHERE id = %s",
                 list(columns.values()) + [fit_id],
             )
+
+        if not fit.get("composition_known", True):
+            # Render only: the garments are genuinely unknown. Import the fit and
+            # stop — no slots, no derived metadata, nothing invented.
+            for field in ("killer", "score"):
+                conn.execute(
+                    "INSERT INTO fit_field_sources (fit_id, field_name, source) "
+                    "VALUES (%s, %s, 'manual') "
+                    "ON CONFLICT (fit_id, field_name) DO NOTHING",
+                    (fit_id, field),
+                )
+            continue
 
         # Slots. Primaries first so alternates can point at the row they swap for.
         conn.execute("DELETE FROM fit_items WHERE fit_id = %s", (fit_id,))
@@ -535,6 +609,8 @@ def seed_fits(conn, changes: list[str]) -> None:
                 "ON CONFLICT (fit_id, field_name) DO NOTHING",
                 (fit_id, field),
             )
+
+    prune_preconditions(conn, seeded, changes)
 
 
 def seed_wear_events(conn, changes: list[str]) -> None:

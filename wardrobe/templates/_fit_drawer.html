@@ -49,6 +49,18 @@
   {# The prose is the point of a fit. Verbatim, never truncated. #}
   <section><p class="commentary">{{ fit.commentary }}</p></section>
 
+  {% if not meta.get('composition_known', True) %}
+    <section>
+      <div class="catch">
+        <span class="label">Composition to confirm</span>
+        <span class="text">This fit was designed and rendered, but its garment list
+          was lost before it was written down. The render is real and correct. Nothing
+          has been guessed from the filename — read the garments off the picture and
+          add them.</span>
+      </div>
+    </section>
+  {% endif %}
+
   <section>
     <h3 class="mono">The pieces</h3>
     <div class="pieces">

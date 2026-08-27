@@ -309,8 +309,11 @@ SELECT f.id, f.name, f.register_code, f.commentary, f.catch, f.style, f.score,
        (i.retired_at IS NOT NULL) AS retired,
        COALESCE(l.state_code, 'clean') AS laundry_state
 FROM fits f
-JOIN fit_items fi ON fi.fit_id = f.id
-JOIN items i ON i.id = fi.item_id
+-- LEFT so a fit whose garment list was lost still loads. Eight of them exist:
+-- the render is real, the composition is unknown, and a fit that cannot even be
+-- opened is worse than one that says so.
+LEFT JOIN fit_items fi ON fi.fit_id = f.id
+LEFT JOIN items i ON i.id = fi.item_id
 LEFT JOIN item_laundry l ON l.item_id = i.id
 ORDER BY f.sort_order, fi.position, fi.is_alternate
 """
@@ -357,6 +360,8 @@ def load_fits(conn) -> list[Fit]:
                 blocked_by=blockers.get(row["id"], []),
             )
             fits[row["id"]] = fit
+        if row["item_id"] is None:
+            continue          # a fit with no known composition
         fit.items.append(
             {
                 "item_id": row["item_id"],

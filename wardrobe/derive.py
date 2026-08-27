@@ -20,7 +20,14 @@ _FORMALITY_TERMS = {
     "casual": 2,
     "smart-casual": 4,
     "smart": 5,
+    "business": 5,
+    "formal": 5,
 }
+
+# The shirts write ranges — "Smart-casual to business" — and qualify them after
+# a dash: "Casual - statement piece, not a default work shirt".
+_RANGE = re.compile(r"\s+to\s+", re.I)
+_TRAILING_NOTE = re.compile(r"(?:\s+[-–—]\s+|,\s+)(.*)$", re.S)
 
 _PARENTHETICAL = re.compile(r"\(([^)]*)\)")
 
@@ -37,13 +44,26 @@ def formality(raw: str | None) -> tuple[int | None, str | None]:
     note = note_match.group(1).strip() if note_match else None
 
     base = _PARENTHETICAL.sub("", raw).strip()
+
+    # A dash introduces an explanation, not another level. Keep it as the note.
+    trailing = _TRAILING_NOTE.search(base)
+    if trailing:
+        note = note or trailing.group(1).strip().rstrip(".")
+        base = base[: trailing.start()].strip()
+
     scores = []
-    for part in base.split("/"):
+    # "A to B" is a range and "A / B" a pair; both average out the same way.
+    for part in _RANGE.split(base.replace("/", " to ")):
         term = part.strip().lower()
         if term in _FORMALITY_TERMS:
             scores.append(_FORMALITY_TERMS[term])
 
     if not scores:
+        # A value written as prose — "The most formal item in the wardrobe".
+        # Take the strongest term that appears anywhere in it.
+        found = [v for term, v in _FORMALITY_TERMS.items() if term in raw.lower()]
+        if found:
+            return max(found), note
         return None, note
 
     # round half up, so 'Smart / smart-casual' lands on 5 rather than 4
@@ -137,6 +157,43 @@ def weatherproof(item: dict) -> tuple[bool, bool]:
     return bool(wp.get("rain", False)), bool(wp.get("wind", False))
 
 
+# ------------------------------------------------------------ colour role --
+
+# Longest first, so "Pale neutral" wins over "Pale" and "Mid tone" over "Mid".
+_ROLE_CODES = [
+    "Pale neutral",
+    "Warm neutral",
+    "Mid neutral",
+    "Anchor dark",
+    "Mid colour",
+    "Pale blue",
+    "Pale warm",
+    "Statement",
+    "Mid tone",
+    "Pattern",
+    "Neutral",
+]
+
+
+def role_code(raw: str | None) -> str | None:
+    """The normalised leading term of a colour role.
+
+    The value is often a whole observation — "Anchor dark - the only dark shirt
+    in Tops" — so the code is the term it starts with. None when nothing
+    matches, which is honest: role_raw still carries what was written.
+    """
+    if not raw:
+        return None
+    text = raw.strip()
+    for code in _ROLE_CODES:
+        if text.lower().startswith(code.lower()):
+            return code
+    for code in _ROLE_CODES:
+        if code.lower() in text.lower():
+            return code
+    return None
+
+
 # ------------------------------------------------------------ bike-safe --
 
 # A loafer or a moccasin comes off at speed. Those travel in the top-box and go
@@ -164,9 +221,34 @@ PATTERN_OVERRIDES = {
 
 DEFAULT_PATTERN = "Plain"
 
+# Read off the garment's own description. The wardrobe was essentially all plain
+# until 40 shirts arrived; hardcoding four exceptions would now call a paisley
+# shirt plain.
+_PATTERN_WORDS = [
+    ("paisley", "Paisley"),
+    ("floral", "Floral"),
+    ("orchid", "Floral"),
+    ("gingham", "Gingham"),
+    ("geometric", "Geometric print"),
+    ("print", "Print"),
+    ("stripe", "Stripe"),
+    ("check", "Check"),
+    ("plaid", "Check"),
+    ("crest", "Crest"),
+    ("tipping", "Contrast tipping"),
+]
+
 
 def pattern(item: dict) -> str:
-    return PATTERN_OVERRIDES.get(item["id"], DEFAULT_PATTERN)
+    if item["id"] in PATTERN_OVERRIDES:
+        return PATTERN_OVERRIDES[item["id"]]
+    blob = " ".join(
+        str(item.get(field) or "") for field in ("name", "cut", "role", "colour")
+    ).lower()
+    for word, label in _PATTERN_WORDS:
+        if word in blob:
+            return label
+    return DEFAULT_PATTERN
 
 
 # ------------------------------------------------------------------ neck --
@@ -175,6 +257,7 @@ def pattern(item: dict) -> str:
 # keep the original in neck_raw.
 _NECK_CODES = [
     "polo collar",
+    "collar",
     "quarter-zip",
     "button/mock",
     "cardigan",

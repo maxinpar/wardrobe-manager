@@ -76,6 +76,21 @@
     </p>
   </section>
 
+  {% if item.actions %}
+    <section>
+      <h3 class="mono">Needs doing</h3>
+      <ul class="jobs">
+        {% for a in item.actions %}
+          <li>
+            <span class="badge {{ 'ok' if a.status == 'done' else 'warn' }}">{{ a.required }}</span>
+            <span class="mono faint">{{ a.status }}</span>
+            {% if a.note %}<div class="muted">{{ a.note }}</div>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
   {% if item.fits %}
     <section>
       <h3 class="mono">In these fits</h3>

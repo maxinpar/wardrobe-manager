@@ -64,17 +64,16 @@ Plain numbered `.sql` files in `migrations/`, applied once each and recorded in
 ```
 
 The first form is a dry run — it prints every change it would make and writes
-nothing. The second one commits. It also seeds the 38 fits (11 from `work-outfits.md`
-including the hidden roll-neck, 7 from `killer-looks.md`, 20 from
-`fits-batch-2.md`), both wear events, and retires any id that has left the
-catalogue.
+nothing. The second one commits. It also seeds the 46 fits (11 hand-mapped from
+`work-outfits.md`, 35 from `data/fits.json`), both wear events, and retires any
+id that has left the catalogue.
 
 The importer prints a verification report: counts per category, verdict and
 scope, items with no photo, `photoPrefix` values that matched no file on disk,
 and anything it couldn't parse. If the numbers don't reconcile against the
-known-good baseline (73 items · Knitwear 18 / Tops 15 / Shoes 12 / Belts 11 /
-Trousers 11 / Outerwear 6 · Keep 50, Tailor 9, Bin 8, Replace 6 · core 69, out 4
-· 7 without a photo) it stops rather than papering over it. The
+known-good baseline (113 items · Tops 53 / Knitwear 18 / Shoes 12 / Belts 11 /
+Trousers 11 / Outerwear 8 · Keep 79, Tailor 11, Bin 17, Replace 6 · core 103,
+out 6, occasional 4 · 7 without a photo) it stops rather than papering over it. The
 baseline lives in `data/baseline.json`, so a legitimate catalogue change is
 recorded as a data edit rather than buried in a code change.
 
@@ -313,8 +312,15 @@ page shows which is which.
 | Source | Fits | References garments by | Metadata |
 |---|---|---|---|
 | `data/work-outfits.md` | 11 (incl. the hidden roll-neck) | display name — **not unique**, so hand-mapped in `wardrobe/seed_data.py` and asserted to resolve to exactly one item | bands, rain-safety, formality and good-for are **derived** from the garments |
-| `data/killer-looks.md` | 7 | item id — unambiguous | authored in the document, so **imported** as written and never re-derived |
-| `data/fits-batch-2.md` | 20 | item id | authored; the document is **parsed** by `wardrobe/fits_batch2.py` rather than transcribed, because a slip in 20 fits of prose would be silent |
+| `data/fits.json` | 35 | item id | authored in the export and **imported as written**, never re-derived. Read by `wardrobe/fits_json.py` |
+
+**Eight of those 35 are render-only.** C7, C8, W7, W8, K7, K8, S3 and S4 were
+designed and rendered on 2026-08-27, then their garment lists were lost when the
+session was compacted. The renders are real; the compositions are genuinely
+unknown. They import with `composition_known = false`, no slots, and no derived
+metadata, and the UI says *composition to confirm* rather than showing an empty
+fit as if it were complete. Nothing is inferred from the filename — a list
+guessed from a slug would be indistinguishable from a fact six months later.
 
 `bad_for` is only ever imported. Deriving a negative claim would invent warnings
 nobody made, so the eleven work-outfits fits have none.
