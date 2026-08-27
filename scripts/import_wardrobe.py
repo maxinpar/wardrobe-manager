@@ -167,6 +167,30 @@ def manual_fields(conn, item_id: str) -> set[str]:
     return {r["field_name"] for r in rows}
 
 
+def apply_gone(conn, item: dict, changes: list[str]) -> None:
+    """`gone` is set in the app, but it still has to survive a rebuild.
+
+    A garment being in the bin is decided by Max in the app, never by a file —
+    so the app stamps the decision `manual` and this leaves it alone. What it
+    does do is restore the flag on a database built from an export, which is
+    the only way a rebuilt catalogue doesn't quietly offer him things he threw
+    out. The bin *date* isn't in the JSON, so a restored one is stamped at
+    import time; the fact is preserved, the day it happened is not.
+
+    An absent key means the file doesn't know, not that the garment came back.
+    Only the app puts something back in the closet.
+    """
+    if not item.get("gone"):
+        return
+    item_id = item["id"]
+    if "gone_at" in manual_fields(conn, item_id):
+        return
+    existing = db.fetch_one(conn, "SELECT gone_at FROM items WHERE id = %s", (item_id,))
+    if existing and existing["gone_at"] is None:
+        conn.execute("UPDATE items SET gone_at = now() WHERE id = %s", (item_id,))
+        changes.append(f"UPDATE   {item_id}.gone_at: None -> now (bin flag from the file)")
+
+
 def upsert_item(
     conn,
     row: dict,
@@ -751,6 +775,12 @@ def main() -> int:
     parser.add_argument(
         "--quiet-changes", action="store_true", help="summarise changes instead of listing them"
     )
+    parser.add_argument(
+        "--no-baseline",
+        action="store_true",
+        help="skip the baseline reconciliation (for a file exported from the database, "
+        "whose counts legitimately differ by the fields Max has set by hand)",
+    )
     args = parser.parse_args()
 
     source = Path(args.json) if args.json else SOURCE_JSON
@@ -760,12 +790,26 @@ def main() -> int:
     print(f"Source: {source}  (generated {payload.get('generated')})")
     print(f"Mode:   {'COMMIT' if args.commit else 'DRY RUN — nothing will be written'}\n")
 
-    problems = reconcile(items)
-    if problems:
-        print("STOP — the source data does not reconcile against the known baseline:")
-        for p in problems:
-            print("  *", p)
-        return 2
+    # The baseline describes data/wardrobe.json, the file that arrives from
+    # outside, and guards against a corrupted one being imported unnoticed. A
+    # file exported *from* the database is a different thing: it carries every
+    # correction Max has since made by hand, so its counts are meant to differ.
+    # roundtrip_check.py compares that file field by field at both ends, which
+    # is a stronger check than counting, so it turns this one off explicitly
+    # rather than the baseline being quietly loosened to accommodate it.
+    if args.no_baseline:
+        print("Baseline reconciliation skipped (--no-baseline).\n")
+    else:
+        problems = reconcile(items)
+        if problems:
+            print("STOP — the source data does not reconcile against the known baseline:")
+            for p in problems:
+                print("  *", p)
+            print(
+                "\nIf this is a file exported from the database, its counts differ by "
+                "the fields set by hand — use --no-baseline."
+            )
+            return 2
 
     changes: list[str] = []
     warnings: list[str] = []
@@ -794,6 +838,7 @@ def main() -> int:
             for code in occasions:
                 derived_summary["occasions"][code] += 1
             upsert_item(conn, row, occasions, changes, source_of_derived(item))
+            apply_gone(conn, item, changes)
 
         retire_missing(conn, {i["id"] for i in items}, changes)
         seed_fits(conn, changes)
@@ -832,7 +877,7 @@ def main() -> int:
         print(f"  {'jobs':9} {preconditions} unmet precondition(s)")
         print(f"  {'wear log':9} {wear} event(s)")
 
-        db_problems = reconcile_db(conn, items)
+        db_problems = [] if args.no_baseline else reconcile_db(conn, items)
 
         print("\nDerived values (first pass — correct any of these by hand later)")
         for field in ("formality_rank", "warmth", "pattern", "rain_unsafe", "occasions"):

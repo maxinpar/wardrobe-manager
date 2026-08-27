@@ -59,6 +59,13 @@ def admin_url(base_url: str) -> str:
 # catalogue plus its history and always disagree.
 ITEM_SCOPED = ("item_occasions", "item_field_sources", "item_laundry")
 
+# Provenance for fields the JSON has no room for. `gone` travels in the export
+# as a plain true, so the *fact* that a garment is binned survives a rebuild —
+# but the row recording that Max decided it in the app, rather than a file
+# having said so, does not. Counting it would report that absence as data loss,
+# when what is lost is a note about the decision, not the decision.
+UNSERIALISED_PROVENANCE = ("gone_at",)
+
 OTHER_TABLES = (
     "fits", "fit_items", "fit_temp_bands", "fit_seasons", "fit_occasions",
     "fit_preconditions", "wear_events", "wear_event_items",
@@ -72,10 +79,16 @@ def counts(url: str) -> dict[str, int]:
             conn, "SELECT count(*) AS n FROM items WHERE retired_at IS NULL"
         )["n"]
         for table in ITEM_SCOPED:
+            extra = ""
+            params: tuple = ()
+            if table == "item_field_sources":
+                extra = " AND t.field_name <> ALL(%s)"
+                params = (list(UNSERIALISED_PROVENANCE),)
             out[table] = db.fetch_one(
                 conn,
                 f"SELECT count(*) AS n FROM {table} t JOIN items i ON i.id = t.item_id "
-                "WHERE i.retired_at IS NULL",
+                f"WHERE i.retired_at IS NULL{extra}",
+                params,
             )["n"]
         for table in OTHER_TABLES:
             out[table] = db.fetch_one(conn, f"SELECT count(*) AS n FROM {table}")["n"]
@@ -114,6 +127,13 @@ def main() -> int:
             str(SCRIPTS / "import_wardrobe.py"),
             "--commit",
             "--quiet-changes",
+            # The file being imported came out of the live database a moment
+            # ago, so it carries the corrections Max has made by hand and its
+            # counts no longer match the baseline for data/wardrobe.json. Step 4
+            # compares both exports field by field, which is a stronger check
+            # than counting — so the count guard is turned off here on purpose,
+            # not loosened for everyone.
+            "--no-baseline",
             "--json",
             str(first),
             "--database-url",

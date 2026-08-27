@@ -331,13 +331,23 @@ and the importer stops offering a draft for it.
 
 ## Known state and follow-ups
 
-- **Trouser verdicts.** The trousers came back from the tailor on 2026-08-20
-  and are wearable, but `wardrobe.json` still says `Tailor` for 6 of them.
-  Imported as-is, by request; the importer prints them, and the exact SQL to
-  flip them, on every run. Marking `verdict_code` as `manual` in
-  `item_field_sources` is what makes the correction stick — the importer never
-  overwrites a manual value. Knitwear `Tailor` items are unconfirmed and
-  untouched.
+- **Trouser verdicts — settled 2026-08-27.** The trousers came back from the
+  tailor on 2026-08-20 and are all wearable, so every trouser now reads `Keep`
+  with `verdict_code` marked `manual` in `item_field_sources`. That mark is what
+  makes it stick: `wardrobe.json` still says `Tailor` for five of them, and the
+  importer never overwrites a manual value. The remaining `Tailor` items are
+  four knitwear (unconfirmed) and two shirts with their own open questions,
+  all untouched.
+- **The database now legitimately differs from `data/wardrobe.json`** on those
+  five verdicts and on six binned garments. That is the point of the app, but it
+  means the file is no longer the newest copy of anything: `export/wardrobe.json`
+  is. `--compare` lists the hand-set fields by name and passes; it fails only on
+  a difference nobody recorded a decision for.
+- **`tops_28_hawes-curtis-pink-twill-shirt` is in the bin** as of 2026-08-27,
+  which is why its `photoPrefix` never matched a file — it was never shot. Its
+  verdict was already `Bin`, the opinion; `gone_at` is the fact that it has
+  physically gone. It is out of the closet and out of the picker, and one click
+  in its drawer puts it back.
 - **The catalogue is photo-complete as of 2026-08-26 rev 2.** All 68 items have
   a source photo and a retail render except `belts_05` and `belts_10`, which are
   marked **not located** — Max gathered every belt he owns and neither turned

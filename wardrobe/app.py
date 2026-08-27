@@ -610,6 +610,16 @@ def item_gone(item_id: str):
             "UPDATE items SET gone_at = %s WHERE id = %s",
             (datetime.now(TZ) if gone else None, item_id),
         )
+        # Stamped manual either way: whether a garment still exists is Max's
+        # call, so an older export must not be able to bin it again — or, worse,
+        # quietly put a binned one back in the rotation.
+        conn.execute(
+            "INSERT INTO item_field_sources (item_id, field_name, source, note) "
+            "VALUES (%s, 'gone_at', 'manual', %s) "
+            "ON CONFLICT (item_id, field_name) "
+            "DO UPDATE SET source = 'manual', note = EXCLUDED.note, updated_at = now()",
+            (item_id, "binned in the app" if gone else "put back in the closet"),
+        )
         affected = db.fetch_one(
             conn,
             "SELECT count(DISTINCT fit_id) AS n FROM fit_items WHERE item_id = %s",

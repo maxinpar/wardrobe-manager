@@ -34,9 +34,16 @@ KEY_ORDER = [
     "slug", "cat", "name", "colour", "hex", "role", "neck", "cut", "material",
     "weight", "formality", "fit", "condition", "verdict", "verdictNote", "scope",
     "worksAlone", "pairs", "layer", "avoid", "notes", "warmth", "weatherproof",
-    "careNote", "noPhoto", "unconfirmed", "actionRequired", "actionStatus",
+    "careNote", "noPhoto", "unconfirmed", "gone", "actionRequired", "actionStatus",
     "actionNote", "photoRef", "photoPrefix", "retailPrefix", "id",
 ]
+
+# `gone` is not in the hand-maintained schema: it is set in the app when Max
+# bins a garment. It is exported so a Claude session reading this file doesn't
+# recommend something that is in the bin, and so a database rebuilt from an
+# export doesn't lose the bin. Listed here because data/wardrobe.json has no
+# such key, and --compare should not report its absence as a difference.
+APP_OWNED_KEYS = ("gone",)
 
 # JSON field -> database column, for the fields that are a straight copy.
 COLUMN_FOR = {
@@ -120,6 +127,9 @@ def build_payload(conn, generated: str) -> dict:
                         "actionStatus": action["status"],
                         "actionNote": action["note"],
                     }[key]
+            elif key == "gone":
+                if row["gone_at"]:
+                    item[key] = True
             elif key == "unconfirmed":
                 # Only the items catalogued from a description carry this.
                 if row["unconfirmed"]:
@@ -148,10 +158,40 @@ def build_payload(conn, generated: str) -> dict:
     }
 
 
-def compare(exported: dict, original_path: Path) -> list[str]:
-    """Value-by-value comparison against the file this all came from."""
+def manual_fields(conn) -> dict[str, set[str]]:
+    """Which fields Max has set by hand, as JSON key names.
+
+    A hand-set field is *meant* to disagree with the source file — that is what
+    setting it by hand means. Without this the round-trip check fails forever
+    after the first correction, and a check that always fails tells you nothing.
+    """
+    key_for = {column: key for key, column in COLUMN_FOR.items()}
+    out: dict[str, set[str]] = {}
+    rows = db.fetch_all(
+        conn,
+        "SELECT item_id, field_name FROM item_field_sources WHERE source = 'manual'",
+    )
+    for row in rows:
+        key = key_for.get(row["field_name"])
+        if key:
+            out.setdefault(row["item_id"], set()).add(key)
+    return out
+
+
+def compare(
+    exported: dict, original_path: Path, overrides: dict[str, set[str]] | None = None
+) -> tuple[list[str], list[str]]:
+    """Value-by-value comparison against the file this all came from.
+
+    Returns (problems, deliberate). App-owned keys are skipped entirely: they
+    exist in the export and never in the source, so reporting them would be
+    reporting the design working. Hand-set fields are reported separately —
+    they are a divergence to read, not a failure to fix.
+    """
+    overrides = overrides or {}
     original = json.loads(original_path.read_text(encoding="utf-8"))
-    problems = []
+    problems: list[str] = []
+    deliberate: list[str] = []
 
     if original.get("owner") != exported.get("owner"):
         problems.append("owner differs")
@@ -170,15 +210,21 @@ def compare(exported: dict, original_path: Path) -> list[str]:
 
     for item_id in sorted(set(by_id) & set(exported_by_id)):
         a, b = by_id[item_id], exported_by_id[item_id]
+        b = {k: v for k, v in b.items() if k not in APP_OWNED_KEYS}
         if set(a) != set(b):
             problems.append(
                 f"{item_id}: key set differs "
                 f"(+{sorted(set(b) - set(a))} -{sorted(set(a) - set(b))})"
             )
         for key in sorted(set(a) & set(b)):
-            if a[key] != b[key]:
-                problems.append(f"{item_id}.{key}: {a[key]!r} != {b[key]!r}")
-    return problems
+            if a[key] == b[key]:
+                continue
+            line = f"{item_id}.{key}: {a[key]!r} -> {b[key]!r}"
+            if key in overrides.get(item_id, ()):
+                deliberate.append(line)
+            else:
+                problems.append(line)
+    return problems, deliberate
 
 
 def main() -> int:
@@ -194,6 +240,7 @@ def main() -> int:
 
     with db.connect(args.database_url) as conn:
         payload = build_payload(conn, generated)
+        overrides = manual_fields(conn) if args.compare else {}
 
     out.parent.mkdir(parents=True, exist_ok=True)
     # 1-space indent and real UTF-8, matching the hand-maintained file.
@@ -203,7 +250,11 @@ def main() -> int:
     print(f"Wrote {out}  ({len(payload['items'])} items, generated {generated})")
 
     if args.compare:
-        problems = compare(payload, Path(args.compare))
+        problems, deliberate = compare(payload, Path(args.compare), overrides)
+        if deliberate:
+            print(f"\n{len(deliberate)} hand-set field(s) — the file is behind the database:")
+            for d in deliberate:
+                print("  ·", d)
         if problems:
             print(f"\nRound-trip FAILED against {args.compare}:")
             for p in problems[:60]:
@@ -211,7 +262,8 @@ def main() -> int:
             if len(problems) > 60:
                 print(f"  … and {len(problems) - 60} more")
             return 2
-        print(f"Round-trip clean: every field matches {args.compare} exactly.")
+        tail = " apart from the hand-set fields above" if deliberate else " exactly"
+        print(f"\nRound-trip clean: every field matches {args.compare}{tail}.")
 
     return 0
 
