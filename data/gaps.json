@@ -1,0 +1,432 @@
+{
+  "generated": "2026-08-29",
+  "source": "wardrobe DB \u2014 131 items, 62 fits, 298 fit_items",
+  "currency": "AUD",
+  "note": "Prices are indicative ranges, not verified live. Candidate entries carry retailer and URL but price is null \u2014 check at purchase.",
+  "sizes": {
+    "shirt_collar": "16 / 41",
+    "shirt_sleeve": "34-35in",
+    "shirt_body": "slim, not extra-slim",
+    "top": "M",
+    "trouser": "W33-34 / EU44",
+    "shoe": "EU44 / UK10",
+    "belt": "34-36in"
+  },
+  "diagnosis": "Top-heavy: 44 live tops and 15 live knits over 9 trousers and 6 pairs of shoes. Four of the six live chinos are the same stone/beige family. Spend below the waist.",
+  "corrections_to_draft": [
+    "Mid-grey chino: the closet has 6 live chinos, 4 in the beige-to-stone family \u2014 not 'nine chinos and eight of them'.",
+    "Navy crew-neck: you already own topman-navy-crew. And a V-neck is what layers over a shirt collar; a crew is the one that fights it. The real gap is a fine gauge, not the neckline.",
+    "Rain-safe dark shoe: the Church's derby, the brown Chelsea and the tan brogue are all rain-safe. What collapses on a wet day is the casual end \u2014 every casual shoe you own is rain-unsafe."
+  ],
+  "gaps": [
+    {
+      "id": "g01",
+      "category": "Trousers",
+      "priority": "high",
+      "status": "open",
+      "title": "Charcoal wool trouser",
+      "image": "/static/gaps/g01.svg",
+      "rationale": "The only sharp cold-weather bottom is the navy Tyrwhitt. Six shirts name this trouser in their own catalogue cards \u2014 tops_18, 22, 23, 25, 26 and 27 all read \"grey trousers when those arrive\".",
+      "unlocks": "Removes the single point of failure behind 7 cold sharp fits; 6 shirts are waiting on it",
+      "spec": "Mid-grey to charcoal, wool or wool blend, flat front, no cuff, no sheen.",
+      "size": "W33-34 / EU44, mid rise",
+      "budget": "A$120-250",
+      "buy_at": [
+        "M.J. Bale",
+        "Politix",
+        "Suitsupply",
+        "Charles Tyrwhitt"
+      ],
+      "candidates": [
+        {
+          "name": "M.J. Bale wool trouser, charcoal",
+          "source": "mjbale.com",
+          "url": "https://www.mjbale.com/collections/mens-sale-trousers-pants",
+          "price": null
+        },
+        {
+          "name": "Politix tailored trouser",
+          "source": "politix.com.au",
+          "url": "https://www.politix.com.au/",
+          "price": null
+        }
+      ],
+      "evidence": {
+        "shirts_requesting_grey": 6,
+        "grey_bottoms_owned": 0,
+        "dark_bottoms_owned": 2
+      },
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g02",
+      "category": "Trousers",
+      "priority": "high",
+      "status": "open",
+      "title": "Mid-grey chino",
+      "image": "/static/gaps/g02.svg",
+      "rationale": "Six live chinos and four of them are the same beige-to-stone family. Grey would give the brown, burgundy and navy knits somewhere else to sit \u2014 right now they all land on beige.",
+      "unlocks": "New base for 4 knits that currently only have beige or stone under them",
+      "spec": "Mid-grey cotton twill, flat front, slight taper, no cuff. Matte, not a suiting cloth.",
+      "size": "W33-34 / EU44",
+      "budget": "A$60-140",
+      "buy_at": [
+        "Uniqlo AU",
+        "Country Road",
+        "Assembly Label"
+      ],
+      "candidates": [
+        {
+          "name": "Uniqlo smart ankle pant, grey",
+          "source": "uniqlo.com/au",
+          "url": null,
+          "price": null
+        }
+      ],
+      "evidence": {
+        "live_chinos": 6,
+        "pale_family": 4
+      },
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g03",
+      "category": "Tops",
+      "priority": "high",
+      "status": "open",
+      "title": "White oxford shirt that actually fits",
+      "image": "/static/gaps/g03.svg",
+      "rationale": "You own zero live white shirts. tops_19 is Tailor with a stain its own card says to avoid showing; tops_29 was binned at a 15in neck that does not close. Every sharp fit falls back to a polo.",
+      "unlocks": "Opens the whole collar-and-knit register \u2014 a shirt under a V-neck is the layer the wardrobe has never had",
+      "spec": "White OCBD, button-down collar with roll, oxford cloth, no chest pocket.",
+      "size": "16 / 41 collar, sleeve 34-35, slim through the body (not extra-slim)",
+      "budget": "A$60-160",
+      "buy_at": [
+        "Charles Tyrwhitt",
+        "Hawes & Curtis",
+        "Country Road",
+        "Uniqlo AU"
+      ],
+      "candidates": [
+        {
+          "name": "Hawes & Curtis white oxford, button-down",
+          "source": "hawesandcurtis.com",
+          "url": "https://www.hawesandcurtis.com/white-oxford-shirt-button-down-collar-wepfa001-n01",
+          "price": null
+        }
+      ],
+      "evidence": {
+        "live_white_shirts": 0,
+        "binned_for_neck": "tops_29 at 15in",
+        "binned_for_sleeve": 2,
+        "binned_for_loose_body": 3
+      },
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g04",
+      "category": "Tops",
+      "priority": "high",
+      "status": "open",
+      "title": "White poplin dress shirt, double cuff",
+      "image": "/static/gaps/g04.svg",
+      "rationale": "The Varce dinner jacket, the black formal trouser and the satin bow tie are a complete black-tie kit with nothing to wear under them. This is the only garment blocking it.",
+      "unlocks": "Unblocks the black-tie fit entirely; also the correct shirt for the navy two-piece",
+      "spec": "Plain white poplin, spread or semi-cutaway collar, double (French) cuff, no pocket.",
+      "size": "16 / 41 collar, sleeve 34-35, slim body",
+      "budget": "A$80-180",
+      "buy_at": [
+        "Charles Tyrwhitt",
+        "Hawes & Curtis",
+        "Suitsupply"
+      ],
+      "candidates": [],
+      "evidence": {
+        "blocks_fit": "fit_f1_black-tie (cannot be created)"
+      },
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g05",
+      "category": "Shoes",
+      "priority": "high",
+      "status": "open",
+      "title": "Black derby, plain or cap toe",
+      "image": "/static/gaps/g05.svg",
+      "rationale": "There is no black dress shoe in scope. The Zegna monk is scope=out, the black Chelsea is Replace and not resoleable. The only black footwear in rotation is a nubuck sneaker.",
+      "unlocks": "Black tie, the Varce black trouser, and any smart fit that wants black leather",
+      "spec": "Black calf, plain-toe or cap-toe derby. Leather or discreet rubber sole. Derby not oxford \u2014 it takes both the suits and a heavier trouser.",
+      "size": "EU44 / UK10, roomy in the toe box \u2014 the Zegnas in 43 are snug",
+      "budget": "A$200-500",
+      "buy_at": [
+        "Aquila",
+        "Loake Australasia",
+        "Meermin"
+      ],
+      "candidates": [
+        {
+          "name": "Aquila black derby",
+          "source": "aquila.com.au",
+          "url": "https://aquila.com.au/collections/mens-black-derby-shoes",
+          "price": null
+        },
+        {
+          "name": "Loake derby",
+          "source": "loakeshoes.com.au",
+          "url": "https://www.loakeshoes.com.au/collections/derby",
+          "price": null
+        }
+      ],
+      "evidence": {
+        "black_dress_shoes_in_scope": 0
+      },
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g06",
+      "category": "Shoes",
+      "priority": "medium",
+      "status": "open",
+      "title": "Dark brown loafer, smooth calf",
+      "image": "/static/gaps/g06.svg",
+      "rationale": "Every sharp fit lands on the Church's derby because there is no dark smooth-leather slip-on. The suede penny loafer is rain-unsafe, so it cannot do a wet day or a client day.",
+      "unlocks": "Gives 5 existing sharp fits a second shoe option",
+      "spec": "Smooth calf, dark brown \u2014 not suede, not oxblood. Leather sole, minimal apron.",
+      "size": "EU44 / UK10",
+      "budget": "A$220-450",
+      "buy_at": [
+        "Meermin",
+        "Aquila",
+        "Loake Australasia"
+      ],
+      "candidates": [
+        {
+          "name": "Meermin Linea Maestro penny loafer",
+          "source": "meermin.es",
+          "url": null,
+          "price": null
+        }
+      ],
+      "evidence": {
+        "loafers_owned": 1,
+        "loafers_rain_safe": 0
+      },
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g07",
+      "category": "Shoes",
+      "priority": "medium",
+      "status": "open",
+      "title": "Rain-safe dark casual shoe",
+      "image": "/static/gaps/g07.svg",
+      "rationale": "Every casual shoe you own is rain-unsafe: the Ecco nubuck, the suede penny loafer and the Air Max are all flagged. The only rain-safe shoes in the closet are three pairs of brown dress leather. A wet casual day has no honest answer.",
+      "unlocks": "Makes 11 dry-days-only fits wearable year-round",
+      "spec": "Dark brown or black, smooth or grained leather, rubber sole. A Chelsea or a plain derby boot. Nothing suede or nubuck.",
+      "size": "EU44 / UK10",
+      "budget": "A$200-450",
+      "buy_at": [
+        "Aquila",
+        "Loake Australasia",
+        "R.M.Williams"
+      ],
+      "candidates": [],
+      "evidence": {
+        "rain_unsafe_casual_shoes": [
+          "shoes_03_ecco-black-nubuck",
+          "shoes_08a_suede-penny-loafer",
+          "shoes_09b_nike-airmax-1"
+        ],
+        "rain_safe_shoes": [
+          "shoes_02",
+          "shoes_04",
+          "shoes_07"
+        ]
+      },
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g08",
+      "category": "Trousers",
+      "priority": "high",
+      "status": "open",
+      "title": "Plain black jean, non-fading",
+      "image": "/static/gaps/g08.svg",
+      "rationale": "trousers_11 carries 11 fits, is greying at the thigh, and its coated/waxed finish is a mid-2010s detail \u2014 the most dated thing in the trouser drawer. If it goes, 11 fits go with it.",
+      "unlocks": "Insurance on 11 existing fits, and retires the coated finish",
+      "spec": "Plain dry black denim. No coating, no whiskering, no distressing, no fading. Straight or slim-straight.",
+      "size": "W33-34 / EU44",
+      "budget": "A$150-260",
+      "buy_at": [
+        "Nudie Jeans AU",
+        "Neuw",
+        "A.P.C."
+      ],
+      "candidates": [
+        {
+          "name": "Nudie 'Everblack' \u2014 denim engineered not to fade",
+          "source": "nudiejeans.com/en-AU",
+          "url": "https://www.nudiejeans.com/en-AU/selection/black-jeans",
+          "price": null
+        }
+      ],
+      "replaces": "trousers_11_black-coated-jeans",
+      "evidence": {
+        "fits_at_risk": 11
+      },
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g09",
+      "category": "Belts",
+      "priority": "medium",
+      "status": "open",
+      "title": "Dark brown dress belt",
+      "image": "/static/gaps/g09.svg",
+      "rationale": "All four brown belts are casual \u2014 two tan at f3, two distressed at f2. There is no f4 or f5 brown belt, which is why the navy two-piece carries the note \"belts_02 is a casual tan and is the best available\".",
+      "unlocks": "Finishes the navy two-piece and every brown-shoe sharp fit",
+      "spec": "Dark chocolate, smooth grain, 30-32mm, plain rectangular buckle in brushed nickel. Not tan, not distressed \u2014 you own four of those.",
+      "size": "34-36in",
+      "budget": "A$80-180",
+      "buy_at": [
+        "Aquila",
+        "Loake Australasia",
+        "Country Road"
+      ],
+      "candidates": [],
+      "evidence": {
+        "brown_belts_owned": 4,
+        "brown_belts_at_f4_or_above": 0
+      },
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g10",
+      "category": "Shoes",
+      "priority": "medium",
+      "status": "open",
+      "title": "White or bone minimal sneaker",
+      "image": "/static/gaps/g10.svg",
+      "rationale": "Your sneakers are a black nubuck and an olive Air Max. There is no white sneaker at all \u2014 the most current-reading casual shoe of the last decade, and the obvious partner to four stone and sand chinos that currently only have brogues, loafers or olive trainers under them.",
+      "unlocks": "Pairs immediately with 4 existing chinos",
+      "spec": "Low-profile leather, white or bone, minimal branding. Not a runner, not chunky.",
+      "size": "EU44 / UK10",
+      "budget": "A$120-280",
+      "buy_at": [
+        "Country Road",
+        "Veja",
+        "Axel Arigato",
+        "Common Projects"
+      ],
+      "candidates": [],
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g11",
+      "category": "Knitwear",
+      "priority": "medium",
+      "status": "open",
+      "title": "Navy fine-gauge merino",
+      "image": "/static/gaps/g11.svg",
+      "rationale": "You do own a navy crew \u2014 the Topman \u2014 but it is a mid-weight cotton blend, too bulky to sit under a jacket or over a collar. The Lyle & Scott navy is the right shape but wool and mid-weight too. A fine merino is what makes the new shirt-under-knit register work.",
+      "unlocks": "Pairs with g03 \u2014 the two together make the collar register work",
+      "spec": "Fine-gauge merino, navy, V-neck. Thin enough to layer under a blazer without bulk.",
+      "size": "M",
+      "budget": "A$100-220",
+      "buy_at": [
+        "Uniqlo AU",
+        "Country Road",
+        "M.J. Bale"
+      ],
+      "candidates": [],
+      "correction": "Your draft said the navy knit is a V-neck and nothing layers over a shirt collar. Half right: the V-neck is exactly what layers over a collar \u2014 a crew is the one that fights it. You also already own topman-navy-crew. The real gap is gauge, not colour or neckline.",
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g12",
+      "category": "Knitwear",
+      "priority": "medium",
+      "status": "open",
+      "title": "Neutral mid-weight crew knit",
+      "image": "/static/gaps/g12.svg",
+      "rationale": "Two knits are Replace and both occupy this slot: the Coofandy for synthetic sheen and a boxy cut \u2014 \"weakest garment in the audit\" \u2014 and the Temu for permanently wavy neck and hem ribs. Buy one good one instead of two cheap ones.",
+      "unlocks": "Retires two Replace items in one purchase",
+      "spec": "Merino or cotton-cashmere, plain crew. Oatmeal, mid-grey or charcoal.",
+      "size": "M",
+      "budget": "A$100-200",
+      "buy_at": [
+        "Uniqlo AU",
+        "Country Road",
+        "M.J. Bale"
+      ],
+      "candidates": [],
+      "replaces": [
+        "coofandy-olive-buttonneck",
+        "temu-cotton-crew"
+      ],
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g13",
+      "category": "Tops",
+      "priority": "low",
+      "status": "open",
+      "title": "Navy-tipped polo, and a greige polo",
+      "image": "/static/gaps/g13.svg",
+      "rationale": "tops_07 is binned as cheapest-tier Shein, but its own note says the navy-tipped style is worth rebuying better \u2014 tipping is the one polo detail that reads current rather than corporate-golf. tops_03 is binned too, leaving the greige slot empty.",
+      "unlocks": "Refills two binned polo slots",
+      "spec": "Piqu\u00e9 or knit polo, greige/oatmeal body with navy tipping at collar and cuff. Ribbed collar that stands.",
+      "size": "M",
+      "budget": "A$60-150",
+      "buy_at": [
+        "Country Road",
+        "M.J. Bale",
+        "Assembly Label"
+      ],
+      "candidates": [],
+      "replaces": [
+        "tops_07_manfinity-greige-navy-tip-polo",
+        "tops_03_colorado-greige-polo"
+      ],
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    },
+    {
+      "id": "g14",
+      "category": "Shoes",
+      "priority": "low",
+      "status": "open",
+      "title": "Second black sneaker",
+      "image": "/static/gaps/g14.svg",
+      "rationale": "shoes_03 alone carries 15 fits and is nubuck, so it is also rain-unsafe. One pair of shoes should not be that load-bearing.",
+      "unlocks": "Reduces the largest single-item dependency in the closet",
+      "spec": "Black leather (not nubuck or suede), low profile, minimal branding.",
+      "size": "EU44 / UK10",
+      "budget": "A$120-280",
+      "buy_at": [
+        "Country Road",
+        "Veja",
+        "Axel Arigato"
+      ],
+      "candidates": [],
+      "evidence": {
+        "fits_depending_on_shoes_03": 15
+      },
+      "image_is_placeholder": true,
+      "image_note": "spec illustration - replace with product photo"
+    }
+  ],
+  "image_status": "PLACEHOLDER \u2014 the gNN.svg files are flat spec illustrations (correct colour and garment type), not product photos. To be replaced with real product shots. Do not present them as products."
+}

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Gaps — Wardrobe{% endblock %}
+
+{% macro gap_chip(label, value, count) %}
+  <a class="filter-chip {{ 'on' if show == value }}"
+     href="{{ url_for('gaps_view', show=value) }}">
+    <span>{{ label }}</span>
+    <span class="filter-chip-count">{{ count }}</span>
+  </a>
+{% endmacro %}
+
+{% block content %}
+<div class="gaps-head">
+  <div>
+    <h1 class="gaps-title">Gaps</h1>
+    <p class="mono gaps-summary">
+      {{ counts.open }} open gap{{ 's' if counts.open != 1 }} ·
+      {{ counts.high }} high · {{ counts.bought }} bought
+    </p>
+  </div>
+  {# Chips filter the same list; they never leave this screen. #}
+  <div class="filter-chips gaps-chips">
+    {{ gap_chip('Open', 'open', counts.open) }}
+    {{ gap_chip('High', 'high', counts.high) }}
+    {{ gap_chip('Medium', 'medium', counts.medium) }}
+    {{ gap_chip('Low', 'low', counts.low) }}
+    {{ gap_chip('Bought', 'bought', counts.bought) }}
+    {{ gap_chip('Not a gap', 'not_a_gap', counts.not_a_gap) }}
+  </div>
+</div>
+
+<div class="gap-grid">
+  {% for g in gaps %}
+    <article class="gap-card {{ 'is-settled' if g.status != 'open' }}">
+      {% if g.image_path %}
+        <div class="gap-image">
+          <img src="{{ g.image_path }}" alt="" loading="lazy">
+          {% if g.image_is_placeholder %}
+            {# A drawing must never be mistaken for the product. #}
+            <span class="gap-placeholder">Spec illustration — not a product photo</span>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="gap-top">
+        <span class="mono gap-cat">{{ g.category }}</span>
+        <span class="gap-priority {{ g.priority }}">{{ g.priority }}</span>
+      </div>
+
+      <h2 class="gap-name">{{ g.title }}</h2>
+
+      {% if g.rationale %}<p class="gap-why">{{ g.rationale }}</p>{% endif %}
+
+      {# The field that makes this part of the app rather than a notes file: it
+         ties the purchase to fits that already exist. Authored, never computed. #}
+      {% if g.unlocks %}
+        <div class="gap-unlocks">
+          <span class="mono label">Unlocks</span>
+          <span class="text">{{ g.unlocks }}</span>
+        </div>
+      {% endif %}
+
+      <dl class="gap-def">
+        {% if g.spec %}<dt class="mono">Spec</dt><dd>{{ g.spec }}</dd>{% endif %}
+        {% if g.size %}<dt class="mono">Size</dt><dd>{{ g.size }}</dd>{% endif %}
+        {% if g.budget %}<dt class="mono">Budget</dt><dd>{{ g.budget }}</dd>{% endif %}
+        {% if g.buy_at %}<dt class="mono">Buy at</dt><dd>{{ g.buy_at|join(', ') }}</dd>{% endif %}
+        {% if g.replaces %}
+          <dt class="mono">Replaces</dt>
+          <dd>
+            {% for r in g.replaces %}
+              <a href="{{ url_for('catalogue', item=r.id) }}">{{ r.name }}</a>
+              {{- ', ' if not loop.last }}
+            {% endfor %}
+          </dd>
+        {% endif %}
+      </dl>
+
+      <div class="gap-candidates">
+        <span class="mono">
+          {{ 'Candidates' if g.candidates else 'No candidate found yet' }}
+        </span>
+        {% for c in g.candidates %}
+          <div class="gap-candidate">
+            <span class="gap-candidate-name">
+              {% if c.url %}
+                <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.name }}</a>
+              {% else %}{{ c.name }}{% endif %}
+              {% if c.source %}<span class="muted"> · {{ c.source }}</span>{% endif %}
+              {% if c.added_by == 'user' %}<span class="gap-yours">yours</span>{% endif %}
+            </span>
+            {# Blank when unverified — never a made-up number, never $0. #}
+            <span class="gap-price">{{ c.price or '' }}</span>
+          </div>
+        {% endfor %}
+
+        <form class="gap-paste" method="post"
+              action="{{ url_for('gap_candidate', gap_id=g.id) }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="url" name="url" placeholder="Paste a link" aria-label="Paste a link">
+          <button type="submit">Add</button>
+        </form>
+      </div>
+
+      <div class="gap-actions">
+        <form method="post" action="{{ url_for('gap_status', gap_id=g.id) }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="hidden" name="status" value="bought">
+          <button type="submit" class="{{ 'btn-ink' if g.status == 'bought' }}">
+            {{ 'Bought ✓' if g.status == 'bought' else 'Bought it' }}
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('gap_status', gap_id=g.id) }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="hidden" name="status" value="not_a_gap">
+          <button type="submit" class="{{ 'btn-ink' if g.status == 'not_a_gap' }}">
+            {{ 'Not a gap ✓' if g.status == 'not_a_gap' else 'Not a gap' }}
+          </button>
+        </form>
+      </div>
+    </article>
+  {% else %}
+    <p class="muted">
+      {% if show == 'open' %}
+        No open gaps. Everything on the list has been bought or ruled out.
+      {% else %}
+        Nothing matches that filter.
+      {% endif %}
+    </p>
+  {% endfor %}
+</div>
+{% endblock %}

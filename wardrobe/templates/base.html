@@ -18,6 +18,7 @@
        not a separate set of things, so they live behind Fits' mode switch. #}
     <a href="{{ url_for('fits_view') }}" class="{{ 'on' if request.endpoint in ('fits_view', 'fit_detail', 'looks_view') }}">Fits</a>
     <a href="{{ url_for('catalogue') }}" class="{{ 'on' if request.endpoint in ('catalogue', 'item_detail') }}">Closet</a>
+    <a href="{{ url_for('gaps_view') }}" class="{{ 'on' if request.endpoint == 'gaps_view' }}">Gaps</a>
     <a href="{{ url_for('laundry_view') }}" class="{{ 'on' if request.endpoint == 'laundry_view' }}">Laundry</a>
     <a href="{{ url_for('log_view') }}" class="{{ 'on' if request.endpoint == 'log_view' }}">Log</a>
   </nav>

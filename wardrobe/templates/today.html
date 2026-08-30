@@ -24,9 +24,15 @@
 <div class="today-grid">
 
   <aside class="today-hero">
-    {% if showing.fit.hero_path %}
-      <img src="{{ url_for('photo', relative_path=showing.fit.hero_path) }}" alt="{{ showing.fit.name }}">
-      <span class="hero-flag">Generated render — not a photo of this being worn</span>
+    {% if showing.fit.render %}
+      <img src="{{ url_for('photo', relative_path=showing.fit.render) }}" alt="{{ showing.fit.name }}">
+      <span class="hero-flag">
+        {%- if showing.fit.render_is_upload -%}
+          Your uploaded render
+        {%- else -%}
+          Generated render — not a photo of this being worn
+        {%- endif -%}
+      </span>
     {% else %}
       <div class="hero-strip">
         {% for p in pieces %}

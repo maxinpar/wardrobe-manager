@@ -14,7 +14,7 @@
       <figure class="look-frame">
         {# The full render, not the thumbnail: this view exists to be looked at.
            Lazy, so only what you scroll to is fetched. #}
-        <img src="{{ url_for('photo', relative_path=fit.hero_path) }}"
+        <img src="{{ url_for('photo', relative_path=fit.render) }}"
              alt="{{ fit.name }}" loading="lazy">
         {{ status_pill(c.problems, fit.blocked_by) }}
         <figcaption class="pill-generated">Generated · never worn</figcaption>

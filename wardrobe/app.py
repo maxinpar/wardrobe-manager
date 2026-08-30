@@ -16,7 +16,10 @@ require_login() below — that is the one obvious place for it.
 from __future__ import annotations
 
 from datetime import date, datetime
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
+
+from werkzeug.utils import secure_filename
 
 from flask import (
     Flask,
@@ -667,10 +670,15 @@ BUILDER_ROLES = [
 ROLE_ORDER = ["outer", "layer", "top", "base", "bottom", "shoe", "belt", "accessory"]
 
 
+# Chip order for the REGISTER group. Anything not listed still shows, after
+# these, alphabetically — a new register appears in the bar on its own.
+REGISTER_ORDER = ("everyday", "sharp", "casual")
+
+
 class FitFilters:
     """Gallery filter state. Query-side only — filters never mutate a fit."""
 
-    KEYS = ("register", "killer", "state", "band", "occasion", "hidden", "mode")
+    KEYS = ("register", "killer", "state", "band", "occasion", "hidden", "binned", "mode")
 
     def __init__(self, args):
         self.register = args.get("register") or ""
@@ -679,6 +687,9 @@ class FitFilters:
         self.band = args.get("band") or ""
         self.occasion = args.get("occasion") or ""
         self.hidden = args.get("hidden") == "1"
+        # Binned fits are their own shelf, not a mixed-in extra: on, you see
+        # only them, exactly as the Closet does for binned garments.
+        self.binned = args.get("binned") == "1"
         # Not a filter: which way the same set of fits is drawn. It rides in the
         # query with them so that changing a chip doesn't throw you back to
         # Details, and so a view can be linked to.
@@ -700,12 +711,14 @@ class FitFilters:
             out["occasion"] = self.occasion
         if self.hidden:
             out["hidden"] = "1"
+        if self.binned:
+            out["binned"] = "1"
         return out
 
     def toggled(self, param: str, value: str) -> dict:
         """The query for clicking a filter chip: on if off, off if already on."""
         out = self.current()
-        if param in ("killer", "hidden"):
+        if param in ("killer", "hidden", "binned"):
             if out.get(param):
                 out.pop(param)
             else:
@@ -811,16 +824,15 @@ def build_cards(conn):
         m["occasion_codes"] = occasion_codes.get(fit.id, [])
         m["season_codes"] = season_codes.get(fit.id, [])
 
-        # The hero is a generated render; the template labels it as such.
-        fit.hero_path = row.get("hero_image_path")
-        fit.hero_thumb = row.get("hero_thumb_path")
-        fit.hero_is_generated = row.get("hero_is_generated", True)
+        # The hero now loads with the fit in picker.load_fits — one source, so
+        # a screen that does not build cards still gets its render.
 
         cards.append(
             {
                 "fit": fit,
                 "meta": m,
                 "problems": picker.staleness(fit),
+                "gone_pieces": picker.gone_pieces(fit),
                 "rating": ratings.get(fit.id),
                 "wearings": wearings.get(fit.id, 0),
                 "source": row.get("source"),
@@ -873,22 +885,52 @@ def fits_view():
                 builder["candidates"][role] = db.fetch_all(
                     conn,
                     "SELECT id, name, cat_code, hex, warmth, formality_rank, rain_unsafe "
-                    "FROM items WHERE retired_at IS NULL AND scope_code = 'core' "
+                    "FROM items WHERE retired_at IS NULL AND gone_at IS NULL "
+                    "AND scope_code = 'core' "
                     "AND verdict_code IN ('Keep', 'Tailor') AND cat_code = ANY(%s) "
                     "ORDER BY name",
                     (list(cats),),
                 )
 
+    # Counted over the live shelf — a binned fit is not "blocked", it is out.
+    live = [c for c in cards if not c["fit"].gone]
     counts = {
-        "total": len(cards),
-        "wearable": sum(1 for c in cards if not c["problems"]),
-        "blocked": sum(1 for c in cards if c["problems"]),
-        "rendered": sum(1 for c in cards if c["fit"].hero_path),
+        "total": len(live),
+        "wearable": sum(1 for c in live if not c["problems"]),
+        "blocked": sum(1 for c in live if c["problems"]),
+        "rendered": sum(1 for c in live if c["fit"].render),
+        "binned": len(cards) - len(live),
+    }
+
+    # Every chip carries a count. They answer "how many fits would this chip
+    # show me", so they are NOT narrowed by the other active filters — only by
+    # the roll-neck toggle, which decides what is on the shelf at all.
+    base = [c for c in live if filters.hidden or not c["fit"].hidden_by_default]
+    registers = sorted({c["fit"].register for c in base if c["fit"].register},
+                       key=lambda r: (REGISTER_ORDER.index(r)
+                                      if r in REGISTER_ORDER else 99, r))
+    chip_counts = {
+        "all": len(base),
+        "register": {r: sum(1 for c in base if c["fit"].register == r)
+                     for r in registers},
+        "wearable": sum(1 for c in base if not c["problems"]),
+        "blocked": sum(1 for c in base if c["problems"]),
+        "killer": sum(1 for c in base if c["fit"].killer),
+        "band": {b: sum(1 for c in base if b in c["meta"]["band_codes"])
+                 for b in ("cold", "mild", "warm")},
+        "occasion": {k: sum(1 for c in base if k in c["meta"]["occasion_codes"])
+                     for k in ("client", "dinner")},
+        # What the toggle would ADD, which is why it is written with a "+".
+        "hidden": sum(1 for c in live if c["fit"].hidden_by_default),
+        "binned": counts["binned"],
     }
 
     shown = []
     for c in cards:
         fit, m = c["fit"], c["meta"]
+        # Binned is binned: out of the gallery unless you ask for that shelf.
+        if fit.gone != filters.binned:
+            continue
         if fit.hidden_by_default and not filters.hidden:
             continue
         if filters.register and fit.register != filters.register:
@@ -909,15 +951,25 @@ def fits_view():
     # ones that have an image — that is the whole point of the view, not a
     # filter you can clear.
     if filters.mode == "renders":
-        shown = [c for c in shown if c["fit"].hero_path]
+        shown = [c for c in shown if c["fit"].render]
 
-    # A fit with a render sorts first — the picture is the fastest way in.
-    shown.sort(key=lambda c: (c["fit"].hero_path is None, c["fit"].sort_order))
+    # A fit built on a garment that has gone sinks to the very bottom: it can
+    # never come back on its own, unlike a wash or a tailoring job. Below that,
+    # a fit with a render sorts first — the picture is the fastest way in.
+    shown.sort(
+        key=lambda c: (
+            bool(c["gone_pieces"]),
+            c["fit"].render is None,
+            c["fit"].sort_order,
+        )
+    )
 
     return render_template(
         "fits.html",
         cards=shown,
         counts=counts,
+        chip_counts=chip_counts,
+        registers=registers,
         filters=filters,
         mode=filters.mode,
         renders=renders,
@@ -1119,6 +1171,126 @@ def fit_create():
 
 
 
+# Where uploaded renders live, under the photo store. One file per fit, named
+# from the fit id, so re-uploading replaces rather than accumulating.
+RENDER_UPLOAD_DIR = "fits/uploads"
+RENDER_MAX_EDGE = 1000       # the long edge; a 5/8 card needs nothing more
+RENDER_QUALITY = 84
+
+
+def store_render(fit_id: str, stream) -> str:
+    """Save an uploaded render, downscaled. Returns the store-relative path.
+
+    The client downscales before sending — a phone photo over wifi is the case
+    this feature exists for — but the server does it again rather than trusting
+    it, because a form posted without JavaScript sends the original file.
+    """
+    from PIL import Image
+
+    image = Image.open(stream)
+    image.load()                      # fails here, before anything is written,
+    if image.mode not in ("RGB", "L"):  # if the file is not really an image
+        image = image.convert("RGB")
+    image.thumbnail((RENDER_MAX_EDGE, RENDER_MAX_EDGE), Image.LANCZOS)
+
+    target_dir = config.photo_store() / RENDER_UPLOAD_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+    name = f"{secure_filename(fit_id)}.jpg"
+    image.save(target_dir / name, "JPEG", quality=RENDER_QUALITY, optimize=True)
+    return f"{RENDER_UPLOAD_DIR}/{name}"
+
+
+@app.route("/fit/<fit_id>/render", methods=["POST"])
+def fit_render_upload(fit_id: str):
+    """Attach a render to a fit. Beats every file-based source for this fit."""
+    with db.connect() as conn:
+        if db.fetch_one(conn, "SELECT 1 AS x FROM fits WHERE id = %s", (fit_id,)) is None:
+            abort(404)
+
+    upload = request.files.get("render")
+    if upload is None or not upload.filename:
+        flash("No image was chosen.")
+        return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
+
+    try:
+        stored = store_render(fit_id, upload.stream)
+    except Exception:
+        # A non-image is ignored rather than half-written; the design says a
+        # dropped non-image is dropped silently, but a chosen one deserves a word.
+        flash("That file isn't an image the app can read — nothing was changed.")
+        return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
+
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE fits SET render_upload_path = %s, render_uploaded_at = %s "
+            "WHERE id = %s",
+            (stored, datetime.now(TZ), fit_id),
+        )
+        conn.commit()
+    return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
+
+
+@app.route("/fit/<fit_id>/render/remove", methods=["POST"])
+def fit_render_remove(fit_id: str):
+    """Drop the upload. The file-based render underneath is untouched, so this
+    reverts to it — or to the piece strip if there was never one."""
+    with db.connect() as conn:
+        row = db.fetch_one(
+            conn, "SELECT render_upload_path FROM fits WHERE id = %s", (fit_id,)
+        )
+        if row is None:
+            abort(404)
+        conn.execute(
+            "UPDATE fits SET render_upload_path = NULL, render_uploaded_at = NULL "
+            "WHERE id = %s",
+            (fit_id,),
+        )
+        conn.commit()
+
+    if row["render_upload_path"]:
+        stored = config.photo_store() / row["render_upload_path"]
+        stored.unlink(missing_ok=True)
+    return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
+
+
+@app.route("/fit/<fit_id>/gone", methods=["POST"])
+def fit_gone(fit_id: str):
+    """Bin a fit — you don't want it, or its garments have gone. Reversible.
+
+    Nothing is deleted: the composition, the render, your score and every wear
+    event stay. Distinct from hiding the roll-neck, which is a preference about
+    a fit that is still in play.
+    """
+    gone = request.form.get("gone") == "1"
+    with db.connect() as conn:
+        row = db.fetch_one(conn, "SELECT name FROM fits WHERE id = %s", (fit_id,))
+        if row is None:
+            abort(404)
+        conn.execute(
+            "UPDATE fits SET gone_at = %s WHERE id = %s",
+            (datetime.now(TZ) if gone else None, fit_id),
+        )
+        # Manual either way, on the same rule as a binned garment: whether a fit
+        # is wanted is Max's call, so no later import can bin it or revive it.
+        conn.execute(
+            "INSERT INTO fit_field_sources (fit_id, field_name, source, note) "
+            "VALUES (%s, 'gone_at', 'manual', %s) "
+            "ON CONFLICT (fit_id, field_name) "
+            "DO UPDATE SET source = 'manual', note = EXCLUDED.note, updated_at = now()",
+            (fit_id, "binned in the app" if gone else "put back in the rotation"),
+        )
+        conn.commit()
+
+    if gone:
+        flash(
+            f"“{row['name']}” is binned. It stops being offered and leaves the "
+            "gallery — nothing was deleted, and the Binned shelf brings it back."
+        )
+    else:
+        flash(f"“{row['name']}” is back in the rotation.")
+    return redirect(request.form.get("next") or url_for("fits_view"))
+
+
 @app.route("/fit/<fit_id>/killer", methods=["POST"])
 def fit_killer(fit_id: str):
     """Max's promotion flag. Only ever set by him, right here."""
@@ -1224,6 +1396,116 @@ def rate_event(event_id: int):
 # --------------------------------------------------------------- laundry --
 
 
+# The six filter chips. Priority chips narrow the open list — a high-priority
+# gap you have already bought is not something to go shopping for.
+GAP_FILTERS = ("open", "high", "medium", "low", "bought", "not_a_gap")
+
+
+def gap_matches(gap, show: str) -> bool:
+    if show in ("bought", "not_a_gap"):
+        return gap["status"] == show
+    if show in ("high", "medium", "low"):
+        return gap["status"] == "open" and gap["priority"] == show
+    return gap["status"] == "open"
+
+
+@app.route("/gaps")
+def gaps_view():
+    """What isn't in the wardrobe, why that hurts, and what would fix it.
+
+    Hand-authored only. Nothing on this screen is derived from the closet at
+    render time — `unlocks` in particular is a claim made when the gap was
+    written, and computing it would let it drift.
+    """
+    show = request.args.get("show") or "open"
+    if show not in GAP_FILTERS:
+        show = "open"
+
+    with db.connect() as conn:
+        gaps = db.fetch_all(conn, "SELECT * FROM gaps ORDER BY sort_order, id")
+
+        buy_at: dict[str, list[str]] = {}
+        for r in db.fetch_all(
+            conn, "SELECT gap_id, retailer FROM gap_buy_at ORDER BY gap_id, sort_order"
+        ):
+            buy_at.setdefault(r["gap_id"], []).append(r["retailer"])
+
+        candidates: dict[str, list] = {}
+        for r in db.fetch_all(
+            conn,
+            "SELECT id, gap_id, name, source, url, price, added_by FROM gap_candidates "
+            "ORDER BY gap_id, added_by DESC, id",
+        ):
+            candidates.setdefault(r["gap_id"], []).append(r)
+
+        replaces: dict[str, list] = {}
+        for r in db.fetch_all(
+            conn,
+            "SELECT gr.gap_id, i.id, i.name FROM gap_replaces gr "
+            "JOIN items i ON i.id = gr.item_id ORDER BY gr.gap_id, i.name",
+        ):
+            replaces.setdefault(r["gap_id"], []).append(r)
+
+    for g in gaps:
+        g["buy_at"] = buy_at.get(g["id"], [])
+        g["candidates"] = candidates.get(g["id"], [])
+        g["replaces"] = replaces.get(g["id"], [])
+
+    # Counts are of exactly the rows each chip shows, so the header and the
+    # chips can never disagree with the grid.
+    counts = {f: sum(1 for g in gaps if gap_matches(g, f)) for f in GAP_FILTERS}
+
+    return render_template(
+        "gaps.html",
+        gaps=[g for g in gaps if gap_matches(g, show)],
+        counts=counts,
+        show=show,
+        total=len(gaps),
+    )
+
+
+@app.route("/gaps/<gap_id>/status", methods=["POST"])
+def gap_status(gap_id: str):
+    """Bought it, or not a gap after all. Both toggle back to open, and neither
+    deletes anything — a decision you can reverse is worth recording."""
+    wanted = request.form.get("status", "open")
+    if wanted not in ("open", "bought", "not_a_gap"):
+        abort(400)
+    with db.connect() as conn:
+        row = db.fetch_one(conn, "SELECT status FROM gaps WHERE id = %s", (gap_id,))
+        if row is None:
+            abort(404)
+        # Pressing the button a second time puts it back.
+        status = "open" if row["status"] == wanted else wanted
+        conn.execute(
+            "UPDATE gaps SET status = %s, status_changed_at = %s, updated_at = now() "
+            "WHERE id = %s",
+            (status, datetime.now(TZ) if status != "open" else None, gap_id),
+        )
+        conn.commit()
+    return redirect(request.form.get("next") or url_for("gaps_view"))
+
+
+@app.route("/gaps/<gap_id>/candidate", methods=["POST"])
+def gap_candidate(gap_id: str):
+    """Paste a link. One action, not a form: the URL is the whole entry."""
+    url = (request.form.get("url") or "").strip()
+    if not url:
+        return redirect(request.form.get("next") or url_for("gaps_view"))
+    with db.connect() as conn:
+        if db.fetch_one(conn, "SELECT 1 AS x FROM gaps WHERE id = %s", (gap_id,)) is None:
+            abort(404)
+        # added_by 'user' is the flag the importer reads to leave this alone.
+        conn.execute(
+            "INSERT INTO gap_candidates (gap_id, name, source, url, added_by) "
+            "VALUES (%s, %s, %s, %s, 'user')",
+            (gap_id, (request.form.get("name") or "").strip() or url,
+             urlsplit(url).netloc or None, url),
+        )
+        conn.commit()
+    return redirect(request.form.get("next") or url_for("gaps_view"))
+
+
 @app.route("/laundry")
 def laundry_view():
     with db.connect() as conn:
@@ -1231,6 +1513,7 @@ def laundry_view():
         items = db.fetch_all(
             conn,
             ITEM_SELECT + " WHERE i.scope_code = 'core' AND i.retired_at IS NULL"
+            " AND i.gone_at IS NULL"
             " ORDER BY c.sort_order, i.name",
         )
     by_state: dict[str, list] = {s["code"]: [] for s in states}

@@ -108,7 +108,8 @@ def rotation(conn, fit, exclude_unavailable: bool = True) -> list[str]:
         r["id"]
         for r in db.fetch_all(
             conn,
-            "SELECT id FROM items WHERE retired_at IS NULL AND verdict_code = 'Keep' "
+            "SELECT id FROM items WHERE retired_at IS NULL AND gone_at IS NULL "
+            "AND verdict_code = 'Keep' "
             "AND scope_code = 'core' AND cat_code = ANY(%s)",
             (list(ROTATING_CATEGORIES),),
         )
@@ -143,7 +144,8 @@ def rotation(conn, fit, exclude_unavailable: bool = True) -> list[str]:
 
     for row in db.fetch_all(
         conn,
-        "SELECT id FROM items WHERE retired_at IS NULL AND verdict_code = 'Keep' "
+        "SELECT id FROM items WHERE retired_at IS NULL AND gone_at IS NULL "
+        "AND verdict_code = 'Keep' "
         "AND scope_code = 'core' AND cat_code = ANY(%s) ORDER BY name",
         (list(ROTATING_CATEGORIES),),
     ):
@@ -216,7 +218,7 @@ def bike_notes(conn, fit, pieces: list[dict]) -> dict:
             """
             SELECT i.id, i.name FROM items i
             LEFT JOIN item_laundry l ON l.item_id = i.id
-            WHERE i.retired_at IS NULL AND i.cat_code = 'Shoes'
+            WHERE i.retired_at IS NULL AND i.gone_at IS NULL AND i.cat_code = 'Shoes'
               AND i.verdict_code = 'Keep' AND i.scope_code = 'core'
               AND i.bike_safe AND COALESCE(l.state_code, 'clean') = 'clean'
             ORDER BY i.name LIMIT 1
@@ -233,7 +235,8 @@ def bike_notes(conn, fit, pieces: list[dict]) -> dict:
     if not wearing_jacket:
         ride_jacket = db.fetch_one(
             conn,
-            "SELECT id, name FROM items WHERE id = %s AND retired_at IS NULL",
+            "SELECT id, name FROM items WHERE id = %s AND retired_at IS NULL "
+            "AND gone_at IS NULL",
             ("outerwear_02_indindustrie-black-waxed-biker",),
         )
         if ride_jacket:

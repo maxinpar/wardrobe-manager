@@ -85,6 +85,26 @@ class Fit:
     hidden_by_default: bool
     sort_order: int
     source: str | None = None    # which pass produced it, e.g. 'work-outfits.md 2026-08-24'
+    gone: bool = False           # binned. Loaded, never scored — see evaluate().
+    hero_path: str | None = None      # the full-look render, if one exists
+    hero_thumb: str | None = None
+    hero_is_generated: bool = True    # a render must never imply a wearing
+    render_upload: str | None = None  # uploaded in the app; outranks the hero
+
+    # Resolution order, in one place so no screen can disagree with another:
+    # the upload wins, then the file-based hero, then the piece-strip fallback.
+    @property
+    def render(self) -> str | None:
+        return self.render_upload or self.hero_path
+
+    @property
+    def render_thumb(self) -> str | None:
+        """An upload has no generated thumbnail — it is already downscaled."""
+        return self.render_upload or self.hero_thumb or self.hero_path
+
+    @property
+    def render_is_upload(self) -> bool:
+        return bool(self.render_upload)
     temp_bands: list[str] = field(default_factory=list)
     # each entry: {item_id, name, role, position, is_alternate, warmth,
     #              rain_unsafe, verdict, scope, laundry_state, cat}
@@ -132,6 +152,12 @@ def unavailable(item: dict) -> str | None:
     'wearable' boolean would go stale, which is the exact failure it would exist
     to prevent.
     """
+    # Physically gone outranks the rest — a garment that no longer exists is
+    # not "in the wash" and not merely "binned" in the verdict sense. Kept
+    # distinct from the Bin verdict below, which is only an opinion that it
+    # should go; see migrations/009_gone.sql.
+    if item.get("gone"):
+        return "gone"
     # `worn` means used since its last wash and STILL WEARABLE. It does not
     # block a fit — that is the whole point of a base that holds five days.
     # Only the wash and the tailor make a garment unavailable.
@@ -172,6 +198,26 @@ def staleness(fit: Fit) -> list[str]:
     return problems
 
 
+def gone_pieces(fit: Fit) -> list[str]:
+    """Names of this fit's garments that are physically gone and unrescued.
+
+    Separate from staleness() because a gone garment is permanent — the fit
+    sorts to the bottom of the gallery and stays there — where in the wash or
+    at the tailor clears on its own.
+    """
+    out = []
+    for item in fit.primary():
+        if not item.get("gone"):
+            continue
+        if any(
+            unavailable(alt) is None
+            for alt in fit.alternates_for(item["role"], item["position"])
+        ):
+            continue
+        out.append(item["name"])
+    return out
+
+
 def evaluate(
     fit: Fit,
     day: date,
@@ -181,6 +227,11 @@ def evaluate(
     allow_tailoring: bool = True,
 ) -> Candidate | Rejection:
     """Score one fit for one day, substituting alternates where it helps."""
+    # Binned is binned. Ahead of every other test, and not reachable by
+    # allow_disliked — that switch is for the roll-neck, which is a preference.
+    if fit.gone:
+        return Rejection(fit, f"{fit.name} is binned")
+
     if fit.hidden_by_default and not allow_disliked:
         return Rejection(fit, f"{fit.name} is hidden by default (roll-neck)")
 
@@ -303,10 +354,14 @@ def _rain_unsafe_word(*fields) -> str | None:
 FITS_SQL = """
 SELECT f.id, f.name, f.register_code, f.commentary, f.catch, f.style, f.score,
        f.killer, f.hidden_by_default, f.sort_order, f.source,
+       f.hero_image_path, f.hero_thumb_path, f.hero_is_generated,
+       f.render_upload_path,
+       (f.gone_at IS NOT NULL) AS fit_gone,
        fi.item_id, i.name AS item_name, i.material, i.cat_code,
        fi.role, fi.position, fi.is_alternate, fi.note,
        i.warmth, i.rain_unsafe, i.weatherproof_rain, i.verdict_code, i.scope_code,
        (i.retired_at IS NOT NULL) AS retired,
+       (i.gone_at IS NOT NULL) AS gone,
        COALESCE(l.state_code, 'clean') AS laundry_state
 FROM fits f
 -- LEFT so a fit whose garment list was lost still loads. Eight of them exist:
@@ -352,6 +407,11 @@ def load_fits(conn) -> list[Fit]:
                 hidden_by_default=row["hidden_by_default"],
                 sort_order=row["sort_order"],
                 source=row["source"],
+                gone=row["fit_gone"],
+                hero_path=row["hero_image_path"],
+                hero_thumb=row["hero_thumb_path"],
+                hero_is_generated=row["hero_is_generated"],
+                render_upload=row["render_upload_path"],
                 temp_bands=[
                     b
                     for b in (BAND_COLD, BAND_MILD, BAND_WARM)
@@ -379,6 +439,7 @@ def load_fits(conn) -> list[Fit]:
                 "scope": row["scope_code"],
                 "laundry_state": row["laundry_state"],
                 "retired": row["retired"],
+                "gone": row["gone"],
             }
         )
     return list(fits.values())

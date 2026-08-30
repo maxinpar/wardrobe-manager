@@ -2,28 +2,74 @@
 {% from "_fit_macros.html" import fit_image, status_pill, fit_badges %}
 {% block title %}Fits — Wardrobe{% endblock %}
 
-{% macro filter_link(label, param, value, active) %}
+{% macro chip(label, param, value, active, count, prefix='') %}
   {# Filters are query-side only: they never mutate a fit. #}
-  <a class="btn {{ 'on' if active }}" href="{{ url_for('fits_view', **filters.toggled(param, value)) }}">{{ label }}</a>
+  <a class="filter-chip {{ 'on' if active }}"
+     href="{{ url_for('fits_view', **filters.toggled(param, value)) }}">
+    <span>{{ label }}</span>
+    <span class="filter-chip-count">{{ prefix }}{{ count }}</span>
+  </a>
 {% endmacro %}
 
 {% block content %}
-<div class="filters">
-  {{ filter_link('All', 'register', '', not filters.register) }}
-  {{ filter_link('Everyday', 'register', 'everyday', filters.register == 'everyday') }}
-  {{ filter_link('Sharp', 'register', 'sharp', filters.register == 'sharp') }}
-  <span class="sep"></span>
-  {{ filter_link('Killer only', 'killer', '1', filters.killer) }}
-  {{ filter_link('Wearable now', 'state', 'wearable', filters.state == 'wearable') }}
-  {{ filter_link('Blocked', 'state', 'blocked', filters.state == 'blocked') }}
-  <span class="sep"></span>
-  {{ filter_link('Cold', 'band', 'cold', filters.band == 'cold') }}
-  {{ filter_link('Mild', 'band', 'mild', filters.band == 'mild') }}
-  {{ filter_link('Warm', 'band', 'warm', filters.band == 'warm') }}
-  <span class="sep"></span>
-  {{ filter_link('Good for client', 'occasion', 'client', filters.occasion == 'client') }}
-  {{ filter_link('Good for dinner', 'occasion', 'dinner', filters.occasion == 'dinner') }}
-  {{ filter_link('Show roll-neck', 'hidden', '1', filters.hidden) }}
+{# Five labelled clusters, not one flat row of pills: the grouping is what says
+   which chips are exclusive and which are toggles. Every chip carries the count
+   it would show, so no chip can look broken when its effect is one card. #}
+<div class="filter-groups">
+  <div class="filter-group">
+    <span class="filter-group-label">Register</span>
+    <div class="filter-chips">
+      {{ chip('All', 'register', '', not filters.register, chip_counts.all) }}
+      {% for code in registers %}
+        {{ chip(code|capitalize, 'register', code,
+                filters.register == code, chip_counts.register.get(code, 0)) }}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="filter-group">
+    <span class="filter-group-label">Availability</span>
+    <div class="filter-chips">
+      {{ chip('Wearable now', 'state', 'wearable',
+              filters.state == 'wearable', chip_counts.wearable) }}
+      {{ chip('Blocked', 'state', 'blocked',
+              filters.state == 'blocked', chip_counts.blocked) }}
+      {{ chip('Killers', 'killer', '1', filters.killer, chip_counts.killer) }}
+      {# Not in the design pack: binned fits are ours, and this is the shelf. #}
+      {{ chip('Binned', 'binned', '1', filters.binned, chip_counts.binned) }}
+    </div>
+  </div>
+
+  <div class="filter-group">
+    <span class="filter-group-label">Weather</span>
+    <div class="filter-chips">
+      {% for code in ('cold', 'mild', 'warm') %}
+        {{ chip(code|capitalize, 'band', code,
+                filters.band == code, chip_counts.band.get(code, 0)) }}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="filter-group">
+    <span class="filter-group-label">Occasion</span>
+    <div class="filter-chips">
+      {% for code in ('client', 'dinner') %}
+        {{ chip(code|capitalize, 'occasion', code,
+                filters.occasion == code, chip_counts.occasion.get(code, 0)) }}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="filter-group">
+    <span class="filter-group-label">Disliked</span>
+    <div class="filter-chips">
+      {# The label carries the state and the count carries the effect: exactly
+         one fit is hidden, so "+1" is the whole story without scrolling. #}
+      {{ chip('Roll-necks ' ~ ('shown' if filters.hidden else 'hidden'),
+              'hidden', '1', filters.hidden, chip_counts.hidden, '+') }}
+    </div>
+  </div>
+
   <span class="segmented mode-switch">
     <a class="btn {{ 'on' if mode == 'details' }}"
        href="{{ url_for('fits_view', **filters.in_mode('details')) }}">Details</a>
@@ -34,7 +80,7 @@
 
 <p class="mono count-line">
   {{ counts.total }} fits · {{ counts.wearable }} wearable now · {{ counts.blocked }} blocked ·
-  {{ counts.rendered }} with a render ·
+  {{ counts.rendered }} with a render · {{ counts.binned }} binned ·
   {% if mode == 'renders' %}
     showing {{ cards|length }} at size · every image below is generated, not a photograph
   {% else %}
@@ -105,6 +151,6 @@
 {% endblock %}
 
 {% block drawer %}
-  {% if selected %}{% include "_fit_drawer.html" %}{% endif %}
+  {% if selected %}{% include "_fit_modal.html" %}{% endif %}
   {% if building %}{% include "_fit_builder.html" %}{% endif %}
 {% endblock %}

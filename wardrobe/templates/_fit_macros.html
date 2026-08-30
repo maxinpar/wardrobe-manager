@@ -8,10 +8,10 @@
 #}
 {% macro fit_image(fit, renders, klass='ground', height_class='') %}
   {% set pieces = fit.primary() | map(attribute='item_id') | select('in', renders) | list %}
-  {% if fit.hero_thumb or fit.hero_path %}
+  {% if fit.render %}
     <div class="{{ klass }} full">
-      <img class="look" src="{{ url_for('photo', relative_path=fit.hero_thumb or fit.hero_path) }}" alt="">
-      {% if fit.hero_is_generated %}
+      <img class="look" src="{{ url_for('photo', relative_path=fit.render_thumb) }}" alt="">
+      {% if fit.hero_is_generated and not fit.render_is_upload %}
         <span class="pill-generated">Generated · never worn</span>
       {% endif %}
       {{ caller() if caller is defined }}
