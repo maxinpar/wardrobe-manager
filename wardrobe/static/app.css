@@ -25,6 +25,8 @@
   --brass-hover: #EFD3A2;
   --brass-text: #8A6320;
   --brass-deep: #241C0C;
+  /* The dashed hairline that marks anything empty or unvetted. */
+  --empty-line: #D9CFB8;
   --catch-bg: #FBF3E4;
   --catch-text: #5C4A22;
   --catch-label: #A07A2C;
@@ -931,3 +933,114 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 }
 .modal-frame.drop-active { border-color: var(--brass); }
 .modal-frame.drop-active .render-drop-note { display: flex; }
+
+/* ------------------------------------------------- the wardrobe switch --
+   Not a filter chip: a mode. It is a segmented control in the header, and a
+   second copy inside the builder drawer because the drawer covers the header.
+   Both post to /wardrobe/<mode> and write the same setting. */
+
+.wardrobe-switch {
+  padding: 3px;
+  background: var(--chip);
+  border-radius: 999px;
+  gap: 3px;
+  border: none;
+}
+.wardrobe-switch button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 15px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--secondary);
+  cursor: pointer;
+}
+.wardrobe-switch button.on { background: var(--ink); color: var(--page); }
+.wardrobe-switch button:not(.on):hover { color: var(--ink); }
+/* The count says how much of the closet this side reaches — the whole reason
+   the switch carries numbers at all. */
+.wardrobe-switch .count { font-size: 9.5px; letter-spacing: 0.06em; color: var(--faint); }
+.wardrobe-switch button.on .count { color: rgba(244, 241, 234, 0.6); }
+
+.builder-wardrobe {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 14px 0 4px;
+}
+.builder-pool-note {
+  flex: 1 1 220px;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--faint);
+}
+
+/* A club crest is what makes a garment read as a uniform off the course. It
+   marks the tile and nothing else — membership of a wardrobe is the occasion
+   tags' job, and the two must not be confused. */
+.candidate { position: relative; }
+.crest-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--brass-text);
+}
+
+.role-count { color: var(--faint); margin-left: 6px; }
+.slot-note {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+/* A slot with genuinely nothing in it says so, rather than leaving a bare
+   header over a 4px void. */
+.slot-note.dashed {
+  border: 1px dashed var(--empty-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+/* ------------------------------------------------------ empty states --
+   Used where a whole screen has nothing to show: the chips, summary line and
+   grid are suppressed entirely rather than rendered with zeros. */
+
+.empty-state {
+  max-width: 560px;
+  margin: 30px 0 60px;
+  padding: 30px 32px;
+  background: var(--surface);
+  border: 1px dashed var(--empty-line);
+  border-radius: 20px;
+}
+.empty-state h2 {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.032em;
+  line-height: 1.15;
+  border: none;
+}
+.empty-state p {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.empty-state .btn {
+  /* .btn is inline by default, and an inline box ignores margin-top: without
+     this the button sits on top of the paragraph's last line. */
+  display: inline-block;
+  margin-top: 20px;
+  padding: 11px 22px;
+  font-size: 13.5px;
+}

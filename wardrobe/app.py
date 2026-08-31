@@ -32,7 +32,7 @@ from flask import (
     url_for,
 )
 
-from . import config, db, fit_derive, picker, seed_data, week
+from . import config, db, fit_derive, picker, seed_data, wardrobes, week
 
 app = Flask(__name__)
 app.secret_key = "wardrobe-local"  # only used for flash messages on localhost
@@ -72,6 +72,70 @@ def header_weather():
             "rain": rain,
         }
     }
+
+
+# --------------------------------------------------- the two wardrobes --
+
+
+def get_wardrobe(conn) -> str:
+    return wardrobes.normalise(get_setting(conn, "wardrobe.mode", wardrobes.DEFAULT))
+
+
+@app.context_processor
+def header_wardrobe():
+    """The wardrobe switch, on every page, with the size of each side on it.
+
+    The counts are what the switch is FOR: they say how much of the closet each
+    mode reaches. They are counted the same way the closet counts, so the number
+    on the pill and the number of cards below it cannot drift apart.
+    """
+    try:
+        with db.connect() as conn:
+            mode = get_wardrobe(conn)
+            counts = {
+                m: db.fetch_one(
+                    conn,
+                    "SELECT count(*) AS n FROM items i WHERE i.retired_at IS NULL "
+                    "AND i.gone_at IS NULL AND i.verdict_code = 'Keep' AND "
+                    + wardrobes.clause(m),
+                )["n"]
+                for m in wardrobes.MODES
+            }
+    except Exception:
+        mode, counts = wardrobes.DEFAULT, {m: 0 for m in wardrobes.MODES}
+    return {
+        "wardrobe": mode,
+        "wardrobe_counts": counts,
+        "wardrobe_modes": wardrobes.MODES,
+        "wardrobe_labels": wardrobes.LABELS,
+        "never_pluralised": wardrobes.NEVER_PLURALISED,
+    }
+
+
+@app.route("/wardrobe/<mode>", methods=["POST"])
+def set_wardrobe(mode: str):
+    """Flip the whole app between the everyday and golf wardrobes.
+
+    Switching CLEARS the builder draft, the selected fit and the selected
+    garment. A half-migrated draft — work trousers in a golf fit — is worse than
+    an empty one, so the redirect drops those keys rather than carrying them.
+    """
+    if mode not in wardrobes.MODES:
+        abort(404)
+    with db.connect() as conn:
+        set_setting(conn, "wardrobe.mode", mode)
+        conn.commit()
+
+    target = request.form.get("next") or url_for("today_view")
+    split = urlsplit(target)
+    if split.scheme or split.netloc:      # never redirect off-site
+        return redirect(url_for("today_view"))
+    keep = [
+        part
+        for part in split.query.split("&")
+        if part and part.split("=")[0] not in ("item", "fit", "rank", "cat")
+    ]
+    return redirect(split.path + ("?" + "&".join(keep) if keep else ""))
 
 
 # ------------------------------------------------------------- helpers --
@@ -252,7 +316,16 @@ def today_view():
         today_index = week.weekday_index(now)
         plan = week.get_or_create(conn, now)
 
-        fits = {f.id: f for f in picker.load_fits(conn)}
+        mode = get_wardrobe(conn)
+        golf_fits = golf_fit_ids(conn)
+        # Today picks out of the active wardrobe only. With no fit to show, the
+        # whole layout is suppressed rather than drawn around a null pick —
+        # `showing` stays None and today.html renders its empty card.
+        fits = {
+            f.id: f
+            for f in picker.load_fits(conn)
+            if (f.id in golf_fits) == (mode == "golf")
+        }
         _, ranked, rejected = picker.pick(
             list(fits.values()), now, temp_c=temp_c, rain=rain, allow_disliked=allow_disliked
         )
@@ -314,6 +387,9 @@ def today_view():
     return render_template(
         "today.html",
         showing=showing,
+        # Two different nothings, and they need different words: a wardrobe with
+        # no fits in it at all, versus one whose fits are all blocked today.
+        wardrobe_empty=not fits,
         pieces=pieces,
         base=[p for p in pieces if p["role"] != "top"],
         day_top=day_top,
@@ -467,11 +543,30 @@ def catalogue():
         )
         params.extend([f"%{filters['q']}%"] * 4)
 
-    sql = ITEM_SELECT + " WHERE " + " AND ".join(where) + " ORDER BY c.sort_order, i.name"
-
     with db.connect() as conn:
+        # The closet shows one wardrobe at a time. This is not a chip you can
+        # clear — the switch in the header is the only way out of it.
+        mode = get_wardrobe(conn)
+        where.append(wardrobes.clause(mode))
+        sql = (
+            ITEM_SELECT + " WHERE " + " AND ".join(where)
+            + " ORDER BY c.sort_order, i.name"
+        )
         items = db.fetch_all(conn, sql, params)
         lookups = load_lookups(conn)
+
+        # The category chips are derived from what is actually in the active
+        # wardrobe, never a fixed list. A hardcoded one omitted Hats and Shorts
+        # — the two categories the golf wardrobe is mostly made of — so its
+        # largest groups had no way to be reached.
+        lookups["categories"] = db.fetch_all(
+            conn,
+            "SELECT c.* FROM categories c WHERE EXISTS ("
+            "  SELECT 1 FROM items i WHERE i.cat_code = c.code"
+            "    AND i.retired_at IS NULL AND i.gone_at IS NULL AND "
+            + wardrobes.clause(mode)
+            + ") ORDER BY c.sort_order",
+        )
         usage = {
             r["item_id"]: r["n"]
             for r in db.fetch_all(
@@ -485,7 +580,8 @@ def catalogue():
         )["n"]
         total = db.fetch_one(
             conn,
-            "SELECT count(*) AS n FROM items WHERE retired_at IS NULL AND gone_at IS NULL",
+            "SELECT count(*) AS n FROM items i WHERE i.retired_at IS NULL "
+            "AND i.gone_at IS NULL AND " + wardrobes.clause(mode),
         )["n"]
 
         selected = None
@@ -651,23 +747,94 @@ def item_state(item_id: str):
 
 # ------------------------------------------------------------------ fits --
 
-# Roles the builder offers, in the order the design lays them out, with the
-# categories eligible for each. The builder's "knit" and "top" slots both land
-# in the `top` role, because that is how the data already models them: when a
-# fit has both, the knit is the top and the polo or tee goes underneath as the
-# `base`. See slot_roles().
-BUILDER_ROLES = [
-    ("outer", "Outer", True, ("Outerwear",)),
-    ("layer", "Layer", True, ("Knitwear",)),
-    ("top", "Top", False, ("Tops",)),
-    ("knit", "Knit", True, ("Knitwear",)),
-    ("bottom", "Bottom", False, ("Trousers",)),
-    ("shoe", "Shoe", False, ("Shoes",)),
-    ("belt", "Belt", False, ("Belts",)),
-]
+# The roles the builder offers live in wardrobes.py, because there are now two
+# anatomies of them — the everyday one and the golf one — and they are easier to
+# read side by side than apart. The builder's "knit" and "top" slots both land
+# in the `top` role either way, because that is how the data already models
+# them: when a fit has both, the knit is the top and the polo or tee goes
+# underneath as the `base`. See slot_roles().
 
-# Sort order for the pieces in the detail drawer.
-ROLE_ORDER = ["outer", "layer", "top", "base", "bottom", "shoe", "belt", "accessory"]
+# Sort order for the pieces in the detail drawer. `hat` is the golf builder's
+# slot name; it saves as `accessory` because the fit schema has no hat role.
+ROLE_ORDER = ["hat", "outer", "layer", "top", "base", "bottom", "shoe", "belt", "accessory"]
+
+
+def crested_ids(conn) -> set[str]:
+    """Every garment the catalogue says carries a club crest."""
+    return {
+        row["id"]
+        for row in db.fetch_all(conn, "SELECT id, formality_note FROM items")
+        if wardrobes.is_crested(row["formality_note"])
+    }
+
+
+def golf_ids(conn) -> set[str]:
+    return {
+        row["id"]
+        for row in db.fetch_all(
+            conn, "SELECT i.id FROM items i WHERE " + wardrobes.GOLF_CLAUSE
+        )
+    }
+
+
+def golf_fit_ids(conn) -> set[str]:
+    """Which fits belong to the golf wardrobe.
+
+    The occasion is the real answer. The second half is a safety net for fits
+    saved before any of the golf tagging existed: a fit built on a crested club
+    polo is a golf fit whatever its metadata says. A plain golf polo is not
+    enough on its own — half the golf wardrobe is deliberately wearable off the
+    course, and treating those as proof would drag everyday fits across.
+    """
+    ids = {
+        row["fit_id"]
+        for row in db.fetch_all(
+            conn,
+            "SELECT DISTINCT fit_id FROM fit_occasions "
+            "WHERE occasion_code = 'golf' AND kind = 'good'",
+        )
+    }
+    crested_golf = golf_ids(conn) & crested_ids(conn)
+    if crested_golf:
+        ids |= {
+            row["fit_id"]
+            for row in db.fetch_all(
+                conn,
+                "SELECT DISTINCT fit_id FROM fit_items WHERE item_id = ANY(%s)",
+                (sorted(crested_golf),),
+            )
+        }
+    return ids
+
+
+def builder_pool(conn, mode: str, role: str, cats: tuple[str, ...]) -> tuple[list, bool]:
+    """The garments offered for one slot, and whether they had to be borrowed.
+
+    Two rules the first build got wrong and that are worth stating:
+      * NO CAP. A `.slice(0, 10)` is the single reason the wardrobe felt
+        invisible — most of the closet could not be reached from the builder.
+      * NO RENDER REQUIRED. Requiring a picture hid every render-less garment;
+        they fall back to a hex swatch instead.
+    """
+    sql = (
+        "SELECT id, name, cat_code, hex, warmth, formality_rank, rain_unsafe, "
+        "formality_note FROM items i "
+        "WHERE i.retired_at IS NULL AND i.gone_at IS NULL AND i.scope_code = 'core' "
+        "AND i.verdict_code IN ('Keep', 'Tailor') AND i.cat_code = ANY(%s) AND "
+    )
+    rows = db.fetch_all(conn, sql + wardrobes.clause(mode) + " ORDER BY name", (list(cats),))
+    if rows or mode != "golf" or role != wardrobes.BORROWED_SLOT:
+        return rows, False
+
+    # Nothing in Knitwear or Outerwear is tagged golf, so the slot borrows light
+    # casual layers rather than showing an empty shelf — and says that it did.
+    borrowed = db.fetch_all(
+        conn,
+        sql + wardrobes.EVERYDAY_CLAUSE
+        + " AND COALESCE(i.warmth, 3) <= %s ORDER BY name",
+        (list(cats), wardrobes.BORROWED_MAX_WARMTH),
+    )
+    return borrowed, True
 
 
 # Chip order for the REGISTER group. Anything not listed still shows, after
@@ -848,7 +1015,13 @@ def fits_view():
     building = request.args.get("build") == "1"
 
     with db.connect() as conn:
-        cards = build_cards(conn)
+        mode = get_wardrobe(conn)
+        golf_fits = golf_fit_ids(conn)
+        # One wardrobe's fits. Everything below — the chip counts, the summary,
+        # the empty state — is counted off this, so no number on the page can
+        # describe a fit the page will not show.
+        cards = [c for c in build_cards(conn)
+                 if (c["fit"].id in golf_fits) == (mode == "golf")]
         renders = item_renders(conn)
         sources = fit_sources(conn)
         selected = None
@@ -879,18 +1052,27 @@ def fits_view():
             )
 
         if building:
-            builder = {"roles": [(r, label, opt) for r, label, opt, _ in BUILDER_ROLES],
-                       "candidates": {}}
-            for role, _, _, cats in BUILDER_ROLES:
-                builder["candidates"][role] = db.fetch_all(
-                    conn,
-                    "SELECT id, name, cat_code, hex, warmth, formality_rank, rain_unsafe "
-                    "FROM items WHERE retired_at IS NULL AND gone_at IS NULL "
-                    "AND scope_code = 'core' "
-                    "AND verdict_code IN ('Keep', 'Tailor') AND cat_code = ANY(%s) "
-                    "ORDER BY name",
-                    (list(cats),),
-                )
+            crested = crested_ids(conn)
+            builder = {
+                "roles": [(r, label, opt) for r, label, opt, _ in wardrobes.roles(mode)],
+                "candidates": {},
+                "borrowed": {},
+                "crested": crested,
+                "mode": mode,
+            }
+            for role, label, _, cats in wardrobes.roles(mode):
+                rows, borrowed = builder_pool(conn, mode, role, cats)
+                builder["candidates"][role] = rows
+                builder["borrowed"][role] = borrowed
+            # The note under the switch is counted off the SAME pools the slots
+            # render. Hardcoding it drifted immediately — the note claimed 18
+            # legs while the slot showed 16, because two golf legs are Replace
+            # and Tailor.
+            builder["note_counts"] = [
+                (len(builder["candidates"][role]), label)
+                for role, label, _, _ in wardrobes.roles(mode)
+                if not builder["borrowed"][role]
+            ]
 
     # Counted over the live shelf — a binned fit is not "blocked", it is out.
     live = [c for c in cards if not c["fit"].gone]
@@ -967,6 +1149,11 @@ def fits_view():
     return render_template(
         "fits.html",
         cards=shown,
+        # No fits at all in this wardrobe — not "no fits matching these chips".
+        # The chips, the summary line and the grid are all suppressed for it:
+        # rendering them with zeros ("All 0, Everyday 0, Sharp 0…" above blank
+        # space) reads as broken rather than as empty.
+        wardrobe_empty=not live,
         counts=counts,
         chip_counts=chip_counts,
         registers=registers,
@@ -1064,7 +1251,10 @@ def slot_roles(picks: dict[str, str]) -> list[tuple[str, str]]:
     for slot, item_id in picks.items():
         if slot in ("knit", "top"):
             continue
-        rows.append((item_id, slot))
+        # The golf builder has a hat slot; the fit schema has no hat role, so it
+        # saves as an accessory. A real `hat` role would be better — see the
+        # open items in docs/HANDOFF-GOLF-WARDROBE.md.
+        rows.append((item_id, "accessory" if slot == "hat" else slot))
     if knit and top:
         rows.append((knit, "top"))
         rows.append((top, "base"))
@@ -1093,7 +1283,7 @@ def fit_create():
     name = (request.form.get("name") or "").strip()
     picks = {
         slot: request.form.get(slot)
-        for slot, _, _, _ in BUILDER_ROLES
+        for slot in wardrobes.ALL_SLOTS
         if request.form.get(slot)
     }
     rows = slot_roles(picks)
@@ -1102,10 +1292,16 @@ def fit_create():
         return redirect(url_for("fits_view", build=1))
 
     with db.connect() as conn:
+        mode = get_wardrobe(conn)
         fit_id = "fit_" + slugify(name)
         if db.fetch_one(conn, "SELECT id FROM fits WHERE id = %s", (fit_id,)):
             fit_id = f"{fit_id}_{today().strftime('%m%d')}"
 
+        # The register stays `everyday`. The handoff asked for `casual`, which is
+        # the prototype's vocabulary, not this database's — `registers` holds
+        # everyday and sharp and nothing else, so writing casual is a foreign
+        # key violation. It is also unnecessary: register says how dressed-up a
+        # fit is, and what makes this a golf fit is the occasion below.
         conn.execute(
             "INSERT INTO fits (id, name, register_code, vetted, source, sort_order) "
             "VALUES (%s, %s, 'everyday', false, %s, 200)",
@@ -1141,7 +1337,16 @@ def fit_create():
                 "INSERT INTO fit_seasons (fit_id, season_code) VALUES (%s, %s)",
                 (fit_id, season),
             )
-        for occasion in fit_derive.good_for(garments):
+        occasions = fit_derive.good_for(garments)
+        # A fit built in the golf wardrobe IS a golf fit, even when the derived
+        # intersection loses the tag — and it does lose it as soon as the knit
+        # slot borrows a casual layer, because nothing in Knitwear is tagged
+        # golf. Without this the fit would save and then vanish from the
+        # wardrobe it was built in.
+        forced_golf = mode == "golf" and "golf" not in occasions
+        if forced_golf:
+            occasions = occasions + ["golf"]
+        for occasion in occasions:
             conn.execute(
                 "INSERT INTO fit_occasions (fit_id, occasion_code, kind) "
                 "VALUES (%s, %s, 'good')",
@@ -1154,8 +1359,11 @@ def fit_create():
         for field in ("temp_bands", "seasons", "good_for", "rain_safe", "formality_rank"):
             conn.execute(
                 "INSERT INTO fit_field_sources (fit_id, field_name, source) "
-                "VALUES (%s, %s, 'derived')",
-                (fit_id, field),
+                "VALUES (%s, %s, %s)",
+                # good_for stops being derived the moment golf is forced onto
+                # it: that came from which wardrobe Max was in, not from the
+                # garments, and an import must not quietly derive it away.
+                (fit_id, field, "manual" if field == "good_for" and forced_golf else "derived"),
             )
         # score, killer and style are never derived: they are Max's to set.
         for field in ("killer", "score"):

@@ -12,6 +12,23 @@
 {% endmacro %}
 
 {% block content %}
+{% if wardrobe_empty %}
+  {# No fits at all in this wardrobe. The chips, the summary line and the grid
+     are all suppressed rather than rendered with zeros — "All 0, Everyday 0,
+     Sharp 0…" above blank space reads as broken, not as empty. #}
+  <div class="empty-state">
+    <h2>{{ 'No golf fits yet' if wardrobe == 'golf' else 'No fits here yet' }}</h2>
+    <p>
+      Your {{ wardrobe_labels[wardrobe]|lower }} wardrobe has
+      {{ wardrobe_counts[wardrobe] }} garments in it, but nothing has been put
+      together into a fit.
+      {%- if wardrobe == 'golf' %} Build one — hat, polo, legs, shoes — and it
+      lands here and in Today.{% else %} Build one and it lands here and in
+      Today.{% endif %}
+    </p>
+    <a class="btn btn-ink" href="{{ url_for('fits_view', build=1) }}">Build a fit</a>
+  </div>
+{% else %}
 {# Five labelled clusters, not one flat row of pills: the grouping is what says
    which chips are exclusive and which are toggles. Every chip carries the count
    it would show, so no chip can look broken when its effect is one card. #}
@@ -147,6 +164,7 @@
     <p class="muted">Nothing matches those filters.</p>
   {% endfor %}
 </div>
+{% endif %}
 {% endif %}
 {% endblock %}
 

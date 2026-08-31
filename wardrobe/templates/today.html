@@ -19,7 +19,32 @@
 
 {% block content %}
 {% if not showing %}
-  <p class="muted">Nothing is wearable today — every fit is blocked. The Fits screen says why.</p>
+  {# The whole layout is suppressed, not drawn around a null pick: the two-column
+     grid, the hero, the base strip, the week strip and the buttons all go. #}
+  {% if wardrobe_empty %}
+    <div class="empty-state">
+      <h2>{{ 'No golf fits yet' if wardrobe == 'golf' else 'No fits here yet' }}</h2>
+      <p>
+        Your {{ wardrobe_labels[wardrobe]|lower }} wardrobe has
+        {{ wardrobe_counts[wardrobe] }} garments in it, but nothing has been put
+        together into a fit.
+        {%- if wardrobe == 'golf' %} Build one — hat, polo, legs, shoes — and it
+        lands here and in Today.{% else %} Build one and it lands here and in
+        Today.{% endif %}
+      </p>
+      <a class="btn btn-ink" href="{{ url_for('fits_view', build=1) }}">Build a fit</a>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <h2>Nothing is wearable today</h2>
+      <p>
+        Every fit in your {{ wardrobe_labels[wardrobe]|lower }} wardrobe is
+        blocked — in the wash, at the tailor, or built on something that has
+        gone. The Fits screen says which, and why.
+      </p>
+      <a class="btn btn-ink" href="{{ url_for('fits_view', state='blocked') }}">See what's blocking them</a>
+    </div>
+  {% endif %}
 {% else %}
 <div class="today-grid">
 

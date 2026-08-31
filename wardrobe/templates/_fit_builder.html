@@ -1,20 +1,66 @@
 {# Build a fit. The only view with client-side state: the derived strip updates
    as pieces are picked, using the same rules as wardrobe/fit_derive.py. It is
    progressive enhancement — with JS off the form still submits and the server
-   derives exactly the same values. #}
+   derives exactly the same values.
+
+   The slot anatomy comes from the active wardrobe (wardrobes.py): Outer/Layer/
+   Top/Knit/Bottom/Shoe/Belt for everyday, Hat/Polo/Knit-or-outerwear/Belt/
+   Shorts-or-trousers/Shoes for golf, in the order Max actually gets dressed. #}
 <aside class="drawer wide" id="builder">
   <form method="post" action="{{ url_for('fit_create') }}" id="builder-form">
     <div class="drawer-head">
       <h2 class="drawer-title" style="border:none">Build a fit</h2>
       <a class="btn drawer-close" href="{{ url_for('fits_view', **filters.current()) }}" title="Close">×</a>
     </div>
-    <p class="mono" style="margin:6px 0 0">Pick a piece per role · metadata derives as you go</p>
+    <p class="mono" style="margin:6px 0 0">
+      {%- if builder.mode == 'golf' -%}
+        Golf wardrobe · hat to shoes · switch wardrobes in the header
+      {%- else -%}
+        Pick a piece per role · metadata derives as you go
+      {%- endif -%}
+    </p>
+
+    {# The drawer covers the header, so the switch is repeated here. Both write
+       the same setting; switching abandons the draft, which is the point. #}
+    <div class="builder-wardrobe">
+      {# Where the switch lands: back in the builder, in the other wardrobe's
+         anatomy, with the draft gone. Switching mid-draft is meant to abandon
+         it — a golf fit half-built out of work trousers is worse than nothing. #}
+      <input type="hidden" name="next" value="{{ url_for('fits_view', build=1) }}">
+      <span class="segmented wardrobe-switch">
+        {% for m in wardrobe_modes %}
+          <button type="submit" class="{{ 'on' if wardrobe == m }}"
+                  formmethod="post" formnovalidate
+                  formaction="{{ url_for('set_wardrobe', mode=m) }}">
+            {{ wardrobe_labels[m] }}
+            <span class="mono count">{{ wardrobe_counts[m] }}</span>
+          </button>
+        {% endfor %}
+      </span>
+      <p class="builder-pool-note">
+        {%- if builder.mode == 'golf' -%}
+          Golf-flagged kit only —
+          {% for n, label in builder.note_counts -%}
+            {{ n }} {{ label|lower }}{{ '' if label in never_pluralised else 's' }}
+            {{- ', ' if not loop.last }}
+          {%- endfor %}.
+          A gold dot marks a club crest.
+          {%- if builder.borrowed.get('knit') %}
+            Knit and outerwear are borrowed from casual — none are tagged golf.
+          {%- endif %}
+        {%- else -%}
+          Everything except golf-only kit. Unbranded golf pieces still show up here.
+        {%- endif -%}
+      </p>
+    </div>
 
     <section>
       <div class="builder-summary">
         <div class="row">
           <input name="name" placeholder="Name this fit" required>
-          <button class="btn-brass" type="submit">Save &amp; render the look</button>
+          <button class="btn-brass" type="submit">
+            {{ 'Save golf fit' if builder.mode == 'golf' else 'Save &amp; render the look' }}
+          </button>
         </div>
         <div class="look-plate mono">Look render on save</div>
         <div class="derived-strip">
@@ -33,27 +79,44 @@
     {% for role, label, optional in builder.roles %}
       <div class="role-row" data-role="{{ role }}">
         <div class="role-head">
-          <span class="mono">{{ label }}{{ ' · optional' if optional }}</span>
+          <span class="mono">
+            {{ label }}{{ ' · optional' if optional }}
+            <span class="role-count">{{ builder.candidates[role]|length }}</span>
+          </span>
           <span class="name" data-picked-name="{{ role }}">nothing picked</span>
         </div>
         <input type="hidden" name="{{ role }}" value="" data-slot="{{ role }}">
-        <div class="candidates">
-          {% for item in builder.candidates[role] %}
-            <button type="button" class="candidate" data-role="{{ role }}" data-item="{{ item.id }}"
-                    data-name="{{ item.name }}" data-cat="{{ item.cat_code }}"
-                    data-warmth="{{ item.warmth or 3 }}"
-                    data-formality="{{ item.formality_rank or 3 }}"
-                    data-rain-unsafe="{{ 1 if item.rain_unsafe else 0 }}">
-              {% set r = renders.get(item.id) %}
-              {% if r and r.thumb %}
-                <img src="{{ url_for('photo', relative_path=r.thumb) }}" alt="">
-              {% else %}
-                <span class="swatch-piece" style="background: {{ item.hex or '#ccc' }}"></span>
-              {% endif %}
-              <span class="cname">{{ item.name }}</span>
-            </button>
-          {% endfor %}
-        </div>
+        {% if builder.borrowed.get(role) %}
+          {# Said out loud rather than hidden: these are not golf garments. #}
+          <p class="slot-note">Borrowed from casual — nothing in this category is tagged golf.</p>
+        {% endif %}
+        {% if builder.candidates[role] %}
+          <div class="candidates">
+            {% for item in builder.candidates[role] %}
+              <button type="button" class="candidate" data-role="{{ role }}" data-item="{{ item.id }}"
+                      data-name="{{ item.name }}" data-cat="{{ item.cat_code }}"
+                      data-warmth="{{ item.warmth or 3 }}"
+                      data-formality="{{ item.formality_rank or 3 }}"
+                      data-rain-unsafe="{{ 1 if item.rain_unsafe else 0 }}">
+                {% if item.id in builder.crested %}
+                  {# A club crest is what makes a garment a uniform off the
+                     course. It marks the tile; it does not filter anything. #}
+                  <span class="crest-dot" title="Club crest"></span>
+                {% endif %}
+                {% set r = renders.get(item.id) %}
+                {% if r and r.thumb %}
+                  <img src="{{ url_for('photo', relative_path=r.thumb) }}" alt="">
+                {% else %}
+                  {# No render is not a reason to hide a garment. #}
+                  <span class="swatch-piece" style="background: {{ item.hex or '#ccc' }}"></span>
+                {% endif %}
+                <span class="cname">{{ item.name }}</span>
+              </button>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="slot-note dashed">Nothing in the wardrobe fits this slot.</p>
+        {% endif %}
       </div>
     {% endfor %}
   </form>

@@ -23,6 +23,25 @@
     <a href="{{ url_for('log_view') }}" class="{{ 'on' if request.endpoint == 'log_view' }}">Log</a>
   </nav>
   <div class="topbar-right">
+    {# The wardrobe switch. Not a filter chip — a mode. It reframes the whole
+       app: which garments the closet lists, which fits exist, what Today picks
+       from, and the anatomy of the builder. The count on each side says how
+       much of the closet that side reaches. #}
+    <form class="segmented wardrobe-switch" method="post"
+          action="{{ url_for('set_wardrobe', mode='everyday') }}">
+      {% for m in wardrobe_modes %}
+        <button type="submit" class="{{ 'on' if wardrobe == m }}"
+                formaction="{{ url_for('set_wardrobe', mode=m) }}"
+                {{ 'aria-current=true' if wardrobe == m }}>
+          {{ wardrobe_labels[m] }}
+          <span class="mono count">{{ wardrobe_counts[m] }}</span>
+        </button>
+      {% endfor %}
+      {# Where to land afterwards. The selected fit, selected garment, open
+         builder and category filter are all dropped by set_wardrobe: a
+         half-migrated draft is worse than an empty one. #}
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+    </form>
     {# Read-only here: the picker's Today screen is where weather is set. #}
     <span class="weather-chip">{{ weather.temp_label }} · {{ weather.band }}</span>
     <span class="weather-chip">{{ 'Rain' if weather.rain else 'Dry' }}</span>
