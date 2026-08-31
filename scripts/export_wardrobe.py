@@ -32,8 +32,8 @@ from wardrobe import config, db  # noqa: E402
 # every field). Items without the optional keys simply omit them.
 KEY_ORDER = [
     "slug", "cat", "name", "colour", "hex", "role", "neck", "cut", "material",
-    "weight", "formality", "fit", "condition", "verdict", "verdictNote", "scope",
-    "worksAlone", "pairs", "layer", "avoid", "notes", "warmth", "weatherproof",
+    "weight", "formality", "formalityNote", "fit", "condition", "verdict", "verdictNote",
+    "scope", "occasions", "worksAlone", "pairs", "layer", "avoid", "notes", "warmth", "weatherproof",
     "careNote", "noPhoto", "unconfirmed", "gone", "actionRequired", "actionStatus",
     "actionNote", "photoRef", "photoPrefix", "retailPrefix", "id",
 ]
@@ -43,7 +43,15 @@ KEY_ORDER = [
 # recommend something that is in the bin, and so a database rebuilt from an
 # export doesn't lose the bin. Listed here because data/wardrobe.json has no
 # such key, and --compare should not report its absence as a difference.
-APP_OWNED_KEYS = ("gone",)
+#
+# `occasions` and `formalityNote` are the same shape of key: both are database-only
+# and neither has ever been in data/wardrobe.json. They are exported because a
+# session reading this file otherwise cannot tell a golf garment from a work one,
+# and cannot tell a crested club polo from a plain one. `occasions` is the list of
+# occasion tags (casual / work / golf / weekend / formal / gym) and is the ONLY
+# place golf is recorded -- `cat` and `scope` do not carry it. `formalityNote` is
+# the per-item prose that states, among other things, whose crest is on the chest.
+APP_OWNED_KEYS = ("gone", "occasions", "formalityNote")
 
 # JSON field -> database column, for the fields that are a straight copy.
 COLUMN_FOR = {
@@ -88,6 +96,14 @@ def build_payload(conn, generated: str) -> dict:
     ):
         sources.setdefault(row["item_id"], {})[row["field_name"]] = row["source"]
 
+    # Occasion tags, one row per (item, occasion). Sorted so the export is stable.
+    occasions: dict[str, list[str]] = {}
+    for row in db.fetch_all(
+        conn,
+        "SELECT item_id, occasion_code FROM item_occasions ORDER BY item_id, occasion_code",
+    ):
+        occasions.setdefault(row["item_id"], []).append(row["occasion_code"])
+
     # One open job per item at most today; the export carries it inline.
     actions = {
         r["item_id"]: r
@@ -130,6 +146,13 @@ def build_payload(conn, generated: str) -> dict:
             elif key == "gone":
                 if row["gone_at"]:
                     item[key] = True
+            elif key == "occasions":
+                # An empty list is a real answer: the item carries no tags at all.
+                item[key] = occasions.get(row["id"], [])
+            elif key == "formalityNote":
+                # Absent rather than blank when nothing has been said about it.
+                if row["formality_note"] is not None:
+                    item[key] = row["formality_note"]
             elif key == "unconfirmed":
                 # Only the items catalogued from a description carry this.
                 if row["unconfirmed"]:
