@@ -78,12 +78,24 @@ unset rather than false.
 
 ## 5. Photos
 
-Renders are `<retailPrefix>.<ext>` — the extension is a **mix of `.jpeg`, `.jpg` and `.png`** and is
-in `data/photos-manifest.json`; do not assume one. 102 of the 106 golf items have a render. The four
-without: `tops_69`, `tops_70`, `tops_71`, `tops_77`.
+**The renders are in the repo now.** `photos/Retail/` holds **235** of them, one per live item
+that has one, named `<retailPrefix>.jpg` and listed in `data/photos-manifest.json`. They resolve
+exactly as the design README already describes: `photos/Retail/<PHOTOS[id]>`.
 
-The image files themselves are not in git (`photos/` is ignored — 253 MB at full resolution). Max is
-sharing the folder separately.
+Two things changed to make that possible, and both matter:
+
+- **They are 500x500 thumbnails, not the full-resolution renders.** `import_photos.py` generates
+  them at JPEG quality 82 alongside the originals; ~20 KB each, 4.74 MB for all 235. The
+  full-resolution originals are 2048x2048 and 253 MB, which is why they stay out of git under
+  `photos/originals/`. If a screen ever needs more than 500px, ask — the originals exist.
+- **Every filename is now `.jpg`.** The originals are a mix of `.jpeg`, `.jpg` and `.png`; the
+  thumbnails are all JPEG. Read the extension from the manifest, don't carry over the old one.
+
+102 of the 106 golf items have a render. The four without: `tops_69`, `tops_70`, `tops_71`,
+`tops_77`.
+
+**These are generated illustrations, not photographs of the garments.** The README's rule holds
+without exception here: every image in this folder is a render and must be labelled as one.
 
 ## 6. Still open
 
