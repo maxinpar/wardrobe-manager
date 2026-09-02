@@ -147,10 +147,13 @@ def build_payload(conn, generated: str) -> dict:
     jobs: dict[str, list[dict]] = {}
     for row in db.fetch_all(
         conn,
-        "SELECT fit_id, text, done FROM fit_preconditions ORDER BY fit_id, id",
+        "SELECT fit_id, text, item_id, done FROM fit_preconditions ORDER BY fit_id, id",
     ):
+        # itemId because a job is usually about one garment ("whiten-wash the
+        # Brioni"), and a reader that cannot tell which one can only print the
+        # sentence. NULL for the jobs that are about the fit as a whole.
         jobs.setdefault(row["fit_id"], []).append(
-            {"text": row["text"], "done": row["done"]}
+            {"text": row["text"], "itemId": row["item_id"], "done": row["done"]}
         )
 
     fits = []
@@ -356,12 +359,19 @@ def compare(
 
     from wardrobe.fits_json import KILLER_LOOK_IDS
 
+    # Same order fits_json.fit_id uses, and for the same reason: an export
+    # states its ids, the 2026-08-27 file did not and has to be read for one.
+    # Nothing is inferred from a fit that carries neither — the fits built in
+    # the app have no render and no code, and guessing an id for them is how a
+    # comparison starts reporting fits that do not exist.
     by_id = {}
     for entry in original["fits"]:
         render = entry.get("render")
-        if render:
+        if entry.get("id"):
+            by_id[entry["id"]] = entry
+        elif render:
             by_id[render.rsplit("_render.", 1)[0]] = entry
-        else:
+        elif entry.get("code"):
             by_id[KILLER_LOOK_IDS.get(entry["code"], entry["code"])] = entry
 
     exported_by_id = {f["id"]: f for f in exported["fits"]}
@@ -378,13 +388,20 @@ def compare(
             if key in UNORDERED and before is not None and after is not None:
                 if sorted(before) == sorted(after):
                     continue
-            if key == "items" and after:
+            if key == "items" and after and not any(
+                slot.get("isAlternate") for slot in (before or [])
+            ):
                 # The hand file kept a fit's optional piece in a separate
                 # `alternate` prose line; fits_json._alternates() read the item
                 # id out of that line and made it a slot. Comparing the slots
                 # against the file's `items` therefore has to leave the
                 # alternates out, or the importer's own work reads as a
-                # difference. Two fits are affected, both from killer-looks.md.
+                # difference.
+                #
+                # Only when the file being compared against has none of its own.
+                # A previous export has them written out, and there the right
+                # answer is an exact comparison — dropping them would hide an
+                # alternate that had genuinely been lost.
                 after = [slot for slot in after if not slot.get("isAlternate")]
             if before == after:
                 continue

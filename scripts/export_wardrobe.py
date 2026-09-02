@@ -35,7 +35,7 @@ KEY_ORDER = [
     "weight", "formality", "formalityNote", "fit", "condition", "verdict", "verdictNote",
     "scope", "occasions", "worksAlone", "pairs", "layer", "avoid", "notes", "warmth", "weatherproof",
     "careNote", "noPhoto", "unconfirmed", "gone", "actionRequired", "actionStatus",
-    "actionNote", "photoRef", "photoPrefix", "retailPrefix", "id",
+    "actionNote", "photoRef", "photoPrefix", "renderUpload", "retailPrefix", "id",
 ]
 
 # `gone` is not in the hand-maintained schema: it is set in the app when Max
@@ -51,7 +51,7 @@ KEY_ORDER = [
 # occasion tags (casual / work / golf / weekend / formal / gym) and is the ONLY
 # place golf is recorded -- `cat` and `scope` do not carry it. `formalityNote` is
 # the per-item prose that states, among other things, whose crest is on the chest.
-APP_OWNED_KEYS = ("gone", "occasions", "formalityNote")
+APP_OWNED_KEYS = ("gone", "occasions", "formalityNote", "renderUpload")
 
 # JSON field -> database column, for the fields that are a straight copy.
 COLUMN_FOR = {
@@ -168,6 +168,14 @@ def build_payload(conn, generated: str) -> dict:
                         "rain": row["weatherproof_rain"],
                         "wind": row["weatherproof_wind"],
                     }
+            elif key == "renderUpload":
+                # A render Max uploaded in the app for this one garment
+                # (migration 066). Absent for almost everything. It is here
+                # because it OUTRANKS the retail render on every screen, so a
+                # session that draws a garment from photoPrefix alone would draw
+                # the picture the app has stopped showing.
+                if row["render_upload_path"] is not None:
+                    item[key] = row["render_upload_path"]
             elif key == "careNote":
                 if row["care_note"] is not None:
                     item[key] = row["care_note"]

@@ -145,6 +145,7 @@
    "preconditions": [
     {
      "text": "Give the Nike Air Max 1 a clean",
+     "itemId": "shoes_09b_nike-airmax-1",
      "done": false
     }
    ]
@@ -405,6 +406,7 @@
    "preconditions": [
     {
      "text": "Clean the dusty coating off the IND Industrie biker jacket",
+     "itemId": "outerwear_02_indindustrie-black-waxed-biker",
      "done": false
     }
    ]
@@ -841,6 +843,7 @@
    "preconditions": [
     {
      "text": "Repair the Fedeli cuff hole and neck mark first",
+     "itemId": null,
      "done": false
     }
    ]
@@ -973,6 +976,7 @@
    "preconditions": [
     {
      "text": "Brioni white has gone creamy - whiten-wash first",
+     "itemId": null,
      "done": false
     }
    ]
@@ -1399,6 +1403,7 @@
    "preconditions": [
     {
      "text": "Whiten-wash the Brioni first; it has gone slightly creamy",
+     "itemId": null,
      "done": false
     }
    ]
@@ -1851,6 +1856,7 @@
    "preconditions": [
     {
      "text": "Repair the Fedeli cuff and the neck mark first - this fit lives or dies on the knit looking expensive",
+     "itemId": null,
      "done": false
     }
    ]
@@ -1977,6 +1983,7 @@
    "preconditions": [
     {
      "text": "Clean the Air Max",
+     "itemId": null,
      "done": false
     }
    ]
@@ -2295,6 +2302,7 @@
    "preconditions": [
     {
      "text": "Wipe the jacket down",
+     "itemId": null,
      "done": false
     }
    ]
@@ -2432,6 +2440,7 @@
    "preconditions": [
     {
      "text": "Spot-clean the mark near the left hip of the overcoat",
+     "itemId": null,
      "done": false
     }
    ]
@@ -4067,6 +4076,7 @@
    "preconditions": [
     {
      "text": "Decide whether the navy suede driving moc comes back into rotation - it is currently scope = out, marked holiday only, and it is the shoe this fit is built on.",
+     "itemId": "shoes_08c_megis-driving-moc",
      "done": true
     }
    ]
@@ -5435,6 +5445,7 @@
    "preconditions": [
     {
      "text": "Replace the Decathlon cream twill short — it is the only Replace-verdict garment in this batch and it carries this fit.",
+     "itemId": "shorts_08_decathlon-cream-twill",
      "done": false
     }
    ]
