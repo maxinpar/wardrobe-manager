@@ -187,6 +187,30 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+/* A section heading is a grid item spanning the full row, so the cards under it
+   stay in the same grid and keep their column widths across a heading. The
+   whole header is the hit target — a small chevron would be a worse one. */
+.fit-section {
+  grid-column: 1 / -1;
+  display: flex; align-items: baseline; gap: 12px;
+  width: 100%; text-align: left; cursor: pointer;
+  background: none; border: none; border-bottom: 1px solid var(--line);
+  padding: 16px 2px 10px; margin-top: 8px;
+  font: inherit; color: inherit;
+}
+.fit-section:hover { border-bottom-color: var(--brass); }
+/* A collapsed section keeps its rule, faintly: the heading is still a lid on
+   something rather than a line in a list. */
+.fit-section[aria-expanded="false"] { border-bottom-color: var(--line-light); }
+.fit-section-mark {
+  width: 12px; font: 400 13px/1 var(--mono); color: var(--muted);
+}
+.fit-section-label { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+.fit-section-count {
+  font: 500 9.5px var(--mono); text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--faint);
+}
+
 .fit-card {
   display: flex; flex-direction: column; gap: 12px;
   background: var(--surface); border-radius: 20px; padding: 14px;

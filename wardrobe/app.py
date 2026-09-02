@@ -947,6 +947,72 @@ def fit_sources(conn) -> dict[str, dict]:
     return out
 
 
+def fit_categories(conn) -> list[dict]:
+    """The authored categories, in the authored order.
+
+    `sort_order` is that order and the only one: reading it here rather than
+    hard-coding a list means a category added by a migration lands where the
+    migration put it, and a fit moved between categories lands where the
+    category belongs rather than where the first fit happened to appear.
+    """
+    return db.fetch_all(
+        conn, "SELECT code, label, sort_order FROM fit_categories ORDER BY sort_order, code"
+    )
+
+
+# The trailing section. Its cards are never hidden — a fit with no category
+# still has to be reachable, and hiding it was a real bug in the first pass.
+UNCATEGORISED = "Not in a category yet"
+
+# Migration 063 wrote the golf labels as "Golf — Old school". The separator is
+# an em dash there and a middle dot elsewhere in the app, so both are tried.
+GOLF_LABEL_PREFIXES = ("Golf — ", "Golf · ", "Golf - ")
+
+
+def strip_golf_prefix(label: str) -> str:
+    for prefix in GOLF_LABEL_PREFIXES:
+        if label.startswith(prefix):
+            return label[len(prefix):]
+    return label
+
+
+def section_cards(cards: list[dict], categories: list[dict]) -> list[dict] | None:
+    """Group the grid into category sections, or None to leave it flat.
+
+    None when nothing in this wardrobe carries a category: headers over a single
+    unnamed section are furniture, not structure. Empty categories are dropped —
+    six of the nine golf ones have no fits and would otherwise be six headers
+    over nothing — but every one of them is still offered in the fit pane's
+    picker, which is where an empty category is useful.
+    """
+    if not any(c["meta"].get("category") for c in cards):
+        return None
+
+    by_code: dict[str, list] = {}
+    for card in cards:
+        by_code.setdefault(card["meta"].get("category") or "", []).append(card)
+
+    sections = []
+    for category in categories:
+        group = by_code.get(category["code"])
+        if group:
+            sections.append(
+                {
+                    "code": category["code"],
+                    # "Golf — Old school" reads as "Old school" here: the
+                    # wardrobe switch in the header has already said Golf, and
+                    # saying it again on every heading is the app talking to
+                    # itself. Only that exact prefix is stripped — a category
+                    # actually called "Golf" would keep its name.
+                    "label": strip_golf_prefix(category["label"]),
+                    "cards": group,
+                }
+            )
+    if by_code.get(""):
+        sections.append({"code": "", "label": UNCATEGORISED, "cards": by_code[""]})
+    return sections
+
+
 def wearings_by_fit(conn) -> dict[str, int]:
     return {
         r["fit_id"]: r["n"]
@@ -1024,6 +1090,7 @@ def fits_view():
                  if (c["fit"].id in golf_fits) == (mode == "golf")]
         renders = item_renders(conn)
         sources = fit_sources(conn)
+        categories = fit_categories(conn)
         selected = None
         builder = None
 
@@ -1149,6 +1216,10 @@ def fits_view():
     return render_template(
         "fits.html",
         cards=shown,
+        # Details only. Renders is one wall of pictures on purpose, and cutting
+        # it into sections would put a heading between every four of them.
+        sections=section_cards(shown, categories) if filters.mode != "renders" else None,
+        categories=categories,
         # No fits at all in this wardrobe — not "no fits matching these chips".
         # The chips, the summary line and the grid are all suppressed for it:
         # rendering them with zeros ("All 0, Everyday 0, Sharp 0…" above blank

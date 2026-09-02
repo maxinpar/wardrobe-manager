@@ -109,9 +109,26 @@
   {% include "_renders.html" %}
 {% else %}
 <div class="fit-grid">
-  {% for c in cards %}
+  {# Sections are grid items spanning the full row, so the cards stay in one
+     grid and keep their column widths across a heading. When no fit in this
+     wardrobe carries a category, `sections` is None and the loop below runs
+     once over the flat list — headers over a single unnamed section would be
+     furniture, not structure. #}
+  {% for section in (sections if sections else [{'code': none, 'label': none, 'cards': cards}]) %}
+    {% if section.label %}
+      <button type="button" class="fit-section" data-section="{{ section.label }}"
+              aria-expanded="true">
+        <span class="fit-section-mark" aria-hidden="true">–</span>
+        <span class="fit-section-label">{{ section.label }}</span>
+        <span class="mono fit-section-count">
+          {{ section.cards|length }} fit{{ '' if section.cards|length == 1 else 's' }}
+        </span>
+      </button>
+    {% endif %}
+  {% for c in section.cards %}
     {% set fit = c.fit %}
-    <a class="fit-card" href="{{ url_for('fits_view', fit=fit.id, **filters.current()) }}">
+    <a class="fit-card" href="{{ url_for('fits_view', fit=fit.id, **filters.current()) }}"
+       {% if section.label %}data-in-section="{{ section.label }}"{% endif %}>
       {% call fit_image(fit, renders) %}
         {{ status_pill(c.problems, fit.blocked_by) }}
       {% endcall %}
@@ -163,6 +180,7 @@
   {% else %}
     <p class="muted">Nothing matches those filters.</p>
   {% endfor %}
+  {% endfor %}
 </div>
 {% endif %}
 {% endif %}
@@ -174,4 +192,5 @@
   {# Last, because it binds the cards AND the open pane and the pane is written
      after the grid. One state, one script, both surfaces. #}
   <script src="{{ url_for('static', filename='layer-switch.js') }}"></script>
+  <script src="{{ url_for('static', filename='fit-sections.js') }}"></script>
 {% endblock %}
