@@ -1,13 +1,21 @@
 # Secrets
 .env
 
-# Photos and thumbnails — copied from Drive at import time, never committed.
-# One exception: photos/Retail/ holds the 500px render thumbnails that
-# import_photos.py generates — ~20 KB each, under 5 MB for the whole catalogue.
-# They are committed so a `git pull` carries real images. The full-resolution
-# originals under photos/originals/ stay out: 253 MB, and no design needs them.
+# Photos — copied from Drive at import time. Photographs of the garments stay
+# out; generated renders go in, because they are the pictures every screen and
+# every design session actually draws.
+#
+#   photos/Retail/  the 500px retail render thumbnails, ~20 KB each, 4.5 MB all up
+#   photos/fits/    the fit renders at full size, 158 MB, plus their thumbs.
+#                   Full size and not thumbs alone: the fit modal serves
+#                   hero_image_path, so a clone with only thumbs shows a broken
+#                   image the moment anyone opens a fit.
+#
+# Out: photos/originals/ (2.4 GB of photographs) and photos/thumbs/ (their
+# thumbnails) — real pictures of Max's clothes, and nothing needs them in git.
 photos/*
 !photos/Retail/
+!photos/fits/
 
 # Python
 __pycache__/
