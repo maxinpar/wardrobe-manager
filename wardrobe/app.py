@@ -1100,6 +1100,9 @@ def fits_view():
                 abort(404)
             selected = dict(match)
             selected["sources"] = sources.get(selected_id, {})
+            # Whether the category is Max's own move, for the badge. Read from
+            # the provenance row rather than diffed against anything.
+            selected["category_moved"] = selected_id in moved_categories(conn)
             selected["pieces"] = sorted(
                 match["fit"].items,
                 key=lambda i: (ROLE_ORDER.index(i["role"]) if i["role"] in ROLE_ORDER else 99,
@@ -1220,6 +1223,9 @@ def fits_view():
         # it into sections would put a heading between every four of them.
         sections=section_cards(shown, categories) if filters.mode != "renders" else None,
         categories=categories,
+        # Stripped of the "Golf — " prefix once, here, so the heading, the chip
+        # and the pane's current-value line cannot word it differently.
+        category_labels={c["code"]: strip_golf_prefix(c["label"]) for c in categories},
         # No fits at all in this wardrobe — not "no fits matching these chips".
         # The chips, the summary line and the grid are all suppressed for it:
         # rendering them with zeros ("All 0, Everyday 0, Sharp 0…" above blank
@@ -1610,6 +1616,62 @@ def fit_style(fit_id: str):
             (fit_id,),
         )
         conn.commit()
+    return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
+
+
+# What the pane writes into fit_field_sources.note when Max moves a fit. The
+# source column can only say `manual`, and migration 063 already says `manual`
+# for the twelve authored golf fits — Max chose those too, in the handoff, so
+# the column cannot tell "chosen when it was written" from "moved afterwards".
+# The note can, and the badge the design asks for says "moved", so it reads
+# this rather than the source.
+MOVED_NOTE = "Moved in the app."
+
+
+def moved_categories(conn) -> set[str]:
+    """Fits whose category Max changed in the app, for the 'yours' badge."""
+    return {
+        row["fit_id"]
+        for row in db.fetch_all(
+            conn,
+            "SELECT fit_id FROM fit_field_sources "
+            "WHERE field_name = 'category_code' AND note = %s",
+            (MOVED_NOTE,),
+        )
+    }
+
+
+@app.route("/fit/<fit_id>/category", methods=["POST"])
+def fit_category(fit_id: str):
+    """Move a fit to another category, or out of all of them.
+
+    One click, no confirm and no save button: it is a shelf, not a form. The
+    grid re-sections on the redirect, which is what makes the move visible.
+    """
+    code = (request.form.get("category") or "").strip()
+
+    with db.connect() as conn:
+        if db.fetch_one(conn, "SELECT 1 AS x FROM fits WHERE id = %s", (fit_id,)) is None:
+            abort(404)
+        # Only a category the database has authored. An unknown code would
+        # otherwise leave a fit in a section that can never be rendered.
+        if code and db.fetch_one(
+            conn, "SELECT 1 AS x FROM fit_categories WHERE code = %s", (code,)
+        ) is None:
+            abort(400)
+
+        conn.execute(
+            "UPDATE fits SET category_code = %s WHERE id = %s", (code or None, fit_id)
+        )
+        conn.execute(
+            "INSERT INTO fit_field_sources (fit_id, field_name, source, note) "
+            "VALUES (%s, 'category_code', 'manual', %s) "
+            "ON CONFLICT (fit_id, field_name) DO UPDATE "
+            "SET source = 'manual', note = EXCLUDED.note, updated_at = now()",
+            (fit_id, MOVED_NOTE),
+        )
+        conn.commit()
+
     return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
 
 

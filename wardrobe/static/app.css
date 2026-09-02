@@ -863,6 +863,35 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 }
 .modal-caption { padding: 10px 20px 16px; font-size: 11.5px; color: #776E60; margin: 0; }
 
+/* ----------------------------------------------------- fit category --- */
+
+.category-block {
+  background: var(--surface); border: 1px solid var(--line-light);
+  border-radius: 16px; padding: 14px 15px;
+}
+.category-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.category-label {
+  font: 500 9px/1 var(--mono); text-transform: uppercase;
+  letter-spacing: 0.16em; color: #776E60;
+}
+.category-current { font-size: 13px; font-weight: 500; }
+/* Says the value is Max's own move, not the category it was authored into. */
+.category-yours {
+  font: 500 8.5px/1 var(--mono); text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 3px 7px; border-radius: 5px;
+  background: var(--catch-bg); color: var(--brass-text);
+}
+.category-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.category-chip {
+  border-radius: 999px; padding: 7px 13px; font: 400 12px var(--ui);
+  background: none; border: 1px solid #DCD5C7; color: var(--secondary);
+  cursor: pointer;
+}
+.category-chip:hover { border-color: var(--ink); }
+.category-chip.on {
+  background: var(--page); border-color: var(--ink); color: var(--ink);
+}
+
 /* Right: everything else, scrolling independently of the render. */
 .modal-detail { overflow-y: auto; padding: 0 2px 44px; min-height: 0; }
 .modal-detail section { margin-top: 22px; padding: 0 24px; }

@@ -149,6 +149,44 @@
         {# The prose is the point of a fit. Verbatim, never truncated. #}
         <section><p class="commentary">{{ fit.commentary }}</p></section>
 
+        {# Golf only. The everyday categories are weather and register, both
+           already derived and both shown elsewhere on this pane; the golf ones
+           are Max's own idea of what a fit IS, which is the only axis worth
+           moving a fit along by hand. #}
+        {% if wardrobe == 'golf' %}
+          <section>
+            <div class="category-block">
+              <div class="category-head">
+                <span class="mono category-label">Category</span>
+                <span class="category-current">
+                  {{ category_labels.get(meta.category) or 'not in a category yet' }}
+                </span>
+                {# Only when there is a category to have been moved to. Clearing
+                   one is Max's choice too, but "moved here · yours" next to
+                   "not in a category yet" claims a here that isn't. #}
+                {% if selected.category_moved and meta.category %}
+                  <span class="category-yours">moved here · yours</span>
+                {% endif %}
+              </div>
+              {# Every category, including the six with no fits: an empty one is
+                 useful exactly here, which is why the grid drops them and this
+                 does not. One click, no confirm, no save button. #}
+              <form class="category-chips" method="post"
+                    action="{{ url_for('fit_category', fit_id=fit.id) }}">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                {% for c in categories if c.code.startswith('golf') %}
+                  <button type="submit" name="category" value="{{ c.code }}"
+                          class="category-chip {{ 'on' if meta.category == c.code }}">
+                    {{ category_labels[c.code] }}
+                  </button>
+                {% endfor %}
+                <button type="submit" name="category" value=""
+                        class="category-chip {{ 'on' if not meta.category }}">None</button>
+              </form>
+            </div>
+          </section>
+        {% endif %}
+
         {% if not meta.get('composition_known', True) %}
           <section>
             <div class="catch">
