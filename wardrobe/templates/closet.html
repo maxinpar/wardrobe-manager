@@ -62,7 +62,7 @@
               <span class="corner-badge">Reshoot</span>
             {% endif %}
           </a>
-          <a class="garment-name" href="{{ url_for('catalogue', item=item.id) }}">{{ item.name }}</a>
+          <a class="garment-name" href="{{ url_for('catalogue', item=item.id, **filters_query) }}">{{ item.name }}</a>
           <span class="mono garment-state {{ 'rust' if item.laundry_state != 'clean' }}">
             {{ item.laundry_label }} · {{ item.verdict_code }}
           </span>
