@@ -686,7 +686,7 @@ def seed_wear_events(conn, changes: list[str]) -> None:
 # ---------------------------------------------------------------- reporting --
 
 
-def photo_prefix_report(items: list[dict]) -> tuple[list[str], bool]:
+def photo_prefix_report(conn, items: list[dict]) -> tuple[list[str], list[str], list[str], bool]:
     """Which photoPrefixes match no file on disk. Read-only against Drive."""
     try:
         root = config.photo_source_root()
@@ -695,13 +695,12 @@ def photo_prefix_report(items: list[dict]) -> tuple[list[str], bool]:
     if not root.exists():
         return [f"{root} not reachable — skipped the photo check"], [], [], False
 
+    # Same source of truth as import_photos.py: a hardcoded list here goes
+    # stale the moment a category is added, and every item in the new one
+    # then reports "matched no file" whether or not the files are there.
     folders = {
-        "Knitwear": "Knitwear",
-        "Tops": "Shirts",
-        "Trousers": "Trousers",
-        "Shoes": "Shoes",
-        "Belts": "Belts",
-        "Outerwear": "Outerwear",
+        r["code"]: r["photo_folder"]
+        for r in db.fetch_all(conn, "SELECT code, photo_folder FROM categories")
     }
     listings = {}
     for cat, folder in folders.items():
@@ -885,7 +884,7 @@ def main() -> int:
             joined = " · ".join(f"{k}: {v}" for k, v in sorted(counts.items(), key=str))
             print(f"  {field:15} {joined}")
 
-        unmatched, stale_no_photo, duplicate_prefixes, checked = photo_prefix_report(items)
+        unmatched, stale_no_photo, duplicate_prefixes, checked = photo_prefix_report(conn, items)
         print("\nPhoto prefixes with no file on disk")
         if not checked:
             print("  " + unmatched[0])

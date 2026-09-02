@@ -14,6 +14,9 @@
       {% if fit.hero_is_generated and not fit.render_is_upload %}
         <span class="pill-generated">Generated · never worn</span>
       {% endif %}
+      {# The base thumbnail only — the grid is for scanning. That there is a
+         second look is worth one pill; showing it is the drawer's job. #}
+      {% if fit.has_two_looks %}<span class="pill-looks">2 looks</span>{% endif %}
       {{ caller() if caller is defined }}
     </div>
   {% else %}

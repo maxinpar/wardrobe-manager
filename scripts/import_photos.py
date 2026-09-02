@@ -12,6 +12,10 @@ Matching rule (unchanged from the old build_app.py): a file belongs to an item
 when its filename starts with that item's photoPrefix. Generated catalogue
 renders live in Retail/ as <retailPrefix>_retail.<ext> and are flagged
 is_render — the app must never present one as a photo of the actual garment.
+
+A fit carries up to two renders. <fit_id>_render is the canonical one; a fit
+built around an optional layer also has <fit_id>_layered_render, the same fit
+with the layer on. Both are generated, and both are labelled as such.
 """
 
 from __future__ import annotations
@@ -26,6 +30,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from PIL import Image, ImageOps  # noqa: E402
 
 from wardrobe import config, db  # noqa: E402
+
+def is_stale(target: Path, source: Path) -> bool:
+    """True when `target` is missing, a different size, or older than `source`.
+
+    Existence alone is not enough: a regenerated render keeps its filename, so
+    an exists-only check leaves the old picture in the store and the app goes on
+    showing it. Thumbnails had the same fault and it was worse, because list
+    views are all thumbnails.
+    """
+    if not target.exists():
+        return True
+    t, s = target.stat(), source.stat()
+    return t.st_size != s.st_size or t.st_mtime < s.st_mtime - 1
+
 
 THUMB_BOX = (500, 500)
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif"}
@@ -199,10 +217,10 @@ def main() -> int:
 
                 if args.commit:
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    if not target.exists() or target.stat().st_size != path.stat().st_size:
+                    if is_stale(target, path):
                         shutil.copy2(path, target)  # copy, never move
                         copied += 1
-                    if not thumb_target.exists():
+                    if is_stale(thumb_target, target):
                         make_thumb(target, thumb_target)
 
                 size = None
@@ -241,9 +259,10 @@ def main() -> int:
                     )
                     indexed += 1
 
-        # ---- fits: hero renders and worn photos -------------------------
-        # fit_<slug>_render.<ext>   generated render — NOT evidence it was worn
-        # fit_<slug>_NN_<angle>.jpg real worn photo, belongs to the wear event
+        # ---- fits: hero renders, layered renders and worn photos --------
+        # fit_<slug>_render.<ext>         generated render — NOT evidence it was worn
+        # fit_<slug>_layered_render.<ext> the same fit WITH its optional layer
+        # fit_<slug>_NN_<angle>.jpg       real worn photo, belongs to the wear event
         fits_dir = source_root / "Fits"
         fit_files = (
             sorted(
@@ -255,6 +274,7 @@ def main() -> int:
         )
         unfiled = []
         heroes = 0
+        layered_renders = 0
         worn_photos = 0
 
         for path in fit_files:
@@ -264,18 +284,28 @@ def main() -> int:
                 unfiled.append(path.name)
                 continue
 
+            # _layered_render is tested FIRST because it also ends with
+            # "_render": the other order strips only the shorter suffix and
+            # leaves a slug ending in "_layered", which matches no fit. That is
+            # what made all twelve layered files report as unfiled.
             stem = path.stem
-            is_render = stem.endswith("_render")
-            slug = stem[: -len("_render")] if is_render else stem.rsplit("_", 2)[0]
+            is_layered = stem.endswith("_layered_render")
+            is_render = is_layered or stem.endswith("_render")
+            if is_layered:
+                slug = stem[: -len("_layered_render")]
+            elif is_render:
+                slug = stem[: -len("_render")]
+            else:
+                slug = stem.rsplit("_", 2)[0]
 
             rel = Path("fits") / path.name
             rel_thumb = (Path("fits") / "thumbs" / path.name).with_suffix(".jpg")
             if args.commit:
                 (store / rel).parent.mkdir(parents=True, exist_ok=True)
-                if not (store / rel).exists():
+                if is_stale(store / rel, path):
                     shutil.copy2(path, store / rel)  # copy, never move
                     copied += 1
-                if not (store / rel_thumb).exists():
+                if is_stale(store / rel_thumb, store / rel):
                     make_thumb(store / rel, store / rel_thumb)
 
             stored = str(rel).replace("\\", "/")
@@ -286,12 +316,23 @@ def main() -> int:
                 if fit is None:
                     unfiled.append(f"{path.name} (no fit {slug!r})")
                     continue
-                conn.execute(
-                    "UPDATE fits SET hero_image_path = %s, hero_thumb_path = %s, "
-                    "hero_is_generated = true WHERE id = %s",
-                    (stored, thumb, slug),
-                )
-                heroes += 1
+                if is_layered:
+                    # The variant, never the hero: the base render stays
+                    # canonical because the fit has to stand up without
+                    # the layer.
+                    conn.execute(
+                        "UPDATE fits SET layered_image_path = %s, "
+                        "layered_thumb_path = %s WHERE id = %s",
+                        (stored, thumb, slug),
+                    )
+                    layered_renders += 1
+                else:
+                    conn.execute(
+                        "UPDATE fits SET hero_image_path = %s, hero_thumb_path = %s, "
+                        "hero_is_generated = true WHERE id = %s",
+                        (stored, thumb, slug),
+                    )
+                    heroes += 1
             else:
                 # A worn photo belongs to the wear event, never to the fit.
                 event = db.fetch_one(
@@ -314,14 +355,18 @@ def main() -> int:
                 )
                 worn_photos += 1
 
-        print(f"\nFits folder: {heroes} hero render(s), {worn_photos} worn photo(s)")
+        print(
+            f"\nFits folder: {heroes} hero render(s), "
+            f"{layered_renders} layered render(s), {worn_photos} worn photo(s)"
+        )
         if unfiled:
             print("  Not filed — a fit photo must be named for its fit:")
             for name in unfiled:
                 print("   ", name)
             print(
-                "    fit_<slug>_render.<ext>       generated render\n"
-                "    fit_<slug>_NN_<angle>.jpg     real worn photo"
+                "    fit_<slug>_render.<ext>          generated render\n"
+                "    fit_<slug>_layered_render.<ext>  the same fit, layer on\n"
+                "    fit_<slug>_NN_<angle>.jpg        real worn photo"
             )
 
         # ---- prune rows whose file no longer belongs to the item ---------

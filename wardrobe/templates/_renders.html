@@ -17,6 +17,9 @@
         <img src="{{ url_for('photo', relative_path=fit.render) }}"
              alt="{{ fit.name }}" loading="lazy">
         {{ status_pill(c.problems, fit.blocked_by) }}
+        {# Same marker as the Details grid, for the same reason: this view is
+           still a list. The second look lives in the drawer. #}
+        {% if fit.has_two_looks %}<span class="pill-looks">2 looks</span>{% endif %}
         <figcaption class="pill-generated">Generated · never worn</figcaption>
       </figure>
 

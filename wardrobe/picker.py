@@ -90,6 +90,11 @@ class Fit:
     hero_thumb: str | None = None
     hero_is_generated: bool = True    # a render must never imply a wearing
     render_upload: str | None = None  # uploaded in the app; outranks the hero
+    # The same fit rendered WITH its optional layer. A variant of the hero, not
+    # a rival to it: the hero is the without-layer render because the fit has to
+    # stand up without the layer. NULL for every fit that has no optional layer.
+    layered_path: str | None = None
+    layered_thumb: str | None = None
 
     # Resolution order, in one place so no screen can disagree with another:
     # the upload wins, then the file-based hero, then the piece-strip fallback.
@@ -105,6 +110,30 @@ class Fit:
     @property
     def render_is_upload(self) -> bool:
         return bool(self.render_upload)
+
+    @property
+    def layered_render(self) -> str | None:
+        """The layered render's thumbnail, falling back to the full image."""
+        return self.layered_thumb or self.layered_path
+
+    @property
+    def has_two_looks(self) -> bool:
+        """Whether this fit can be shown as a pair.
+
+        An upload is excluded on purpose: it replaces the hero, so pairing it
+        with the layered render would caption someone else's picture "without
+        the layer". The pair only means anything when both halves came from the
+        same generated set.
+        """
+        return bool(self.layered_path) and not self.render_is_upload
+
+    @property
+    def layer_piece(self) -> str | None:
+        """The garment that comes off — named, so the caption can say which."""
+        for item in self.items:
+            if item["role"] in ("layer", "outer") and not item["is_alternate"]:
+                return item["name"]
+        return None
     temp_bands: list[str] = field(default_factory=list)
     # each entry: {item_id, name, role, position, is_alternate, warmth,
     #              rain_unsafe, verdict, scope, laundry_state, cat}
@@ -355,7 +384,7 @@ FITS_SQL = """
 SELECT f.id, f.name, f.register_code, f.commentary, f.catch, f.style, f.score,
        f.killer, f.hidden_by_default, f.sort_order, f.source,
        f.hero_image_path, f.hero_thumb_path, f.hero_is_generated,
-       f.render_upload_path,
+       f.render_upload_path, f.layered_image_path, f.layered_thumb_path,
        (f.gone_at IS NOT NULL) AS fit_gone,
        fi.item_id, i.name AS item_name, i.material, i.cat_code,
        fi.role, fi.position, fi.is_alternate, fi.note,
@@ -412,6 +441,8 @@ def load_fits(conn) -> list[Fit]:
                 hero_thumb=row["hero_thumb_path"],
                 hero_is_generated=row["hero_is_generated"],
                 render_upload=row["render_upload_path"],
+                layered_path=row["layered_image_path"],
+                layered_thumb=row["layered_thumb_path"],
                 temp_bands=[
                     b
                     for b in (BAND_COLD, BAND_MILD, BAND_WARM)
