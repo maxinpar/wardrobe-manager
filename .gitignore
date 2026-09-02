@@ -32,3 +32,6 @@ export/
 
 # Unzipped drops — the files that matter are copied into data/ and docs/
 .incoming/
+
+# Import run logs — the run says what it did on screen; the file is scratch
+*.log
