@@ -6,6 +6,9 @@
 # every design session actually draws.
 #
 #   photos/Retail/  the 500px retail render thumbnails, ~20 KB each, 4.5 MB all up
+#   photos/items/   renders Max uploads for a single garment, 700px each. The
+#                   answer to the 61 garments that have none and draw as a
+#                   colour swatch on four screens.
 #   photos/fits/    the fit renders at full size, 158 MB, plus their thumbs.
 #                   Full size and not thumbs alone: the fit modal serves
 #                   hero_image_path, so a clone with only thumbs shows a broken
@@ -16,6 +19,7 @@
 photos/*
 !photos/Retail/
 !photos/fits/
+!photos/items/
 
 # Python
 __pycache__/

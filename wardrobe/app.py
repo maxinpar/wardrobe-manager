@@ -145,15 +145,18 @@ SELECT i.*, c.label AS cat_label, c.sort_order AS cat_sort,
        v.label AS verdict_label, v.wearable,
        COALESCE(l.state_code, 'clean') AS laundry_state,
        ls.label AS laundry_label,
-       -- The generated retail render is the preferred catalogue image; a real
-       -- photo of this garment is the fallback, and the hex swatch after that.
+       -- Max's own upload first, then the generated retail render, then a real
+       -- photo of this garment, then the hex swatch. The upload is in front
+       -- because it is the answer to a garment having no render at all, and one
+       -- upload has to fix every screen at once or it is not worth making.
        -- starts_with(filename, id) is what makes a photo this item's own: a
        -- shared group-reference shot (three loafers in one frame) is named for
        -- the group, so it never stands in as a photo of one of them.
-       (SELECT p.thumb_path FROM photos p
-         WHERE p.item_id = i.id
-           AND (p.is_render OR starts_with(p.source_filename, i.id))
-         ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS thumb_path,
+       COALESCE(i.render_upload_path,
+         (SELECT p.thumb_path FROM photos p
+           WHERE p.item_id = i.id
+             AND (p.is_render OR starts_with(p.source_filename, i.id))
+           ORDER BY p.is_render DESC, p.sort_order LIMIT 1)) AS thumb_path,
        (SELECT p.is_render FROM photos p
          WHERE p.item_id = i.id
            AND (p.is_render OR starts_with(p.source_filename, i.id))
@@ -208,10 +211,12 @@ def photo_thumbs(conn) -> dict[str, dict]:
         conn,
         """
         SELECT i.id, i.hex, i.no_photo,
-               (SELECT p.thumb_path FROM photos p
-                 WHERE p.item_id = i.id
-                   AND (p.is_render OR starts_with(p.source_filename, i.id))
-                 ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS thumb_path,
+               -- An upload outranks both, here as everywhere else.
+               COALESCE(i.render_upload_path,
+                 (SELECT p.thumb_path FROM photos p
+                   WHERE p.item_id = i.id
+                     AND (p.is_render OR starts_with(p.source_filename, i.id))
+                   ORDER BY p.is_render DESC, p.sort_order LIMIT 1)) AS thumb_path,
                (SELECT p.is_render FROM photos p
                  WHERE p.item_id = i.id
                    AND (p.is_render OR starts_with(p.source_filename, i.id))
@@ -910,18 +915,19 @@ class FitFilters:
 def item_renders(conn) -> dict[str, dict]:
     """item_id -> the image to show it with.
 
-    The retail render wins: they are all shot on white, which is why every photo
-    ground in this design is white. A real photo of the garment is the fallback,
-    and the hex swatch the fallback after that.
+    Max's upload wins, then the retail render — they are all shot on white,
+    which is why every photo ground in this design is white — then a real photo
+    of the garment, and the hex swatch after that.
     """
     rows = db.fetch_all(
         conn,
         """
         SELECT i.id, i.hex, i.name,
-               (SELECT p.thumb_path FROM photos p
-                 WHERE p.item_id = i.id
-                   AND (p.is_render OR starts_with(p.source_filename, i.id))
-                 ORDER BY p.is_render DESC, p.sort_order LIMIT 1) AS thumb
+               COALESCE(i.render_upload_path,
+                 (SELECT p.thumb_path FROM photos p
+                   WHERE p.item_id = i.id
+                     AND (p.is_render OR starts_with(p.source_filename, i.id))
+                   ORDER BY p.is_render DESC, p.sort_order LIMIT 1)) AS thumb
         FROM items i WHERE i.retired_at IS NULL
         """,
     )
@@ -1456,14 +1462,19 @@ def fit_create():
 
 
 
-# Where uploaded renders live, under the photo store. One file per fit, named
-# from the fit id, so re-uploading replaces rather than accumulating.
+# Where uploaded renders live, under the photo store. One file per fit and one
+# per garment, named from the id, so re-uploading replaces rather than
+# accumulating. A garment is drawn no larger than a closet tile, so it needs
+# less of an edge than a fit's 5/8 card does.
 RENDER_UPLOAD_DIR = "fits/uploads"
 RENDER_MAX_EDGE = 1000       # the long edge; a 5/8 card needs nothing more
+ITEM_UPLOAD_DIR = "items/uploads"
+ITEM_MAX_EDGE = 700
 RENDER_QUALITY = 84
 
 
-def store_render(fit_id: str, stream) -> str:
+def store_render(key: str, stream, directory: str = RENDER_UPLOAD_DIR,
+                 max_edge: int = RENDER_MAX_EDGE) -> str:
     """Save an uploaded render, downscaled. Returns the store-relative path.
 
     The client downscales before sending — a phone photo over wifi is the case
@@ -1476,13 +1487,13 @@ def store_render(fit_id: str, stream) -> str:
     image.load()                      # fails here, before anything is written,
     if image.mode not in ("RGB", "L"):  # if the file is not really an image
         image = image.convert("RGB")
-    image.thumbnail((RENDER_MAX_EDGE, RENDER_MAX_EDGE), Image.LANCZOS)
+    image.thumbnail((max_edge, max_edge), Image.LANCZOS)
 
-    target_dir = config.photo_store() / RENDER_UPLOAD_DIR
+    target_dir = config.photo_store() / directory
     target_dir.mkdir(parents=True, exist_ok=True)
-    name = f"{secure_filename(fit_id)}.jpg"
+    name = f"{secure_filename(key)}.jpg"
     image.save(target_dir / name, "JPEG", quality=RENDER_QUALITY, optimize=True)
-    return f"{RENDER_UPLOAD_DIR}/{name}"
+    return f"{directory}/{name}"
 
 
 @app.route("/fit/<fit_id>/render", methods=["POST"])
@@ -1536,6 +1547,66 @@ def fit_render_remove(fit_id: str):
         stored = config.photo_store() / row["render_upload_path"]
         stored.unlink(missing_ok=True)
     return redirect(request.form.get("next") or url_for("fits_view", fit=fit_id))
+
+
+@app.route("/item/<item_id>/render", methods=["POST"])
+def item_render_upload(item_id: str):
+    """Attach a render to a garment. Beats every file-based source for it.
+
+    One upload fixes every screen at once — the closet tile, the piece strip in
+    a fit, Today's pieces, the builder's tiles — because they all resolve their
+    image the same way and this now sits in front of it. That is the point:
+    61 garments have no render, and each one is a colour swatch on four screens.
+    """
+    with db.connect() as conn:
+        if db.fetch_one(conn, "SELECT 1 AS x FROM items WHERE id = %s", (item_id,)) is None:
+            abort(404)
+
+    upload = request.files.get("render")
+    fallback = url_for("catalogue", item=item_id)
+    if upload is None or not upload.filename:
+        flash("No image was chosen.")
+        return redirect(request.form.get("next") or fallback)
+
+    try:
+        stored = store_render(item_id, upload.stream, ITEM_UPLOAD_DIR, ITEM_MAX_EDGE)
+    except Exception:
+        flash("That file isn't an image the app can read — nothing was changed.")
+        return redirect(request.form.get("next") or fallback)
+
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE items SET render_upload_path = %s, render_uploaded_at = %s "
+            "WHERE id = %s",
+            (stored, datetime.now(TZ), item_id),
+        )
+        conn.commit()
+    return redirect(request.form.get("next") or fallback)
+
+
+@app.route("/item/<item_id>/render/remove", methods=["POST"])
+def item_render_remove(item_id: str):
+    """Drop the upload and fall back to the catalogue render underneath.
+
+    The retail render was never touched, which is what makes trying an upload
+    safe: this is always a way back, not a repair.
+    """
+    with db.connect() as conn:
+        row = db.fetch_one(
+            conn, "SELECT render_upload_path FROM items WHERE id = %s", (item_id,)
+        )
+        if row is None:
+            abort(404)
+        conn.execute(
+            "UPDATE items SET render_upload_path = NULL, render_uploaded_at = NULL "
+            "WHERE id = %s",
+            (item_id,),
+        )
+        conn.commit()
+
+    if row["render_upload_path"]:
+        (config.photo_store() / row["render_upload_path"]).unlink(missing_ok=True)
+    return redirect(request.form.get("next") or url_for("catalogue", item=item_id))
 
 
 @app.route("/fit/<fit_id>/gone", methods=["POST"])

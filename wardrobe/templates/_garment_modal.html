@@ -22,14 +22,61 @@
     <div class="modal-body">
       <div class="modal-figure">
         {% set p = item.photos[0] if item.photos else none %}
-        <div class="modal-frame" style="background: {{ item.hex or '#DCD5C7' if not p else '#FFFFFF' }}">
-          {% if p %}
+        {% set uploaded = item.render_upload_path %}
+        {# The whole pane is the drop target, not a button on it: dragging an
+           image at a picture is the gesture, and a target you have to aim at is
+           a worse one. #}
+        <div class="modal-frame" data-render-drop
+             style="background: {{ item.hex or '#DCD5C7' if not (p or uploaded) else '#FFFFFF' }}">
+          {% if uploaded %}
+            {# Max's own render, in front of the catalogue's. Not labelled as
+               generated: whether he made it or shot it is not recorded, so the
+               app does not assert either. #}
+            <img src="{{ url_for('photo', relative_path=uploaded) }}" alt="">
+            <span class="hero-flag">Your render</span>
+          {% elif p %}
             <img src="{{ url_for('photo', relative_path=p.stored_path or p.thumb_path) }}" alt="">
             {% if p.is_render %}
               <span class="hero-flag">Generated render — not a photograph of this garment</span>
             {% endif %}
           {% else %}
-            <span class="hero-flag">No image — {{ item.photo_prefix }}</span>
+            <span class="hero-flag">
+              {% if item.no_photo %}
+                No photo anywhere — colour field stands in
+              {% else %}
+                Render pending — colour field stands in
+              {% endif %}
+            </span>
+          {% endif %}
+          <span class="render-drop-note">Drop to set this render</span>
+        </div>
+
+        {# One upload fixes the closet tile, the piece strip in every fit,
+           Today's pieces and the builder's tiles at once — they all draw the
+           garment the same way and the upload sits in front of it. #}
+        <div class="render-source">
+          <form method="post" enctype="multipart/form-data"
+                action="{{ url_for('item_render_upload', item_id=item.id) }}"
+                data-render-form data-max-edge="700">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <input type="file" name="render" accept="image/*" data-render-input hidden>
+            <button class="render-btn" type="submit" data-render-pick>
+              {% if uploaded %}Replace this render
+              {% elif item.thumb_path %}Upload your own render
+              {% else %}Upload a render{% endif %}
+            </button>
+          </form>
+
+          {% if uploaded %}
+            <form method="post"
+                  action="{{ url_for('item_render_remove', item_id=item.id) }}">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="render-remove" type="submit">Back to the catalogue one</button>
+            </form>
+          {% endif %}
+
+          {% if not item.thumb_path %}
+            <span class="mono render-hint">no render yet — or drop an image on the panel</span>
           {% endif %}
         </div>
       </div>
@@ -168,3 +215,5 @@
     </div>
   </div>
 </div>
+
+<script src="{{ url_for('static', filename='fit-render.js') }}"></script>

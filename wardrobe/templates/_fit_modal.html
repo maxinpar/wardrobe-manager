@@ -92,7 +92,7 @@
         <div class="render-source">
           <form method="post" enctype="multipart/form-data"
                 action="{{ url_for('fit_render_upload', fit_id=fit.id) }}"
-                data-render-form>
+                data-render-form data-max-edge="1000">
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <input type="file" name="render" accept="image/*" data-render-input hidden>
             <button class="render-btn" type="submit" data-render-pick>
