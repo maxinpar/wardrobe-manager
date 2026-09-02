@@ -4,7 +4,7 @@
    full-look render, and stripped to the picture: 5/8 portrait, cover, then the
    name, the score and one line of meta. Everything else about the fit is in the
    drawer, which opens over this view. #}
-{% from "_fit_macros.html" import status_pill %}
+{% from "_fit_macros.html" import status_pill, layer_switch %}
 
 <div class="look-list">
   {% for c in cards %}
@@ -15,12 +15,20 @@
         {# The full render, not the thumbnail: this view exists to be looked at.
            Lazy, so only what you scroll to is fetched. #}
         <img src="{{ url_for('photo', relative_path=fit.render) }}"
-             alt="{{ fit.name }}" loading="lazy">
+             alt="{{ fit.name }}" loading="lazy"
+             {% if fit.has_two_looks %}
+               data-look-base="{{ url_for('photo', relative_path=fit.render) }}"
+               data-look-layered="{{ url_for('photo', relative_path=fit.layered_path) }}"
+             {% endif %}>
         {{ status_pill(c.problems, fit.blocked_by) }}
-        {# Same marker as the Details grid, for the same reason: this view is
-           still a list. The second look lives in the drawer. #}
-        {% if fit.has_two_looks %}<span class="pill-looks">2 looks</span>{% endif %}
-        <figcaption class="pill-generated">Generated · never worn</figcaption>
+        {# The same switch as the Details grid and the pane, sharing its state:
+           this view is the one that exists to be looked at, so the second look
+           belongs here most of all. The per-card "Generated · never worn" is
+           gone — the count line above says it once for the whole page, and
+           repeating it under every picture was noise. A card is badged only
+           when the picture is Max's own. #}
+        {% if fit.render_is_upload %}<span class="pill-yours">Your photo</span>{% endif %}
+        {{ layer_switch(fit) }}
       </figure>
 
       <div class="fit-title-row">

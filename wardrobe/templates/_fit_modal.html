@@ -1,6 +1,7 @@
 {# The fit detail. A centred modal, not a right-hand aside: the aside covered a
    column of the gallery it was launched from. The backdrop is an anchor, so
    closing is a navigation and the back button behaves. #}
+{% from "_fit_macros.html" import layer_switch %}
 {% set fit = selected.fit %}
 {% set meta = selected.meta %}
 {% set close_url = url_for('fits_view', **filters.current()) %}
@@ -34,38 +35,16 @@
         {# The frame is also the drop target. data-render-drop is what the
            progressive-enhancement script binds to; without JavaScript the
            button below still works as a plain file input and form. #}
-        {% if fit.has_two_looks %}
-          {# Two renders of one fit: the layer comes off at the range, so both
-             looks are real and the fit has to hold up in the left one. Base
-             first, which is also the order they stack in when the panel is
-             narrow. Only the base frame takes a drop — an upload replaces the
-             hero, and the pair is the hero's variant. #}
-          <div class="look-pair">
-            <figure class="look-pane">
-              <div class="modal-frame" data-render-drop>
-                <img class="look" src="{{ url_for('photo', relative_path=fit.render) }}" alt="">
-                {% if fit.hero_is_generated %}
-                  <span class="pill-generated">Generated · never worn</span>
-                {% endif %}
-                <span class="render-drop-note">Drop to set the render</span>
-              </div>
-              <figcaption>Without the layer</figcaption>
-            </figure>
-            <figure class="look-pane">
-              <div class="modal-frame">
-                <img class="look" src="{{ url_for('photo', relative_path=fit.layered_render) }}" alt="">
-                {# Generated too, and labelled identically: neither picture is
-                   evidence that this fit was ever worn. #}
-                <span class="pill-generated">Generated · never worn</span>
-              </div>
-              <figcaption>
-                With the {{ fit.layer_piece if fit.layer_piece else 'layer' }}
-              </figcaption>
-            </figure>
-          </div>
-        {% elif fit.render %}
+        {% if fit.render %}
           <div class="modal-frame" data-render-drop>
-            <img class="look" src="{{ url_for('photo', relative_path=fit.render) }}" alt="">
+            {# One hero, switched — not two frames side by side. Half the width
+               each meant two small pictures of the same fit, and the thing being
+               compared is one garment on or off. #}
+            <img class="look" src="{{ url_for('photo', relative_path=fit.render) }}" alt=""
+                 {% if fit.has_two_looks %}
+                   data-look-base="{{ url_for('photo', relative_path=fit.render) }}"
+                   data-look-layered="{{ url_for('photo', relative_path=fit.layered_path) }}"
+                 {% endif %}>
             {% if fit.hero_is_generated and not fit.render_is_upload %}
               <span class="pill-generated">Generated · never worn</span>
             {% endif %}
@@ -83,14 +62,26 @@
           </div>
         {% endif %}
 
+        {% if fit.has_two_looks %}
+          {# The row reserves its height — 58px, and 32px for the note — because
+             the two notes are different lengths and the row used to grow and
+             shrink between states, visibly resizing the hero above it. The hero
+             box is pixel-identical in both states, which is the whole point. #}
+          <div class="layer-row">
+            {{ layer_switch(fit, 'pane') }}
+            <span class="layer-note"
+                  data-layer-note-off="Without the {{ fit.layer_piece or 'layer' }} — it comes off at the range."
+                  data-layer-note-on="With the {{ fit.layer_piece or 'layer' }} on.">
+              Without the {{ fit.layer_piece or 'layer' }} — it comes off at the range.
+            </span>
+          </div>
+        {% endif %}
+
         {# Three captions, three sources. An upload is never called generated:
            whether it is a photograph or an AI render is not ours to assume. #}
         <p class="modal-caption tight">
-          {% if fit.has_two_looks %}
-            Both generated illustrations — neither is a photo of this fit being worn.
-            The layer is optional: the fit is designed to stand up without it.
-          {% elif fit.render_is_upload %}
-            Your uploaded render.
+          {% if fit.render_is_upload %}
+            Your own picture, uploaded in the app.
           {% elif fit.render %}
             Generated illustration — not a photo of this fit being worn.
           {% else %}

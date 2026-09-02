@@ -129,10 +129,23 @@ class Fit:
 
     @property
     def layer_piece(self) -> str | None:
-        """The garment that comes off — named, so the caption can say which."""
+        """The garment that comes off — named, so the note can say which.
+
+        The note is the real answer: the golf batch writes "Optional — comes off
+        at the range" on the piece that does, and a fit can carry both a layer
+        and an outer. Role is the fallback for the fits whose slots were written
+        before that convention, and `layer` is tried before `outer` because an
+        outer over a layer is the one that stays on.
+        """
         for item in self.items:
-            if item["role"] in ("layer", "outer") and not item["is_alternate"]:
+            if item["is_alternate"]:
+                continue
+            if (item.get("note") or "").strip().lower().startswith("optional"):
                 return item["name"]
+        for role in ("layer", "outer"):
+            for item in self.items:
+                if item["role"] == role and not item["is_alternate"]:
+                    return item["name"]
         return None
     temp_bands: list[str] = field(default_factory=list)
     # each entry: {item_id, name, role, position, is_alternate, warmth,

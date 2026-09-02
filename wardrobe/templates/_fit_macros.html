@@ -6,17 +6,41 @@
   an empty slot. A generated render carries its label without exception: it must
   never imply a wearing.
 #}
+{#
+  One switch, never two. A segmented "Without / With" control was tried and
+  rejected: the target moves when you press it, so going back means chasing it.
+  This is one button that flips, and the label says which state you are in.
+
+  It renders in the disabled-JavaScript state — off, showing the base render,
+  which is the hero and the picture the card would have shown anyway. Nothing
+  is hidden without a script, only unswitchable.
+#}
+{% macro layer_switch(fit, variant='card') %}
+  {% if fit.has_two_looks %}
+    <button type="button" class="layer-switch {{ variant }}"
+            data-layer-switch="{{ fit.id }}" aria-pressed="false">
+      <span class="layer-label">Layer off</span>
+      <span class="layer-track"><span class="layer-knob"></span></span>
+    </button>
+  {% endif %}
+{% endmacro %}
+
 {% macro fit_image(fit, renders, klass='ground', height_class='') %}
   {% set pieces = fit.primary() | map(attribute='item_id') | select('in', renders) | list %}
   {% if fit.render %}
     <div class="{{ klass }} full">
-      <img class="look" src="{{ url_for('photo', relative_path=fit.render_thumb) }}" alt="">
-      {% if fit.hero_is_generated and not fit.render_is_upload %}
-        <span class="pill-generated">Generated · never worn</span>
-      {% endif %}
-      {# The base thumbnail only — the grid is for scanning. That there is a
-         second look is worth one pill; showing it is the drawer's job. #}
-      {% if fit.has_two_looks %}<span class="pill-looks">2 looks</span>{% endif %}
+      <img class="look" src="{{ url_for('photo', relative_path=fit.render_thumb) }}" alt=""
+           {% if fit.has_two_looks %}
+             data-look-base="{{ url_for('photo', relative_path=fit.render_thumb) }}"
+             data-look-layered="{{ url_for('photo', relative_path=fit.layered_render) }}"
+           {% endif %}>
+      {# No "Generated · never worn" here. With every golf render carrying the
+         same provenance the badge was noise twelve times over, so the rule is
+         inverted: silence means generated, and a card is badged only when the
+         picture is Max's own. The sentence stays in the pane, where there is
+         room to say it properly. #}
+      {% if fit.render_is_upload %}<span class="pill-yours">Your photo</span>{% endif %}
+      {{ layer_switch(fit) }}
       {{ caller() if caller is defined }}
     </div>
   {% else %}

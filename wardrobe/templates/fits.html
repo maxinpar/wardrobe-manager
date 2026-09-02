@@ -171,4 +171,7 @@
 {% block drawer %}
   {% if selected %}{% include "_fit_modal.html" %}{% endif %}
   {% if building %}{% include "_fit_builder.html" %}{% endif %}
+  {# Last, because it binds the cards AND the open pane and the pane is written
+     after the grid. One state, one script, both surfaces. #}
+  <script src="{{ url_for('static', filename='layer-switch.js') }}"></script>
 {% endblock %}
