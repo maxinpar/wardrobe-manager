@@ -1164,3 +1164,262 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
   padding: 11px 22px;
   font-size: 13.5px;
 }
+
+/* ============================================================== phone === */
+
+/* The phone shell is inert on desktop. Both pieces are rendered on every page
+   — the breakpoint is a media query and the server has no viewport to test —
+   so they are switched off here rather than in the template. */
+.tabbar, .more-sheet { display: none; }
+.build-fit-plus { display: none; }
+
+/* One breakpoint, 760px, per design_handoff_mobile_layout: below it the phone
+   treatment, above it the desktop layout untouched. There is no tablet tier.
+
+   This block is deliberately last in the file. Four earlier media queries
+   (1100px, 900px, 820px, 640px) also match a phone, and at equal specificity
+   the later rule is the one that lands. */
+@media (max-width: 760px) {
+
+  /* ------------------------------------------------------- the top bar --- */
+
+  /* Stripped to the two controls worth reaching for mid-scroll: which wardrobe
+     you are in, and starting a fit. The title, the six nav pills and the two
+     weather chips all go — navigation moves to the bottom bar, and the weather
+     to the foot of the More sheet. */
+  .topbar {
+    gap: 10px; padding: 10px 12px; z-index: 22; flex-wrap: nowrap;
+  }
+  .topbar .brand,
+  .topbar nav,
+  .topbar .weather-chip { display: none; }
+
+  .topbar-right { margin-left: 0; flex: 1 1 auto; gap: 10px; min-width: 0; }
+
+  /* Promoted to the primary control: full width, and the counts dropped —
+     at this size the two words are the whole message. */
+  .wardrobe-switch { flex: 1 1 auto; width: auto; max-width: none; flex-wrap: nowrap; }
+  .wardrobe-switch button {
+    flex: 1 1 0; justify-content: center;
+    padding: 11px 6px; font-size: 14px;
+  }
+  .wardrobe-switch .count { display: none; }
+
+  /* Build a fit collapses to a circle. The words stay in the accessibility
+     tree — clipped, not display:none — because a bare + does not say what it
+     builds. */
+  .build-fit {
+    flex: none; display: grid; place-items: center;
+    width: 46px; height: 46px; padding: 0; border-radius: 999px;
+  }
+  .build-fit-label {
+    position: absolute; width: 1px; height: 1px; margin: -1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .build-fit-plus { display: block; font-size: 21px; line-height: 1; }
+
+  /* ---------------------------------------------------- the bottom bar --- */
+
+  /* Three destinations, not six: Today, Fits and Closet are the daily loop.
+     The rest go behind More, which is a fourth column rather than a fourth
+     tab — it opens a sheet, it does not navigate. */
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 26;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+    background: var(--surface); border-top: 1px solid var(--line);
+    padding: 7px 8px calc(9px + env(safe-area-inset-bottom));
+  }
+  .tab {
+    display: grid; place-items: center; min-height: 48px;
+    padding: 15px 4px; border-radius: 999px;
+    font: 500 13.5px var(--ui); color: var(--secondary);
+    background: transparent; border: none; cursor: pointer; text-align: center;
+  }
+  .tab.on { background: var(--ink); color: var(--page); }
+  /* More is never the page you are on, so it does not take the ink pill. The
+     softer chip says its sheet is open, or that what is open came from it. */
+  .tab-more.on { background: var(--chip); color: var(--ink); }
+
+  /* ----------------------------------------------------- the More sheet --- */
+
+  .more-sheet { display: block; position: fixed; inset: 0; z-index: 28; }
+  .more-sheet[hidden] { display: none; }
+  .more-scrim {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    background: rgba(26, 24, 21, 0.42);
+    border: none; border-radius: 0; padding: 0;
+  }
+  .more-panel {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; flex-direction: column; gap: 8px;
+    background: var(--surface); border-radius: 22px 22px 0 0;
+    padding: 14px 14px calc(26px + env(safe-area-inset-bottom));
+  }
+  .more-grab {
+    width: 42px; height: 4px; border-radius: 999px;
+    background: var(--line); margin: 0 auto 6px;
+  }
+  .more-row {
+    display: flex; align-items: center; gap: 10px; min-height: 52px;
+    border: 1px solid var(--line-light); border-radius: 14px;
+    padding: 16px; font-size: 15px; color: var(--body);
+  }
+  /* The row for the page you are already on, so opening More from Gaps does
+     not read as four equally distant places. */
+  .more-row.on { background: var(--row); }
+  .more-row.dark {
+    background: var(--ink); border-color: var(--ink); color: var(--page);
+  }
+  .more-note { margin-left: auto; color: var(--problem-text); }
+  .more-weather {
+    margin: 6px 0 0; text-align: center; color: var(--muted);
+  }
+  /* The sheet is the only thing that scrolls while it is up. */
+  body.sheet-open { overflow: hidden; }
+
+  /* --------------------------------------------------------- the pages --- */
+
+  /* Every scrollable area reserves room for the bar, or its last row sits
+     under it and cannot be reached. */
+  main { padding: 14px 12px 96px; }
+
+  /* ------ Fits ------ */
+
+  body[data-page="fits_view"] main,
+  body[data-page="fit_detail"] main { padding: 0 12px 96px; }
+
+  /* Five labelled clusters become one scrolling strip. The labels, the
+     Details/Renders switch and the summary count line are all desktop
+     affordances that cost a phone more room than they return. */
+  .filter-groups {
+    display: flex; flex-wrap: nowrap; align-items: center; gap: 7px;
+    overflow-x: auto; margin: 0 -12px; padding: 11px 12px 13px;
+    scrollbar-width: none;
+  }
+  .filter-groups::-webkit-scrollbar { display: none; }
+  .filter-group { flex: none; flex-direction: row; align-items: center; gap: 7px; }
+  .filter-group-label { display: none; }
+  .filter-chips { flex-wrap: nowrap; gap: 7px; }
+  .filter-chip { padding: 10px 15px; font-size: 13px; }
+  .mode-switch, .count-line { display: none; }
+
+  /* Two across. The 5/8 render is the point of the card, so it keeps its size
+     and everything that was explaining it goes. */
+  .fit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .fit-card { padding: 7px; gap: 8px; border-radius: 16px; }
+  .fit-title { font-size: 13.5px; }
+  /* Tapping the card is the only action left on it: the detail sheet is where
+     a phone can show any of this properly. */
+  .fit-card .badges,
+  .fit-card .fit-meta,
+  .fit-card .catch,
+  .fit-card .job-row,
+  .fit-card .fit-footer { display: none; }
+
+  /* The heading is a <button>, so it inherits the 999px pill radius. On a
+     desktop-width row that is invisible; across 388px it bows the bottom rule
+     into a shallow bowl. The rule is a rule. */
+  .fit-section {
+    padding: 14px 2px 8px; margin-top: 4px; border-radius: 0;
+  }
+  .fit-section-label { font-size: 15px; }
+
+  /* ------ Closet ------ */
+
+  body[data-page="catalogue"] main,
+  body[data-page="item_detail"] main { padding: 0; }
+
+  body[data-page="catalogue"] .filters { padding: 12px 12px 6px; margin: 0; }
+  body[data-page="catalogue"] .filters + .filters {
+    padding: 2px 12px 10px; flex-wrap: nowrap; overflow-x: auto;
+    scrollbar-width: none;
+  }
+  body[data-page="catalogue"] .filters + .filters::-webkit-scrollbar { display: none; }
+  body[data-page="catalogue"] .filters + .filters .btn { flex: none; }
+  body[data-page="catalogue"] .filters input[type="search"] {
+    flex: 1 1 auto; min-width: 0; padding: 11px 15px; font-size: 13.5px;
+  }
+  body[data-page="catalogue"] .closet-grid,
+  body[data-page="catalogue"] .count-line,
+  body[data-page="catalogue"] .empty-state { margin-left: 12px; margin-right: 12px; }
+  body[data-page="catalogue"] .closet-grid { margin-bottom: 96px; }
+
+  /* Three across, and the tile carries its picture, its checkbox and its name.
+     The state line, the usage line and the render-pending tag are all things
+     you go into the garment to act on. */
+  .closet-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .garment { padding: 7px; }
+  .garment-state, .garment-usage, .corner-badge { display: none; }
+
+  /* ------ Today ------ */
+
+  body[data-page="today_view"] main { padding: 0; }
+
+  .today-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  /* The hero stops being a sticky card beside the text and becomes the top of
+     the page: a fixed height, so the pane under it starts somewhere
+     predictable however tall the render is. */
+  .today-hero {
+    position: relative; top: auto; max-width: none;
+    height: 58vh; border-radius: 0; border-left: none; border-right: none;
+  }
+  .today-hero img { height: 100%; aspect-ratio: auto; }
+  .hero-strip { height: 100%; aspect-ratio: auto; }
+  .today-pane { padding: 22px 14px 100px; }
+  .today-name { font-size: 31px; }
+  .info-cards { grid-template-columns: minmax(0, 1fr); }
+
+  /* Four across rather than six, so a garment is still recognisable. */
+  .base-tiles, .piece-strip {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
+  }
+  .tile { width: auto; }
+
+  /* The week scrolls instead of wrapping: five days in two rows reads as ten
+     things, not as a week. */
+  .week-strip {
+    display: flex; grid-template-columns: none; gap: 8px;
+    overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;
+  }
+  .week-strip::-webkit-scrollbar { display: none; }
+  .day-card { flex: 0 0 94px; }
+
+  /* ------ the detail sheets ------ */
+
+  /* A centred panel with margin around it wastes the only screen there is.
+     Full-bleed, one column, and the whole body scrolls rather than two panes
+     scrolling independently — which on a phone is a trap, not a feature. */
+  .modal { padding: 0; }
+  .modal-panel,
+  .modal.garment .modal-panel {
+    width: 100vw; height: 100vh; height: 100dvh;
+    max-width: none; border-radius: 0;
+  }
+  .modal-head { padding: 16px 16px 12px; }
+  .modal-head .drawer-title { font-size: 21px; }
+  .modal-body,
+  .modal.garment .modal-body {
+    grid-template-columns: minmax(0, 1fr); overflow-y: auto;
+  }
+  /* A minimum, not a height: without it the figure collapses to nothing once
+     the body rather than the pane is what scrolls. */
+  .modal-figure { overflow: visible; min-height: 64vh; }
+  .modal.garment .modal-figure { min-height: 52vh; padding: 14px; }
+  .modal-detail { overflow-y: visible; padding-bottom: 32px; }
+  .modal-detail section { padding: 0 16px; }
+
+  /* The builder was a right rail. There is no room beside anything here. */
+  .drawer, .drawer.wide {
+    width: 100vw; border-left: none; padding: 16px 14px 96px;
+  }
+
+  /* -------------------------------------------------------- type floor --- */
+
+  /* 7.5-9.5px uppercase mono is texture on a desktop and illegible at 412px.
+     Labels worth keeping are raised to the floor — nothing below 10.5px, and
+     no uppercase mono below 11px. Labels that carry no phone value are hidden
+     above rather than shrunk to meet it. */
+  .pill-status, .pill-generated, .pill-yours { font-size: 10.5px; }
+  .fit-score, .fit-section-count { font-size: 11px; }
+  .tile-label, .day-status { display: none; }
+}

@@ -1,8 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Laundry — Wardrobe{% endblock %}
+{% block title %}Hospital — Wardrobe{% endblock %}
 
 {% block content %}
-<h2>Laundry</h2>
+{# Hospital, not Laundry: the route and the states are unchanged, but the
+   destination is named for everything a garment can be out of action for —
+   wash, tailor, repair, cosmetic — not washing alone. #}
+<h2>Hospital</h2>
 
 <div class="bulk">
   <form method="post" action="{{ url_for('laundry_bulk') }}">

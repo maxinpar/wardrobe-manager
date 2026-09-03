@@ -7,19 +7,28 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body data-page="{{ request.endpoint }}">
+{# The three destination groups, named once. The top bar and the phone's tab
+   bar have to agree on which tab is lit, and a fit opened from the grid is
+   still Fits. #}
+{% set on_today = request.endpoint == 'today_view' %}
+{% set on_fits = request.endpoint in ('fits_view', 'fit_detail', 'looks_view') %}
+{% set on_closet = request.endpoint in ('catalogue', 'item_detail') %}
+{% set on_more = request.endpoint in ('laundry_view', 'gaps_view', 'log_view') %}
 <header class="topbar">
   <div class="brand">
     <span class="brand-mark"></span>
     <span class="brand-name">Wardrobe</span>
   </div>
   <nav>
-    <a href="{{ url_for('today_view') }}" class="{{ 'on' if request.endpoint == 'today_view' }}">Today</a>
+    <a href="{{ url_for('today_view') }}" class="{{ 'on' if on_today }}">Today</a>
     {# Looks was its own tab for a day. The renders are a way of drawing fits,
        not a separate set of things, so they live behind Fits' mode switch. #}
-    <a href="{{ url_for('fits_view') }}" class="{{ 'on' if request.endpoint in ('fits_view', 'fit_detail', 'looks_view') }}">Fits</a>
-    <a href="{{ url_for('catalogue') }}" class="{{ 'on' if request.endpoint in ('catalogue', 'item_detail') }}">Closet</a>
+    <a href="{{ url_for('fits_view') }}" class="{{ 'on' if on_fits }}">Fits</a>
+    <a href="{{ url_for('catalogue') }}" class="{{ 'on' if on_closet }}">Closet</a>
     <a href="{{ url_for('gaps_view') }}" class="{{ 'on' if request.endpoint == 'gaps_view' }}">Gaps</a>
-    <a href="{{ url_for('laundry_view') }}" class="{{ 'on' if request.endpoint == 'laundry_view' }}">Laundry</a>
+    {# Hospital, not Laundry: the route is unchanged, but the destination now
+       covers wash, tailor, repair and cosmetic jobs rather than washing alone. #}
+    <a href="{{ url_for('laundry_view') }}" class="{{ 'on' if request.endpoint == 'laundry_view' }}">Hospital</a>
     <a href="{{ url_for('log_view') }}" class="{{ 'on' if request.endpoint == 'log_view' }}">Log</a>
   </nav>
   <div class="topbar-right">
@@ -45,7 +54,12 @@
     {# Read-only here: the picker's Today screen is where weather is set. #}
     <span class="weather-chip">{{ weather.temp_label }} · {{ weather.band }}</span>
     <span class="weather-chip">{{ 'Rain' if weather.rain else 'Dry' }}</span>
-    <a class="btn btn-ink" href="{{ url_for('fits_view', build=1) }}">Build a fit</a>
+    {# One control, two shapes. On a phone this is a 46px circular +, so the
+       words stay in the accessibility tree rather than being thrown away. #}
+    <a class="btn btn-ink build-fit" href="{{ url_for('fits_view', build=1) }}">
+      <span class="build-fit-label">Build a fit</span>
+      <span class="build-fit-plus" aria-hidden="true">+</span>
+    </a>
   </div>
 </header>
 
@@ -59,6 +73,50 @@
   {% block content %}{% endblock %}
 </main>
 {% block drawer %}{% endblock %}
+
+{# --------------------------------------------------------- phone shell ---
+   Below 760px the six-destination header does not fit, so the three tabs that
+   carry the daily loop get a bottom bar and the other three live behind More.
+   Build a fit appears in both places: it is an action, not a destination, and
+   the + in the top bar is the one you reach for mid-scroll.
+
+   Always rendered, never conditionally: the breakpoint is a CSS media query
+   and the server has no viewport to test. Above 760px this is display:none. #}
+<nav class="tabbar" aria-label="Sections">
+  <a class="tab {{ 'on' if on_today }}" href="{{ url_for('today_view') }}">Today</a>
+  <a class="tab {{ 'on' if on_fits }}" href="{{ url_for('fits_view') }}">Fits</a>
+  <a class="tab {{ 'on' if on_closet }}" href="{{ url_for('catalogue') }}">Closet</a>
+  <button type="button" class="tab tab-more {{ 'on' if on_more }}"
+          id="more-button" aria-expanded="false" aria-controls="more-sheet">More</button>
+</nav>
+
+<div class="more-sheet" id="more-sheet" hidden>
+  <button type="button" class="more-scrim" data-more-close aria-label="Close"></button>
+  <div class="more-panel" role="dialog" aria-modal="true" aria-label="More">
+    <span class="more-grab" aria-hidden="true"></span>
+    <a class="more-row {{ 'on' if request.endpoint == 'laundry_view' }}"
+       href="{{ url_for('laundry_view') }}">
+      <span>Hospital</span>
+      {# The one number the tab bar cannot show. Suppressed at zero: "0
+         blocking" is a worse thing to read than nothing. #}
+      {% if hospital_blocking %}
+        <span class="mono more-note">{{ hospital_blocking }} blocking</span>
+      {% endif %}
+    </a>
+    <a class="more-row {{ 'on' if request.endpoint == 'gaps_view' }}"
+       href="{{ url_for('gaps_view') }}">Gaps</a>
+    <a class="more-row {{ 'on' if request.endpoint == 'log_view' }}"
+       href="{{ url_for('log_view') }}">Log</a>
+    <a class="more-row dark" href="{{ url_for('fits_view', build=1) }}">Build a fit</a>
+    {# The weather the desktop header carries as two chips. It is read-only in
+       both places; Today is where it is actually set. #}
+    <p class="mono more-weather">
+      {{ weather.temp_label }} · {{ weather.band }} · {{ 'rain' if weather.rain else 'dry' }}
+    </p>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='mobile-nav.js') }}"></script>
 {# Last script on every page: it puts the scroll back after a modal, and
    it has to run after anything that folds part of the grid away. #}
 <script src="{{ url_for('static', filename='grid-scroll.js') }}"></script>

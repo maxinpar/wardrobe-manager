@@ -103,6 +103,27 @@ def header_weather():
     }
 
 
+@app.context_processor
+def header_hospital():
+    """The count on the Hospital row of the phone's More sheet.
+
+    A precondition is by definition a job that blocks its fit (migration 003),
+    so an open one is a fit that cannot be worn until it is done. Hospital is
+    the one destination that gets pushed behind More on a phone, and this is
+    what stops that hiding it: the number rides on the More button's own row.
+    """
+    try:
+        with db.connect() as conn:
+            row = db.fetch_one(
+                conn, "SELECT count(*) AS n FROM fit_preconditions WHERE NOT done"
+            )
+        blocking = int(row["n"]) if row else 0
+    except Exception:
+        # Same rule as the weather chips: a header must never take a page down.
+        blocking = 0
+    return {"hospital_blocking": blocking}
+
+
 # --------------------------------------------------- the two wardrobes --
 
 
