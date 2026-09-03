@@ -9,20 +9,25 @@ the fits; the app owns laundry state, the wear log, and the three things on a
 fit that are Max's alone: `killer`, `score` and `style`. It never computes any
 of those three — a number he typed is never silently changed.
 
-There is no auth. If you ever expose this beyond the LAN, add it in
-require_login() below — that is the one obvious place for it.
+Auth is off until AUTH_USER and AUTH_PASSWORD are set, which keeps
+localhost frictionless; set them before this leaves the LAN. See
+require_login() below.
 """
 
 from __future__ import annotations
+
+import hmac
 
 from datetime import date, datetime
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
+from waitress import serve
 from werkzeug.utils import secure_filename
 
 from flask import (
     Flask,
+    Response,
     abort,
     flash,
     redirect,
@@ -35,7 +40,7 @@ from flask import (
 from . import config, db, fit_derive, picker, seed_data, wardrobes, week
 
 app = Flask(__name__)
-app.secret_key = "wardrobe-local"  # only used for flash messages on localhost
+app.secret_key = config.secret_key()
 
 TZ = ZoneInfo(config.TIMEZONE)
 
@@ -46,8 +51,32 @@ def today() -> date:
 
 @app.before_request
 def require_login():
-    """No auth in v1. Add it here if this ever leaves the LAN."""
-    return None
+    """Basic auth, but only once AUTH_USER and AUTH_PASSWORD are both set.
+    Unset is the localhost default, so development is unchanged.
+
+    Being a before_request, this covers /photos as well: the images cannot be
+    fetched around the gate.
+    """
+    expected = config.auth_credentials()
+    if expected is None:
+        return None
+    sent = request.authorization
+    offered = (
+        (sent.username or "", sent.password or "")
+        if sent and sent.type == "basic"
+        else ("", "")
+    )
+    # Both halves compared every time, so a wrong username and a wrong password
+    # take the same path out.
+    user_ok = hmac.compare_digest(offered[0], expected[0])
+    password_ok = hmac.compare_digest(offered[1], expected[1])
+    if user_ok and password_ok:
+        return None
+    return Response(
+        "Authentication required.",
+        401,
+        {"WWW-Authenticate": 'Basic realm="Wardrobe"'},
+    )
 
 
 @app.context_processor
@@ -1955,7 +1984,13 @@ def photo(relative_path: str):
 
 
 def main() -> None:
-    app.run(host=config.app_host(), port=config.app_port(), debug=True)
+    host, port = config.app_host(), config.app_port()
+    if config.app_debug():
+        # The reloader and the interactive debugger, for local work only.
+        app.run(host=host, port=port, debug=True)
+        return
+    print(f"Serving on http://{host}:{port} — waitress, debugger off.")
+    serve(app, host=host, port=port)
 
 
 if __name__ == "__main__":

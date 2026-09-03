@@ -45,3 +45,19 @@ def app_host() -> str:
 
 def app_port() -> int:
     return int(os.environ.get("APP_PORT", "5005"))
+
+
+def app_debug() -> bool:
+    """Off unless asked for. The Werkzeug debugger must never face a tunnel."""
+    return os.environ.get("APP_DEBUG", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def auth_credentials() -> tuple[str, str] | None:
+    """The basic-auth pair, or None for no gate — the localhost default."""
+    user = os.environ.get("AUTH_USER", "").strip()
+    password = os.environ.get("AUTH_PASSWORD", "").strip()
+    return (user, password) if user and password else None
+
+
+def secret_key() -> str:
+    return os.environ.get("SECRET_KEY", "wardrobe-local")
