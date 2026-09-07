@@ -82,4 +82,8 @@
 
 {% block drawer %}
   {% if selected %}{% include "_garment_modal.html" %}{% endif %}
+  {# The garment sheet has no folds yet, but the scroll lock in here is what
+     stops the closet grid scrolling behind it. After the include, because it
+     reads the markup the include writes. #}
+  <script src="{{ url_for('static', filename='sheet-sections.js') }}"></script>
 {% endblock %}

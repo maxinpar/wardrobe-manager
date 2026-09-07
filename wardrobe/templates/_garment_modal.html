@@ -19,7 +19,7 @@
       <a class="btn drawer-close" href="{{ close_url }}" title="Close">×</a>
     </div>
 
-    <div class="modal-body">
+    <div class="modal-body" data-nobar="1">
       <div class="modal-figure">
         {% set p = item.photos[0] if item.photos else none %}
         {% set uploaded = item.render_upload_path %}
@@ -33,12 +33,10 @@
                generated: whether he made it or shot it is not recorded, so the
                app does not assert either. #}
             <img src="{{ url_for('photo', relative_path=uploaded) }}" alt="">
-            <span class="hero-flag">Your render</span>
           {% elif p %}
             <img src="{{ url_for('photo', relative_path=p.stored_path or p.thumb_path) }}" alt="">
-            {% if p.is_render %}
-              <span class="hero-flag">Generated render — not a photograph of this garment</span>
-            {% endif %}
+            {# Same rule as everywhere else now: a picture that exists is not
+               labelled, an absent one is. #}
           {% else %}
             <span class="hero-flag">
               {% if item.no_photo %}

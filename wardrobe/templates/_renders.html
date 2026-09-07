@@ -24,16 +24,18 @@
         {# The same switch as the Details grid and the pane, sharing its state:
            this view is the one that exists to be looked at, so the second look
            belongs here most of all. The per-card "Generated · never worn" is
-           gone — the count line above says it once for the whole page, and
-           repeating it under every picture was noise. A card is badged only
-           when the picture is Max's own. #}
-        {% if fit.render_is_upload %}<span class="pill-yours">Your photo</span>{% endif %}
+           gone — the count line above says it once for the whole page, and so
+           now is "Your photo": both were provenance nobody acts on, sitting on
+           the corner of a picture. The pane says it properly. #}
         {{ layer_switch(fit) }}
       </figure>
 
       <div class="fit-title-row">
         <span class="fit-title">{{ fit.name }}</span>
-        <span class="fit-score">{{ (fit.score ~ '/10') if fit.score else 'unscored' }}</span>
+        {# `unscored` is marked rather than omitted: desktop keeps it, the phone
+           hides it in CSS. A score slot that says "no score" is fine on a wide
+           card and is one more thing to read past on a narrow one. #}
+        <span class="fit-score{{ ' unscored' if not fit.score }}">{{ (fit.score ~ '/10') if fit.score else 'unscored' }}</span>
       </div>
 
       <div class="fit-meta">

@@ -117,4 +117,28 @@
       alert("Pick at least three pieces before saving.");
     }
   });
+
+  /* "Tweak it by hand" in the AI builder lands here, carrying its picks as
+     ?pick_<role>=<id> and the fit's name. They are applied by CLICKING the
+     candidate tiles rather than by writing the hidden inputs, so the derived
+     strip is computed by the handler above — the one implementation that owns
+     it. A picked garment that is not in this wardrobe's pool simply does not
+     match a tile and is skipped, which is the right outcome: the manual builder
+     only ever shows what it can actually offer. */
+  (function preselect() {
+    var params = new URLSearchParams(window.location.search);
+    var name = params.get("name");
+    if (name) {
+      var field = form.querySelector('input[name="name"]');
+      if (field) field.value = name;
+    }
+    params.forEach(function (value, key) {
+      if (key.indexOf("pick_") !== 0) return;
+      var role = key.slice(5);
+      var tile = form.querySelector(
+        '.candidate[data-role="' + role + '"][data-item="' + value + '"]'
+      );
+      if (tile) tile.click();
+    });
+  })();
 })();

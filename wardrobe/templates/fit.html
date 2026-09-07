@@ -16,10 +16,10 @@
   {% if not row.rain_safe %} · <span class="warn-text">not rain-safe</span>{% endif %}
 </p>
 
+{# Only when something is wrong. "wearable now" was true of almost every fit,
+   which made it decoration. Silence means wearable. #}
 {% if problems %}
   <p>{% for p in problems %}<span class="badge warn">{{ p }}</span>{% endfor %}</p>
-{% else %}
-  <p><span class="badge ok">wearable now</span></p>
 {% endif %}
 
 {% if row.hero_image_path %}
