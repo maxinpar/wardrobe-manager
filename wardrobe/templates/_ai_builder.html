@@ -1,0 +1,163 @@
+{# Ask AI — build a fit from the brief.
+
+   A full-screen overlay, per the design handover, with two views inside it:
+   the setup (must-wear on the left, the brief on the right) and the results,
+   which arrive as a fragment from /fits/ai/build and replace the pane.
+
+   The two panes each scroll on their own at desktop width, deliberately: with
+   one scroll surface the Build button leaves the screen behind 140 closet
+   tiles and the brief becomes unreachable. On a phone they stack and the whole
+   panel scrolls as one. #}
+<div class="builder-overlay" id="ai-builder"
+     data-endpoint="{{ url_for('ai_build') }}"
+     data-save="{{ url_for('fit_create') }}">
+
+  <header class="builder-bar">
+    <div class="builder-bar-title">
+      <h2>Build a fit</h2>
+      <p class="mono">
+        {%- if ai.mode == 'golf' %}Golf wardrobe · {% endif -%}
+        Lock in what you're wearing · Claude fills the rest
+      </p>
+    </div>
+
+    <div class="builder-bar-tools">
+      <span class="segmented wardrobe-switch">
+        {% for m in wardrobe_modes %}
+          <form method="post" action="{{ url_for('set_wardrobe', mode=m) }}">
+            {# Switching wardrobe abandons the brief along with the draft — the
+               seeds are garments from the wardrobe being left. #}
+            <input type="hidden" name="next" value="{{ url_for('fits_view', build=1, ai=1) }}">
+            <button type="submit" class="{{ 'on' if wardrobe == m }}">
+              {{ wardrobe_labels[m] }}
+              <span class="mono count">{{ wardrobe_counts[m] }}</span>
+            </button>
+          </form>
+        {% endfor %}
+      </span>
+
+      <span class="segmented builder-mode">
+        <a href="{{ url_for('fits_view', build=1) }}">Manual</a>
+        <a class="on" href="{{ url_for('fits_view', build=1, ai=1) }}">Ask AI</a>
+      </span>
+
+      <a class="btn builder-close" href="{{ url_for('fits_view', **filters.current()) }}"
+         title="Close">×</a>
+    </div>
+  </header>
+
+  <div class="builder-body" id="ai-setup">
+    <section class="ai-pane ai-seeds-pane">
+      <div class="ai-pane-head">
+        <h3>Must wear</h3>
+        <span class="mono" data-seed-count>nothing locked in</span>
+        <input type="search" id="ai-search" autocomplete="off"
+               placeholder="Search — jeans, oxford, loafers">
+      </div>
+
+      {# Counts are the live pool's, and they re-count as the search narrows.
+         A tab that has nothing left hides itself; Everything never does. #}
+      <div class="ai-tabs" role="tablist">
+        {% for label, count in ai.tabs %}
+          <button type="button" class="ai-tab {{ 'on' if loop.first }}"
+                  data-tab="{{ label }}" role="tab">
+            {{ label }} <span class="mono count">{{ count }}</span>
+          </button>
+        {% endfor %}
+      </div>
+
+      <div class="ai-chips" data-seed-chips hidden></div>
+
+      <div class="ai-tiles">
+        {% for item in ai.garments %}
+          {% set r = renders.get(item.id) %}
+          <button type="button" class="ai-tile" data-item="{{ item.id }}"
+                  data-tab="{{ ai.tab_for(item) }}"
+                  data-name="{{ item.name }}"
+                  data-search="{{ [item.name, item.cat_code, item.colour, item.material, item.formality_raw, item.cut]|select|join(' ')|lower }}">
+            <span class="ai-tile-img">
+              {% if r and r.thumb %}
+                <img src="{{ url_for('photo', relative_path=r.thumb) }}" alt="" loading="lazy">
+              {% else %}
+                {# No render is not a reason to hide a garment — same rule the
+                   manual builder follows. #}
+                <span class="swatch-piece" style="background: {{ item.hex or '#ccc' }}"></span>
+              {% endif %}
+              <span class="ai-tile-tick">✓</span>
+            </span>
+            <span class="mono ai-tile-cat">{{ ai.tab_for(item) }}</span>
+            <span class="ai-tile-name">{{ item.name }}</span>
+          </button>
+        {% endfor %}
+      </div>
+    </section>
+
+    <form class="ai-pane ai-brief" id="ai-brief">
+      <div class="ai-field">
+        <div class="ai-field-head">
+          <h3>Wearing it when</h3>
+          <span class="mono" data-day-temp>{{ ai.days[0].temp_label }}</span>
+        </div>
+        <div class="ai-days">
+          {% for day in ai.days %}
+            <button type="button" class="ai-day {{ 'on' if loop.first }}"
+                    data-day="{{ day.key }}" data-temp="{{ day.temp_label }}"
+                    data-sky="{{ day.sky }}{% if day.rain_chance is not none %} · {{ day.rain_chance }}% rain{% endif %}">
+              {{ day.short }}
+            </button>
+          {% endfor %}
+        </div>
+        <p class="ai-sky mono" data-day-sky>
+          {{ ai.days[0].sky }}{% if ai.days[0].rain_chance is not none %} · {{ ai.days[0].rain_chance }}% rain{% endif %}
+        </p>
+        <p class="ai-place mono">{{ ai.place }}</p>
+      </div>
+
+      <div class="ai-field">
+        <h3>What it's for</h3>
+        <span class="segmented ai-occ">
+          {% for code, label, meaning in ai.occasions %}
+            <button type="button" class="{{ 'on' if loop.first }}"
+                    data-occ="{{ code }}" title="{{ meaning }}">{{ label }}</button>
+          {% endfor %}
+        </span>
+      </div>
+
+      <div class="ai-field">
+        <div class="ai-field-head">
+          <h3>How sharp</h3>
+          <span class="mono" data-sharp-label>
+            {{ ai.sharpness[ai.default_sharpness - 1][1] }}
+          </span>
+        </div>
+        <div class="ai-dial">
+          {% for level, label in ai.sharpness %}
+            <button type="button" class="ai-dial-bar {{ 'on' if level <= ai.default_sharpness }}"
+                    data-level="{{ level }}" data-label="{{ label }}"
+                    title="{{ label }}">
+              <span style="height: {{ 3 + level * 5 }}px"></span>
+            </button>
+          {% endfor %}
+        </div>
+        <div class="ai-dial-ends mono"><span>relaxed</span><span>sharp</span></div>
+      </div>
+
+      <div class="ai-field">
+        <input type="text" id="ai-note" maxlength="200"
+               placeholder="Anything else? e.g. client lunch">
+      </div>
+
+      <button type="submit" class="btn-brass ai-go" data-go>Build me a fit</button>
+      <p class="ai-avail mono">
+        {{ ai.garments|length }} garments available{% if ai.skipped %} ·
+        {{ ai.skipped }} skipped — in the wash or at the tailor{% endif %}
+      </p>
+    </form>
+  </div>
+
+  {# Results land here. Empty until the first ask, and it replaces the setup
+     rather than sitting under it — the brief comes back via "Change the brief". #}
+  <div class="builder-body" id="ai-results" hidden></div>
+</div>
+
+<script src="{{ url_for('static', filename='ai-builder.js') }}"></script>

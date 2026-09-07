@@ -1,0 +1,92 @@
+{# The results pane. Returned by /fits/ai/build and swapped into the overlay —
+   a fragment, not a page, so it extends nothing and includes no chrome.
+
+   The failure case renders through this same template on purpose. A dead end
+   that does not say what to do next is worse than the failure itself, so the
+   error names Manual, which is one click away and works. #}
+
+{% if error %}
+  <div class="ai-error">
+    <p class="ai-error-msg">{{ error }}</p>
+    <p class="mono">Try again — or build it by hand in Manual, which needs nothing from the network.</p>
+    <div class="ai-recap-tools">
+      <button type="button" class="btn" data-back>Change the brief</button>
+      <button type="button" class="btn-brass" data-again>Try again</button>
+    </div>
+  </div>
+{% else %}
+
+<div class="ai-recap">
+  <div>
+    <h3>{{ ['No', 'One', 'Two', 'Three'][fits|length] if fits|length < 4 else fits|length }}
+        fit{{ '' if fits|length == 1 else 's' }} for {{ day.long }}</h3>
+    <p class="mono">
+      {{ occasion_label }} · {{ day.temp_label }} · {{ sharpness_label }}
+      {%- if brief.seeds %} · {{ brief.seeds|length }} locked in{% endif %}
+      {%- if answer.cached %} · from earlier{% endif %}
+    </p>
+  </div>
+  <div class="ai-recap-tools">
+    <button type="button" class="btn" data-back>Change the brief</button>
+    {# Ask again bypasses the cache — the same brief twice is normally the same
+       answer returned free, and this is the way to say "no, something else". #}
+    <button type="button" class="btn" data-again>Ask again</button>
+  </div>
+</div>
+
+<div class="ai-cards">
+  {% for fit in fits %}
+    <article class="ai-card">
+      <div class="ai-card-head">
+        <span class="ai-badge {{ 'best' if loop.first else 'alt' }}">
+          {{ 'Best call' if loop.first else 'Alternative' }}
+        </span>
+        <h4>{{ fit.name }}</h4>
+      </div>
+      <p class="mono ai-card-meta">{{ fit.meta }}</p>
+
+      {# fit['items'] and not fit.items: dotted access finds the dict's own
+         .items() method first and hands the loop a builtin. #}
+      <div class="ai-pieces">
+        {% for pick in fit['items'] %}
+          {% set item = by_id.get(pick.id) %}
+          {% if item %}
+            {% set r = renders.get(pick.id) %}
+            <div class="ai-piece{{ ' seeded' if pick.id in fit.seeds }}">
+              {% if r and r.thumb %}
+                <img src="{{ url_for('photo', relative_path=r.thumb) }}" alt="{{ item.name }}">
+              {% else %}
+                <span class="swatch-piece" style="background: {{ item.hex or '#ccc' }}"></span>
+              {% endif %}
+              <span class="mono ai-piece-role">{{ role_labels.get(pick.role, pick.role) }}</span>
+              {% if pick.id in fit.seeds %}<span class="ai-piece-yours mono">yours</span>{% endif %}
+              <span class="ai-piece-name">{{ item.name }}</span>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      <p class="ai-card-note">{{ fit.note }}</p>
+
+      <div class="ai-card-tools">
+        {# Saves through the ordinary fit_create route with the ordinary slot
+           fields, so an AI fit and a hand-built one are the same kind of row.
+           Only `style` and `source` say where it came from. #}
+        <form method="post" action="{{ url_for('fit_create') }}">
+          <input type="hidden" name="name" value="{{ fit.name }}">
+          <input type="hidden" name="style" value="{{ fit.note }}">
+          <input type="hidden" name="source" value="built with AI · {{ day.long }}">
+          {% for pick in fit['items'] %}
+            <input type="hidden" name="{{ pick.role }}" value="{{ pick.id }}">
+          {% endfor %}
+          <button type="submit" class="btn-brass">Save this fit</button>
+        </form>
+        <button type="button" class="btn" data-tweak
+                data-picks='{{ fit["items"]|tojson }}' data-name="{{ fit.name }}">
+          Tweak it by hand
+        </button>
+      </div>
+    </article>
+  {% endfor %}
+</div>
+{% endif %}

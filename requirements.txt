@@ -3,3 +3,5 @@ psycopg[binary]==3.2.1
 python-dotenv==1.0.1
 Pillow==10.4.0
 waitress==3.0.2
+anthropic==1.4.0
+PyJWT[crypto]==2.10.1
