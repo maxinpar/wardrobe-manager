@@ -80,13 +80,24 @@ ANGLE_ORDER = {
 }
 
 
-def snapshot(root: Path) -> dict[str, tuple[int, int]]:
-    """(size, mtime) for every file under root — used to prove we didn't write."""
+def snapshot(root: Path, subdirs: list[str] | None = None) -> dict[str, tuple[int, int]]:
+    """(size, mtime) for every file under root — used to prove we didn't write.
+
+    `subdirs` limits the walk to those folders under root. The whole-root walk
+    stats ~1,500 files twice per run, and on Drive File Stream that is over a
+    minute of the runtime. Only the folders this run actually reads can be
+    written by it, so verifying those is the same guarantee at a fraction of
+    the cost.
+    """
+    roots = [root / d for d in subdirs] if subdirs else [root]
     out = {}
-    for path in root.rglob("*"):
-        if path.is_file():
-            stat = path.stat()
-            out[str(path.relative_to(root))] = (stat.st_size, int(stat.st_mtime))
+    for base in roots:
+        if not base.exists():
+            continue
+        for path in base.rglob("*"):
+            if path.is_file():
+                stat = path.stat()
+                out[str(path.relative_to(root))] = (stat.st_size, int(stat.st_mtime))
     return out
 
 
@@ -116,7 +127,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--commit", action="store_true", help="copy files and write rows")
     parser.add_argument("--database-url", default=None)
+    parser.add_argument(
+        "--only",
+        action="append",
+        metavar="PREFIX",
+        help="Limit the run to items whose id or photo/retail prefix starts with PREFIX. "
+             "Repeatable. Skips the fits pass and the orphan-row prune, and reads only the "
+             "folders those items live in — use it when adding a garment or two.",
+    )
     args = parser.parse_args()
+    only = args.only or []
 
     source_root = config.photo_source_root()
     if not source_root.exists():
@@ -126,8 +146,6 @@ def main() -> int:
     print(f"Source: {source_root}  (read-only)")
     print(f"Store:  {store}")
     print(f"Mode:   {'COMMIT' if args.commit else 'DRY RUN — nothing copied or written'}\n")
-
-    before = snapshot(source_root)
 
     copied = 0
     indexed = 0
@@ -139,13 +157,46 @@ def main() -> int:
             r["code"]: r["photo_folder"]
             for r in db.fetch_all(conn, "SELECT code, photo_folder FROM categories")
         }
+
+        all_items = db.fetch_all(
+            conn,
+            "SELECT id, cat_code, photo_prefix, retail_prefix, no_photo FROM items ORDER BY id",
+        )
+        items = all_items
+
+        if only:
+            items = [
+                i for i in items
+                if any(
+                    str(v).startswith(p)
+                    for p in only
+                    for v in (i["id"], i["photo_prefix"], i["retail_prefix"])
+                    if v
+                )
+            ]
+            if not items:
+                raise SystemExit(f"No item matches --only {only!r}. Nothing done.")
+            print(f"--only {only} matched {len(items)} item(s):")
+            for i in items:
+                print("   ", i["id"])
+            print()
+
+        # Only the folders this run reads can be written by it, so those are the
+        # only ones worth listing or verifying.
+        wanted = {i["cat_code"] for i in items}
+        scan_dirs = sorted(
+            {folders[c] for c in wanted if c in folders}
+            | {"Retail"}
+            | (set() if only else {"Fits"})
+        )
+
         listings = {}
         for cat, folder in folders.items():
             path = source_root / folder
             listings[cat] = sorted(
                 p for p in path.iterdir()
                 if p.is_file() and p.suffix.lower() in IMAGE_SUFFIXES
-            ) if path.exists() else []
+            ) if cat in wanted and path.exists() else []
 
         retail_dir = source_root / "Retail"
         retail_files = sorted(
@@ -153,16 +204,15 @@ def main() -> int:
             if p.is_file() and p.suffix.lower() in IMAGE_SUFFIXES
         ) if retail_dir.exists() else []
 
-        items = db.fetch_all(
-            conn,
-            "SELECT id, cat_code, photo_prefix, retail_prefix, no_photo FROM items ORDER BY id",
-        )
+        before = snapshot(source_root, scan_dirs)
 
         # A render stands for one specific garment, so it must never attach to
         # more than one. Five items (three loafers, two Nikes) share a group
         # retail prefix; for those, only <item_id>_retail is accepted.
+        # Counted across EVERY item, never the --only subset: a shared prefix is
+        # shared whether or not this run happens to look at both owners.
         prefix_owners: dict[str, int] = {}
-        for item in items:
+        for item in all_items:
             if item["retail_prefix"]:
                 prefix_owners[item["retail_prefix"]] = (
                     prefix_owners.get(item["retail_prefix"], 0) + 1
@@ -269,7 +319,7 @@ def main() -> int:
                 p for p in fits_dir.iterdir()
                 if p.is_file() and p.suffix.lower() in IMAGE_SUFFIXES
             )
-            if fits_dir.exists()
+            if fits_dir.exists() and not only
             else []
         )
         unfiled = []
@@ -374,7 +424,9 @@ def main() -> int:
         # 2026-08-26, which orphans their rows against the old group stems.
         # Photo rows are derived from disk, so dropping a stale one destroys
         # nothing: the file itself is untouched, in Drive and in the store.
-        stale = db.fetch_all(
+        # Skipped under --only: the prune walks every photo row, and a partial
+        # run has not looked at enough of the store to judge the rest.
+        stale = [] if only else db.fetch_all(
             conn,
             """
             SELECT p.id, p.item_id, p.source_filename, i.photo_prefix, i.retail_prefix
@@ -402,7 +454,7 @@ def main() -> int:
                 print("   ", line)
             print("    The files are untouched — only the index rows go.")
 
-        no_photo_rows = db.fetch_all(
+        no_photo_rows = [] if only else db.fetch_all(
             conn,
             "SELECT i.id FROM items i LEFT JOIN photos p ON p.item_id = i.id "
             "WHERE p.id IS NULL ORDER BY i.id",
@@ -412,9 +464,12 @@ def main() -> int:
         print(f"New photo rows:      {indexed}")
         print(f"Refreshed rows:      {skipped_existing}")
         print(f"Files copied:        {copied}")
-        print(f"\nItems with no photo at all: {len(no_photo_rows)}")
-        for row in no_photo_rows:
-            print("   ", row["id"])
+        if only:
+            print("\n(--only run: fits pass, orphan prune and the no-photo audit skipped.)")
+        else:
+            print(f"\nItems with no photo at all: {len(no_photo_rows)}")
+            for row in no_photo_rows:
+                print("   ", row["id"])
 
         if args.commit:
             conn.commit()
@@ -423,9 +478,12 @@ def main() -> int:
             conn.rollback()
             print("\nDry run — rolled back. Re-run with --commit to copy and index.")
 
-    after = snapshot(source_root)
+    after = snapshot(source_root, scan_dirs)
     if before == after:
-        print(f"\nSource folder verified unchanged: {len(before)} files, same size and mtime.")
+        print(
+            f"\nSource verified unchanged in {', '.join(scan_dirs)}: "
+            f"{len(before)} files, same size and mtime."
+        )
     else:
         changed = {k for k in before.keys() | after.keys() if before.get(k) != after.get(k)}
         print("\n!! SOURCE FOLDER CHANGED — this should never happen:")
