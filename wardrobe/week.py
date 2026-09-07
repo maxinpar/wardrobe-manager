@@ -109,17 +109,29 @@ def rotation(conn, fit, exclude_unavailable: bool = True) -> list[str]:
     # any old Keep top here would plan a week of days the set has no picture of,
     # which is exactly the week Max built the set to stop having.
     if getattr(fit, "variant_set", None):
-        members = db.fetch_all(
+        rows = db.fetch_all(
             conn,
-            "SELECT fi.item_id FROM fits f "
-            "JOIN fit_items fi ON fi.fit_id = f.id "
-            " AND fi.role = 'top' AND NOT fi.is_alternate "
-            "WHERE f.variant_set = %s ORDER BY f.variant_position",
+            "SELECT f.variant_position, fi.item_id FROM fits f "
+            "JOIN fit_items fi ON fi.fit_id = f.id AND NOT fi.is_alternate "
+            "WHERE f.variant_set = %s ORDER BY f.variant_position, fi.position",
             (fit.variant_set,),
         )
-        tops = [r["item_id"] for r in members if r["item_id"] not in blocked]
-        if tops:
-            return tops
+        by_position: dict[int, list[str]] = {}
+        for row in rows:
+            by_position.setdefault(row["variant_position"], []).append(row["item_id"])
+
+        # The garment that VARIES, not the one in a particular slot. black_canvas
+        # swaps the top; the_shawl holds the shawl as the top and swaps the tee
+        # beneath it, which is `base`. Reading a role here gets one of them wrong.
+        shared = set.intersection(*(set(v) for v in by_position.values())) if by_position else set()
+        varying = [
+            item_id
+            for position in sorted(by_position)
+            for item_id in by_position[position]
+            if item_id not in shared and item_id not in blocked
+        ]
+        if varying:
+            return varying
 
     rotatable = {
         r["id"]

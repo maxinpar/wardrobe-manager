@@ -387,7 +387,7 @@ def current_variant(members: list[Fit], day: date) -> Fit | None:
     """
     rotated = variants_from(members, day)
     for fit in rotated:
-        if why_top_is_out(fit) is None:
+        if why_variant_is_out(fit, members) is None:
             return fit
     return rotated[0] if rotated else None
 
@@ -417,14 +417,14 @@ def evaluate_set(
     for fit in rotated:
         result = evaluate(fit, day, temp_c, rain, allow_disliked, allow_tailoring)
         if isinstance(result, Rejection):
-            skipped.append(why_top_is_out(fit) or result.reason)
+            skipped.append(why_variant_is_out(fit, members) or result.reason)
             continue
         if skipped:
             # Said out loud, in the same voice as the substitution messages a
             # single fit produces: silently showing a different top than the
             # rotation called for would look like the rotation was broken.
             result.substitutions.insert(
-                0, f"swapped to the {top_name(fit)} — {skipped[0]}"
+                0, f"swapped to the {variant_name(fit, members)} — {skipped[0]}"
             )
         return result
 
@@ -436,29 +436,48 @@ def evaluate_set(
     )
 
 
-def why_top_is_out(fit: Fit) -> str | None:
-    """`the burgundy crew is in the wash`, or None if the top is fine.
+def variant_item(fit: Fit, members: list[Fit]) -> dict | None:
+    """The one garment that makes this variant itself.
 
-    A skip that lets a LATER variant through is always the top's fault: every
-    variant shares one base, so an unwearable shoe or trouser takes the whole
-    set down rather than one member of it. Reading the top directly gives the
-    message the garment's name instead of the fit's, which is what Max is
-    actually being told to go and find.
+    THE VARYING SLOT IS NOT ALWAYS `top`. black_canvas swaps the top over a
+    held base; the_shawl holds the shawl AS the top and swaps the tee
+    underneath it, which is `base`. Anything that hardcodes a role gets the
+    second set wrong and says so confidently.
+
+    So the variant garment is defined by what it IS rather than where it sits:
+    the item this member has that its siblings do not. Alternates are ignored —
+    position 1 of the_shawl carries an optional waxed biker that belongs to that
+    fit alone and is not what distinguishes it.
     """
-    for item in fit.primary():
-        if item["role"] != "top":
-            continue
-        blocker = unavailable(item)
-        return f"the {item['name']} is {blocker}" if blocker else None
-    return None
+    others = [m for m in members if m.id != fit.id]
+    if not others:
+        return None
+    shared = set.intersection(
+        *({i["item_id"] for i in m.primary()} for m in others)
+    ) if others else set()
+    mine = [i for i in fit.primary() if i["item_id"] not in shared]
+    return mine[0] if mine else None
 
 
-def top_name(fit: Fit) -> str:
-    """The display name of the fit's top, for the swap message."""
-    for item in fit.primary():
-        if item["role"] == "top":
-            return item["name"]
-    return fit.name
+def why_variant_is_out(fit: Fit, members: list[Fit]) -> str | None:
+    """`the burgundy crew is in the wash`, or None if this variant is wearable.
+
+    A skip that lets a LATER variant through is always the varying garment's
+    fault: every member shares the rest, so an unwearable shoe takes the whole
+    set down rather than one member of it. Naming the garment rather than the
+    fit is what makes the message something Max can act on.
+    """
+    item = variant_item(fit, members)
+    if item is None:
+        return None
+    blocker = unavailable(item)
+    return f"the {item['name']} is {blocker}" if blocker else None
+
+
+def variant_name(fit: Fit, members: list[Fit]) -> str:
+    """The display name of the garment that varies, for labels and messages."""
+    item = variant_item(fit, members)
+    return item["name"] if item else fit.name
 
 
 def pick(

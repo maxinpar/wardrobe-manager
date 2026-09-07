@@ -510,10 +510,16 @@ def today_view():
         hero_fit = showing.fit if showing else None
         if showing is not None and day_top:
             for variant in showing_variants:
-                tops = [i for i in variant.primary() if i["role"] == "top"]
-                if tops and tops[0]["item_id"] == day_top:
+                item = picker.variant_item(variant, showing_variants)
+                if item and item["item_id"] == day_top:
                     hero_fit = variant
                     break
+
+        # Labels for the strip: the garment that varies, per member. Computed
+        # here because only the view has the whole set to compare against.
+        variant_labels = {
+            v.id: picker.variant_name(v, showing_variants) for v in showing_variants
+        }
         pieces = week.base_pieces(showing.fit, day_top) if showing else []
         if showing and day_top and not any(p["item_id"] == day_top for p in pieces):
             top = db.fetch_one(
@@ -536,6 +542,7 @@ def today_view():
         "today.html",
         showing_variants=showing_variants,
         hero_fit=hero_fit,
+        variant_labels=variant_labels,
         showing=showing,
         # Two different nothings, and they need different words: a wardrobe with
         # no fits in it at all, versus one whose fits are all blocked today.
@@ -1302,6 +1309,10 @@ def fits_view():
             # The strip under the hero. Present only for a fit in a set, so an
             # ordinary fit renders exactly as before — no strip, no empty pane.
             selected["variants"] = variant_siblings.get(selected_id, [])
+            sibling_fits = [c["fit"] for c in selected["variants"]]
+            selected["variant_labels"] = {
+                f.id: picker.variant_name(f, sibling_fits) for f in sibling_fits
+            }
             selected["sources"] = sources.get(selected_id, {})
             # Whether the category is Max's own move, for the badge. Read from
             # the provenance row rather than diffed against anything.

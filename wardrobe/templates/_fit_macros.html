@@ -140,7 +140,7 @@
   same rule applies: none of them is a photograph of Max wearing the fit, and
   nothing here may imply otherwise.
 #}
-{% macro variant_strip(variants, current_id, renders, label='') %}
+{% macro variant_strip(variants, current_id, labels, label='') %}
   {% if variants and variants|length > 1 %}
     <div class="variant-strip">
       {% if label %}<span class="mono variant-strip-label">{{ label }}</span>{% endif %}
@@ -156,18 +156,14 @@
             {% else %}
               <span class="swatch-piece" style="background: #DCD5C7"></span>
             {% endif %}
-            <span class="variant-top">{{ variant_top_name(vfit) }}</span>
+            {# Labelled by the garment that VARIES, which is not always the
+               top: the_shawl swaps the tee under the shawl. The view works
+               out which item that is; the template must not guess. #}
+            <span class="variant-top">{{ labels.get(vfit.id, vfit.name) }}</span>
           </a>
         {% endfor %}
       </div>
       <p class="mono variant-note">Generated renders — not photographs of these being worn.</p>
     </div>
   {% endif %}
-{% endmacro %}
-
-{# The top's own display name, which is the only thing that differs between
-   variants and therefore the only useful label. #}
-{% macro variant_top_name(fit) %}
-  {%- set tops = fit.primary() | selectattr('role', 'equalto', 'top') | list -%}
-  {{- tops[0].name if tops else fit.name -}}
 {% endmacro %}
