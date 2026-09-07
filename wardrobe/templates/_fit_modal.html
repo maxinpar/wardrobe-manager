@@ -1,7 +1,7 @@
 {# The fit detail. A centred modal, not a right-hand aside: the aside covered a
    column of the gallery it was launched from. The backdrop is an anchor, so
    closing is a navigation and the back button behaves. #}
-{% from "_fit_macros.html" import layer_switch %}
+{% from "_fit_macros.html" import layer_switch, sheet_section, variant_strip %}
 {% set fit = selected.fit %}
 {% set meta = selected.meta %}
 {% set close_url = url_for('fits_view', **filters.current()) %}
@@ -17,17 +17,19 @@
           <input type="hidden" name="next" value="{{ request.full_path }}">
           <input class="drawer-title" name="name" value="{{ fit.name }}" aria-label="Fit name">
         </form>
-        <p class="mono modal-subhead">
-          {{ fit.register }} ·
-          {% if meta.formality_rank %}formality {{ meta.formality_rank }}/5 · {% endif %}
-          {{ 'rain-safe' if meta.rain_safe else 'dry days only' }} ·
-          {{ selected.source }}
-        </p>
+        {# The metadata line has moved to the very bottom of the sheet. It is
+           reference, not identity: at the top it pushed the hero down the
+           screen to tell Max things he already knew about a fit he chose. #}
       </div>
       <a class="btn drawer-close" href="{{ close_url }}" title="Close">×</a>
     </div>
 
-    <div class="modal-body">
+    {# ONE scroll surface. This was a 218px window holding 1,776px of detail
+       inside a panel that also scrolled — a scroller inside a scroller, where
+       the inner one swallows the gesture and the outer one never moves.
+       data-nobar hides the bar itself on the phone: a 15px gutter on the right
+       takes the hero off centre, and the sheet is a picture first. #}
+    <div class="modal-body" data-nobar="1">
       {# Left: the render, and only the render. It gets half the panel at full
          height, contained rather than cropped, so a standing figure reads head
          to feet at the largest size the panel allows. #}
@@ -49,6 +51,10 @@
               <span class="pill-generated">Generated · never worn</span>
             {% endif %}
             <span class="render-drop-note">Drop to set the render</span>
+            {# Inside the photo, bottom-left. It used to own a 58px row of its
+               own below the hero — a whole band of phone screen for one
+               toggle. #}
+            {{ layer_switch(fit, 'pane') }}
           </div>
         {% else %}
           <div class="modal-frame pieces-fallback" data-render-drop>
@@ -67,8 +73,7 @@
              the two notes are different lengths and the row used to grow and
              shrink between states, visibly resizing the hero above it. The hero
              box is pixel-identical in both states, which is the whole point. #}
-          <div class="layer-row">
-            {{ layer_switch(fit, 'pane') }}
+          <div class="layer-row desk-only">
             <span class="layer-note"
                   data-layer-note-off="Without the {{ fit.layer_piece or 'layer' }} — it comes off at the range."
                   data-layer-note-on="With the {{ fit.layer_piece or 'layer' }} on.">
@@ -77,19 +82,23 @@
           </div>
         {% endif %}
 
-        {# Three captions, three sources. An upload is never called generated:
-           whether it is a photograph or an AI render is not ours to assume. #}
-        <p class="modal-caption tight">
-          {% if fit.render_is_upload %}
-            Your own picture, uploaded in the app.
-          {% elif fit.render %}
-            Generated illustration — not a photo of this fit being worn.
-          {% else %}
-            The pieces, as shot. No render of the whole fit yet.
-          {% endif %}
-        </p>
+        {# The other tops this base takes. Only for a fit in a set — an
+           ordinary fit gets no strip and no empty pane. #}
+        {{ variant_strip(selected.variants, fit.id, renders, 'Swap the top') }}
 
-        <div class="render-source">
+        {# One caption, and only for the absence. Naming the source of a
+           picture that is right there told Max something he could see; naming
+           the missing one tells him something he can fix. #}
+        {% if not fit.render %}
+          <p class="modal-caption tight">
+            The pieces, as shot. No render of the whole fit yet.
+          </p>
+        {% endif %}
+
+        {# Desktop only: picking a file, dropping an image and swapping a
+           render are all things Max does at the machine where the renders are.
+           On a phone the row is three controls he will not use. #}
+        <div class="render-source desk-only">
           <form method="post" enctype="multipart/form-data"
                 action="{{ url_for('fit_render_upload', fit_id=fit.id) }}"
                 data-render-form data-max-edge="1000">
@@ -137,6 +146,12 @@
           </section>
         {% endif %}
 
+        {# The prose is the point of a fit. Verbatim, never truncated. #}
+        <section><p class="commentary">{{ fit.commentary }}</p></section>
+
+        {# CATCH sits UNDER the description, not over it. Above, the caveat was
+           the first thing read about a fit Max already liked enough to open;
+           below, it reads as the footnote it is. #}
         {% if fit.catch %}
           <section>
             <div class="catch">
@@ -146,28 +161,19 @@
           </section>
         {% endif %}
 
-        {# The prose is the point of a fit. Verbatim, never truncated. #}
-        <section><p class="commentary">{{ fit.commentary }}</p></section>
-
         {# Golf only. The everyday categories are weather and register, both
            already derived and both shown elsewhere on this pane; the golf ones
            are Max's own idea of what a fit IS, which is the only axis worth
            moving a fit along by hand. #}
         {% if wardrobe == 'golf' %}
-          <section>
+          {# The header carries the current category, so folded it still says
+             which one this fit is in. Only the other fourteen need a tap.
+             "moved here · yours" is gone with it: provenance noise on a row
+             whose job is to name a category. The fact is still in
+             fit_field_sources for anything that needs it. #}
+          {% call sheet_section('Category', 'category',
+                                category_labels.get(meta.category) or 'not in a category yet') %}
             <div class="category-block">
-              <div class="category-head">
-                <span class="mono category-label">Category</span>
-                <span class="category-current">
-                  {{ category_labels.get(meta.category) or 'not in a category yet' }}
-                </span>
-                {# Only when there is a category to have been moved to. Clearing
-                   one is Max's choice too, but "moved here · yours" next to
-                   "not in a category yet" claims a here that isn't. #}
-                {% if selected.category_moved and meta.category %}
-                  <span class="category-yours">moved here · yours</span>
-                {% endif %}
-              </div>
               {# Every category, including the six with no fits: an empty one is
                  useful exactly here, which is why the grid drops them and this
                  does not. One click, no confirm, no save button. #}
@@ -184,7 +190,7 @@
                         class="category-chip {{ 'on' if not meta.category }}">None</button>
               </form>
             </div>
-          </section>
+          {% endcall %}
         {% endif %}
 
         {% if not meta.get('composition_known', True) %}
@@ -199,8 +205,7 @@
           </section>
         {% endif %}
 
-        <section>
-          <h3 class="mono">The pieces</h3>
+        {% call sheet_section('The pieces', 'pieces') %}
           <div class="pieces">
             {% for item in selected.pieces %}
               {# Each row is the way into that garment in the Closet. #}
@@ -224,10 +229,9 @@
               </a>
             {% endfor %}
           </div>
-        </section>
+        {% endcall %}
 
-        <section>
-          <h3 class="mono">Three numbers, kept apart</h3>
+        {% call sheet_section('Three numbers, kept apart', 'numbers') %}
           <div class="numbers">
             <div class="number-row">
               <span class="number-label">Your score</span>
@@ -253,7 +257,7 @@
               <span class="number-hint">Computed per day on Today; never stored</span>
             </div>
           </div>
-        </section>
+        {% endcall %}
 
         <section>
           <h3 class="mono">Killer, and how you would characterise it</h3>
@@ -282,8 +286,7 @@
           </div>
         </section>
 
-        <section>
-          <h3 class="mono">When to wear it</h3>
+        {% call sheet_section('When to wear it', 'whentowear') %}
           <dl class="when">
             <dt>Temperature</dt>
             <dd>{{ meta.bands|join(' · ') if meta.bands else '—' }}</dd>
@@ -305,7 +308,7 @@
             <dd>{{ meta.bad_for|join(', ') if meta.bad_for else '—' }}</dd>
             <dd class="tag">{{ 'imported' if meta.bad_for else '—' }}</dd>
           </dl>
-        </section>
+        {% endcall %}
 
         {% if selected.jobs %}
           <section>
@@ -325,8 +328,7 @@
           </section>
         {% endif %}
 
-        <section>
-          <h3 class="mono">Worn</h3>
+        {% call sheet_section('Worn', 'worn') %}
           {% if selected.worn %}
             <ul class="wear-list">
               {% for w in selected.worn %}
@@ -352,19 +354,25 @@
             <input type="text" name="note" placeholder="How did it go?">
             <button class="btn-ink" type="submit">Log it</button>
           </form>
-        </section>
+        {% endcall %}
 
-        <section>
-          <details>
-            <summary class="btn" style="display:block;text-align:center">The rules these were checked against</summary>
-            <p class="muted" style="margin-top:10px">
-              Reference only — not enforced in v1. The fits were hand-checked.
-            </p>
-            <ol class="rules-list">
-              {% for rule in rules %}<li>{{ rule }}</li>{% endfor %}
-            </ol>
-          </details>
-        </section>
+        {# Was a <details> with its own summary button — a second folding idiom
+           on a sheet that now has one. Same fold as every other section. #}
+        {% call sheet_section('The rules', 'rules') %}
+          <p class="muted">
+            Reference only — not enforced in v1. The fits were hand-checked.
+          </p>
+          <ol class="rules-list">
+            {% for rule in rules %}<li>{{ rule }}</li>{% endfor %}
+          </ol>
+        {% endcall %}
+
+        <p class="mono sheet-footnote">
+          {{ fit.register }} ·
+          {% if meta.formality_rank %}formality {{ meta.formality_rank }}/5 · {% endif %}
+          {{ 'rain-safe' if meta.rain_safe else 'dry days only' }} ·
+          {{ selected.source }}
+        </p>
 
         {% if not fit.gone %}
           <section class="danger-zone">

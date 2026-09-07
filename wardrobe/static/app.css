@@ -1423,3 +1423,700 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
   .fit-score, .fit-section-count { font-size: 11px; }
   .tile-label, .day-status { display: none; }
 }
+
+/* ============================================================ Ask AI ==
+ *
+ * The AI fit builder. A full-screen overlay rather than the 680px drawer the
+ * manual builder uses: the must-wear grid is the whole closet, and a drawer
+ * that wide is a column of two tiles.
+ *
+ * The breakpoint is 760px, the same one the rest of the phone layout uses.
+ * Above it the setup is two panes that scroll independently - that is load-
+ * bearing, not decoration: with one scroll surface the Build button sits below
+ * 140 tiles and cannot be reached without scrolling past the entire wardrobe.
+ * Below it they stack and the panel scrolls as one.
+ */
+
+.builder-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--page);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.builder-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 22px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.builder-bar-title h2 { margin: 0; font-size: 19px; }
+.builder-bar-title .mono { margin: 2px 0 0; color: var(--muted); font-size: 11.5px; }
+.builder-bar-tools { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.builder-bar-tools .wardrobe-switch form { display: contents; }
+
+.segmented.builder-mode a {
+  display: inline-block;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  color: var(--secondary);
+  text-decoration: none;
+}
+.segmented.builder-mode a.on { background: var(--ink); color: var(--surface); }
+
+.builder-close {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.builder-body { display: grid; min-height: 0; }
+
+/* Manual mode: one centred column rather than two panes. 820px is as wide as a
+   row of candidate tiles wants to be — wider and the slots stop reading as a
+   sequence of decisions and start reading as a wall. */
+.builder-body.builder-column,
+#builder .builder-body { display: block; overflow-y: auto; }
+.builder-column {
+  width: min(820px, 100%);
+  margin: 0 auto;
+  padding: 18px 22px 60px;
+  box-sizing: border-box;
+}
+.builder-column .builder-pool-note { margin: 0 0 14px; }
+
+/* `display: grid` above outranks the browser's own [hidden] { display: none },
+   so without this the empty results pane still claims a grid row and squashes
+   the header into an unreadable overlap. Any class that sets display must say
+   what hidden means for it. */
+.builder-body[hidden] { display: none; }
+#ai-setup { grid-template-columns: minmax(0, 1fr) 360px; }
+.ai-pane { min-height: 0; height: 100%; overflow-y: auto; box-sizing: border-box; }
+
+/* ------------------------------------------------------- must wear -- */
+
+.ai-seeds-pane { padding: 18px 22px 44px; }
+.ai-pane-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ai-pane-head h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.ai-pane-head .mono { color: var(--muted); font-size: 11.5px; }
+.ai-pane-head input[type="search"] {
+  flex: 0 1 250px;
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.ai-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 0; }
+.ai-tab {
+  padding: 9px 14px;
+  min-height: 40px;
+  font-size: 12.5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--body);
+  cursor: pointer;
+}
+.ai-tab.on { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.ai-tab .count { margin-left: 6px; color: var(--faint); font-size: 10.5px; }
+.ai-tab.on .count { color: var(--brass); }
+
+.ai-chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 0; }
+.ai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  font-size: 12px;
+  background: #FAF6EC;
+  border: 1px solid var(--brass);
+  border-radius: 999px;
+  color: var(--brass-text);
+  cursor: pointer;
+}
+.ai-chip .x { font-size: 14px; line-height: 1; }
+
+.ai-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(114px, 1fr));
+  gap: 10px;
+  margin: 16px 0 0;
+}
+.ai-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  border: 1px solid var(--line-card);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+}
+.ai-tile.on { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass); }
+.ai-tile-img { position: relative; display: block; height: 116px; background: var(--row); }
+.ai-tile-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.ai-tile-img .swatch-piece { display: block; width: 100%; height: 100%; }
+.ai-tile-tick {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: none;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--brass);
+  font-size: 12px;
+}
+.ai-tile.on .ai-tile-tick { display: grid; }
+.ai-tile-cat { padding: 0 8px; color: var(--faint); font-size: 10.5px; }
+.ai-tile-name { padding: 0 8px 9px; font-size: 11.5px; line-height: 1.3; }
+
+/* ---------------------------------------------------------- brief -- */
+
+.ai-brief {
+  background: var(--surface-muted);
+  border-left: 1px solid var(--line);
+  padding: 18px 20px 44px;
+}
+.ai-field { margin: 0 0 22px; }
+.ai-field h3 { margin: 0; font-size: 13.5px; font-weight: 600; }
+.ai-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ai-field-head .mono { color: var(--muted); font-size: 11.5px; }
+
+.ai-days { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.ai-day {
+  min-width: 44px;
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.ai-day.on { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.ai-sky { margin: 9px 0 0; color: var(--secondary); font-size: 11.5px; }
+.ai-place { margin: 3px 0 0; color: var(--faint); font-size: 10.5px; }
+
+.ai-occ { display: inline-flex; margin: 10px 0 0; }
+.ai-occ button { min-height: 40px; padding: 8px 15px; font-size: 12.5px; cursor: pointer; }
+
+.ai-dial { display: flex; align-items: flex-end; gap: 4px; margin: 10px 0 0; }
+/* NOT .builder-bar — that is the header. A dial segment that shares a class with the
+   top bar silently gave the header width: 38px and display: grid. */
+.ai-dial-bar {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: end center;
+  padding: 0 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.ai-dial-bar span { display: block; width: 14px; border-radius: 2px; background: var(--line); }
+.ai-dial-bar.on span { background: var(--ink); }
+.ai-dial-ends {
+  display: flex;
+  justify-content: space-between;
+  margin: 5px 0 0;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+#ai-note {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.ai-go { width: 100%; min-height: 52px; font-size: 14px; }
+.ai-avail { margin: 9px 0 0; color: var(--faint); font-size: 10.5px; line-height: 1.45; }
+
+/* -------------------------------------------------------- results -- */
+
+#ai-results { display: block; overflow-y: auto; padding: 18px 22px 44px; }
+#ai-results[hidden] { display: none; }
+
+.ai-recap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--line-light);
+}
+.ai-recap h3 { margin: 0; font-size: 17px; }
+.ai-recap .mono { margin: 3px 0 0; color: var(--muted); font-size: 11.5px; }
+.ai-recap-tools { display: flex; gap: 8px; margin-left: auto; }
+
+.ai-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0 0;
+}
+.ai-card {
+  background: var(--surface);
+  border: 1px solid var(--line-card);
+  border-radius: 12px;
+  padding: 16px;
+}
+.ai-card-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.ai-card-head h4 { margin: 0; font-size: 15.5px; }
+.ai-badge {
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+.ai-badge.best { background: var(--brass); color: var(--brass-deep); }
+.ai-badge.alt { background: var(--line-light); color: var(--secondary); }
+.ai-card-meta { margin: 7px 0 0; color: var(--faint); font-size: 10.5px; }
+
+.ai-pieces {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 8px;
+  margin: 13px 0 0;
+}
+.ai-piece { position: relative; }
+.ai-piece img,
+.ai-piece .swatch-piece {
+  width: 100%;
+  height: 86px;
+  object-fit: contain;
+  display: block;
+  background: var(--row);
+  border-radius: 8px;
+}
+.ai-piece-role { display: block; margin: 4px 0 0; color: var(--faint); font-size: 10.5px; }
+.ai-piece-name { display: block; font-size: 11px; line-height: 1.3; color: var(--secondary); }
+.ai-piece-yours {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--brass);
+  color: var(--brass-deep);
+  font-size: 9.5px;
+}
+
+.ai-card-note { margin: 13px 0 0; font-size: 13.5px; line-height: 1.55; }
+.ai-card-tools { display: flex; gap: 8px; margin: 14px 0 0; }
+.ai-card-tools .btn-brass,
+.ai-card-tools .btn { min-height: 44px; }
+
+/* --------------------------------------------- waiting and failing -- */
+
+.ai-thinking { padding: 60px 0; text-align: center; color: var(--secondary); }
+.ai-thinking p { margin: 6px 0 0; }
+.ai-thinking .mono { color: var(--faint); font-size: 11.5px; }
+.ai-dots { display: inline-flex; gap: 6px; margin: 0 0 14px; }
+.ai-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brass);
+  animation: ai-pulse 1.2s ease-in-out infinite;
+}
+.ai-dots i:nth-child(2) { animation-delay: 0.15s; }
+.ai-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ai-pulse {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
+}
+/* A wait that animates for 40 seconds is a nuisance to anyone who asked not to
+   see motion; the words carry the meaning on their own. */
+@media (prefers-reduced-motion: reduce) {
+  .ai-dots i { animation: none; opacity: 0.7; }
+}
+
+.ai-error {
+  max-width: 560px;
+  margin: 40px auto;
+  padding: 22px;
+  background: var(--problem-bg);
+  border-radius: 12px;
+  text-align: center;
+}
+.ai-error-msg { margin: 0; color: var(--problem-text); font-size: 14px; line-height: 1.5; }
+.ai-error .mono { margin: 8px 0 0; color: var(--secondary); font-size: 11.5px; }
+.ai-error .ai-recap-tools { justify-content: center; margin: 16px 0 0; }
+
+.builder-overlay.empty-search .ai-tiles::after {
+  content: "Nothing matches that.";
+  grid-column: 1 / -1;
+  padding: 26px 0;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+/* ------------------------------------------------------------ phone -- */
+
+@media (max-width: 760px) {
+  /* One scroll surface: the panes stack, so scrolling them separately would
+     mean two nested scrollbars in a single column.
+
+     FLEX, NOT GRID. As a single-column grid the two panes' auto rows were sized
+     against the container rather than their content — the seeds pane came out
+     327px holding 10,000px of tiles, and `overflow: visible` painted them
+     straight over the brief. A column flex box sizes each pane to its content
+     and lets the container do the scrolling.
+
+     AND THE BRIEF GOES FIRST. The handover has the panes stack but does not say
+     in what order, and keeping the desktop order puts "Build me a fit" ten
+     thousand pixels down, behind 146 tiles. Locking a seed is optional — the
+     button works with nothing selected — so the brief is what a phone should
+     open on, and the closet is there for anyone who scrolls to it. */
+  #ai-setup {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  #ai-setup .ai-pane { height: auto; overflow: visible; flex: 0 0 auto; }
+  .ai-brief {
+    order: -1;
+    border-left: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .builder-column { padding: 14px 14px 40px; }
+  .builder-bar { padding: 11px 14px; gap: 10px; }
+  .builder-bar-title h2 { font-size: 17px; }
+  .builder-bar-tools { width: 100%; margin-left: 0; }
+  .builder-close { margin-left: auto; }
+  .ai-seeds-pane { padding: 14px 14px 30px; }
+  .ai-tiles { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .ai-cards { grid-template-columns: 1fr; }
+  #ai-results { padding: 14px 14px 30px; }
+  .ai-pane-head input[type="search"] { flex: 1 1 100%; margin-left: 0; }
+}
+
+/* ================================================== the phone sheets ==
+ *
+ * Part 2 of the design handover. Desktop is deliberately untouched except
+ * where a badge was removed outright; everything else in here is either a
+ * phone rule or a restyle of the layer toggle, which changed on both.
+ */
+
+/* ---------------------------------------------- the layer toggle -- */
+
+/* A jumper, not a labelled pill and a switch. Outline is no layer, filled is
+   layered, and that is the whole state model. The visible mark is small; the
+   BUTTON is 44px, because it sits inside a card whose own click opens the fit
+   and a near-miss must not navigate. */
+.layer-switch {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+}
+.layer-switch:hover { background: none; }
+
+.layer-glyph { display: block; width: 21px; height: 21px; pointer-events: none; }
+.layer-glyph svg { display: block; width: 100%; height: 100%; }
+.layer-glyph svg path {
+  fill: none;
+  stroke: #EFE7D6;
+  /* The glyph sits on a photograph, so it carries its own contrast rather than
+     relying on whatever happens to be behind it. */
+  filter: drop-shadow(0 1px 2px rgba(26, 24, 21, 0.75));
+  vector-effect: non-scaling-stroke;
+}
+.layer-switch.on .layer-glyph svg path { fill: #EFE7D6; }
+
+/* The words are a DESKTOP affordance — the handover keeps "Layer on/off" and
+   the explanatory note there and drops both on the phone, where the shape
+   carries it alone.
+
+   Only in the sheet, though. The card's own spec is a glyph with nothing behind
+   it, and a floating label across a 200px thumbnail is the pill this change set
+   out to remove. In the sheet there is room beside the picture for it. */
+.layer-switch .layer-label { display: none; }
+.layer-switch.pane .layer-label {
+  display: block;
+  position: absolute;
+  left: 44px;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: #EFE7D6;
+  /* It sits on the photograph now, so it carries its own contrast. */
+  text-shadow: 0 1px 2px rgba(26, 24, 21, 0.85);
+}
+
+/* In the sheet the glyph is a little larger and the hit area 48px, because
+   there is no card-sized target competing with it. */
+.layer-switch.pane {
+  width: 48px;
+  height: 48px;
+  bottom: 8px;
+  left: 8px;
+  border: none;
+  background: none;
+}
+.layer-switch.pane:hover { border: none; background: none; }
+.layer-switch.pane .layer-glyph { width: 23px; height: 23px; }
+
+/* ------------------------------------------- folding sections -- */
+
+/* DESKTOP IS FLAT. Every section open, no mark, the header a heading and not a
+   control. The fold exists to make 1,800px navigable on a phone; on a wide
+   screen it would only hide things behind a click. */
+.sheet-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: default;
+}
+.sheet-sec-head h3 { margin: 0; }
+.sheet-sec-mark,
+.sheet-sec-value { display: none; }
+.sheet-sec-body { display: block; }
+
+/* --------------------------------------------------- footnote -- */
+
+/* The metadata line, at the very bottom now. Reference, not identity. */
+.sheet-footnote {
+  margin: 30px 0 0;
+  padding: 0 24px;
+  font-size: 9px;
+  color: #B5AD9C;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------ no scrollbar -- */
+
+/* The only legal helmet: a 15px bar in the right gutter takes the hero off
+   centre, and the sheet is a picture first. Scrolling is unaffected. */
+[data-nobar="1"] { scrollbar-width: none; }
+[data-nobar="1"]::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* ===================================================== phone ===== */
+
+@media (max-width: 760px) {
+  /* Anything the phone has no use for. Uploading a render, the layer note and
+     its wording: all things Max does at the machine the renders live on. */
+  .desk-only { display: none !important; }
+
+  /* A score slot that says "no score" is one more thing to read past. */
+  .fit-score.unscored { display: none; }
+
+  /* The wording goes with the note: phone gets the glyph and nothing else. */
+  .layer-switch.pane .layer-label { display: none; }
+
+  /* The 44px floor, held throughout. The sheets' own controls predate this
+     pass and sat at 32-34: the close ×, the render button, and the state and
+     verdict chips, which are the two things Max actually taps in a garment
+     sheet. Applied to the sheets only — the desktop sizes are unchanged and
+     the gallery's own chips are a separate surface. */
+  .modal button,
+  .modal a.btn,
+  .modal input[type="submit"] { min-height: 44px; }
+
+  /* --- one scroll surface ------------------------------------------
+     The sheet body scrolls. The detail pane must NOT: it was a 218px window
+     holding 1,776px, so the inner scroller swallowed the gesture and the
+     outer one never moved. */
+  .modal-detail { overflow-y: visible; min-height: 0; }
+  .modal-body { overflow-y: auto; }
+
+  /* --- the hero is the point of the screen -------------------------
+     392 x 620, and `cover` on a pane deliberately NARROWER than the render's
+     own aspect. That is what trims the empty studio margins off the SIDES and
+     leaves a full figure, head to shoes. A full-width cover box crops the
+     shoes off; a `contain` box bands white down both edges. Neither is
+     acceptable, and this is the only combination that is neither. */
+  .modal:not(.garment) .modal-frame {
+    width: calc(100% - 20px);
+    margin: 10px auto 0;
+    border-radius: 22px;
+    overflow: hidden;
+  }
+  /* Height on the GRID ITEM, not on its flex child: on the child it overflows
+     the row and paints over the copy below. */
+  /* 630, not 620: the frame's own 10px top margin sits inside this, and a
+     min-height of 620 left the hero 609 tall. */
+  .modal:not(.garment) .modal-figure { min-height: 630px; padding: 0; }
+  .modal:not(.garment) .modal-frame { height: 620px; }
+  .modal:not(.garment) .modal-frame img.look {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+  }
+
+  /* --- header is the name and the close, nothing else -------------- */
+  .modal-head { align-items: center; }
+
+  /* --- folded sections --------------------------------------------
+     48px a row instead of 68. The hairline above is what makes a stack of
+     them read as a list rather than as loose headings. */
+  .sheet-sec { margin-top: 0 !important; padding: 0 !important; }
+  .sheet-sec + .sheet-sec { border-top: 1px solid var(--line-lighter); }
+  .sheet-sec-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 4px 20px 0;
+    cursor: pointer;
+  }
+  .sheet-sec-head h3 { flex: 0 0 auto; }
+  .sheet-sec-mark {
+    display: block;
+    margin-left: auto;
+    width: 20px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  /* A folded section that can answer its own question does. */
+  .sheet-sec-value {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11.5px;
+    color: var(--secondary);
+    text-align: right;
+  }
+  .sheet-sec .sheet-sec-body { display: none; padding: 6px 20px 18px; }
+  .sheet-sec.open .sheet-sec-body { display: block; }
+  .sheet-sec.open .sheet-sec-value { display: none; }
+
+  /* --- the garment sheet ------------------------------------------
+     Same single scroll surface, a shorter hero, and `contain`: a product shot
+     of a shoe or a belt buckle must not be cropped. Only the full-figure fit
+     render gets `cover`. */
+  /* `.modal-frame` is `flex: 1 1 0` in a column flex box, so a plain `height`
+     is ignored — flex-basis:0 wins and the hero collapsed to 2px. Setting the
+     BASIS is the honest fix: 300px of hero, and no arithmetic against whatever
+     else shares the column (the upload button does, which is why a min-height
+     on the figure gave 247). */
+  .modal.garment .modal-figure { padding: 10px 10px 0; min-height: 0; }
+  .modal.garment .modal-frame { flex: 0 0 300px; margin: 0; }
+  .modal.garment .modal-frame img {
+    width: 86%;
+    height: 86%;
+    inset: 7%;
+    object-fit: contain;
+  }
+}
+
+/* ============================================== fit variant sets ==
+ *
+ * A base fit with swappable tops. The strip is a way of changing your shirt,
+ * not of changing your mind about the outfit, so it reads as a row of tops
+ * rather than as a row of rival fits.
+ */
+
+.badge.looks {
+  background: var(--chip-soft);
+  color: var(--secondary);
+  border: 1px solid var(--line);
+}
+
+.variant-strip { margin: 14px 0 0; }
+.variant-strip-label {
+  display: block;
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.variant-thumbs {
+  display: flex;
+  gap: 8px;
+  /* The one intentional horizontal scroller here: five 84px tops do not fit a
+     412px phone, and wrapping them onto two rows makes a strip of alternatives
+     look like a grid of fits. */
+  overflow-x: auto;
+  padding: 0 0 4px;
+  scrollbar-width: none;
+}
+.variant-thumbs::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+.variant-thumb {
+  flex: 0 0 auto;
+  width: 84px;
+  display: block;
+  text-decoration: none;
+  border: 1px solid var(--line-card);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.variant-thumb img,
+.variant-thumb .swatch-piece {
+  display: block;
+  width: 100%;
+  height: 104px;
+  object-fit: cover;
+  object-position: center top;
+  background: var(--row);
+}
+.variant-thumb .variant-top {
+  display: block;
+  padding: 5px 6px 7px;
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--secondary);
+}
+/* Current one is marked the same way a selected tile is marked anywhere else
+   in the app — brass border, no second signal needed. */
+.variant-thumb.on {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 1px var(--brass);
+}
+.variant-thumb.on .variant-top { color: var(--ink); }
+
+.variant-note {
+  margin: 6px 0 0;
+  color: var(--faint);
+  font-size: 9.5px;
+}
+
+@media (max-width: 760px) {
+  .variant-thumb { width: 76px; }
+  .variant-thumb img,
+  .variant-thumb .swatch-piece { height: 94px; }
+}

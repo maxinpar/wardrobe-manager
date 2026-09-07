@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_fit_macros.html" import variant_strip %}
 {% block title %}Today — Wardrobe{% endblock %}
 {% block body_class %}today-page{% endblock %}
 
@@ -49,15 +50,15 @@
 <div class="today-grid">
 
   <aside class="today-hero">
-    {% if showing.fit.render %}
-      <img src="{{ url_for('photo', relative_path=showing.fit.render) }}" alt="{{ showing.fit.name }}">
-      <span class="hero-flag">
-        {%- if showing.fit.render_is_upload -%}
-          Your uploaded render
-        {%- else -%}
-          Generated render — not a photo of this being worn
-        {%- endif -%}
-      </span>
+    {# hero_fit is the selected DAY's variant where the fit is part of a set,
+       and the showing fit itself otherwise. The render is only shown when it is
+       a render OF THIS DAY — otherwise the pieces are, because they are what he
+       is actually putting on. #}
+    {% if hero_fit.render %}
+      <img src="{{ url_for('photo', relative_path=hero_fit.render) }}" alt="{{ hero_fit.name }}">
+      {# No flag over a picture that exists. The rule is inverted: the badge
+         appears when there is NOTHING to show, which is the only state anyone
+         can act on. #}
     {% else %}
       <div class="hero-strip">
         {% for p in pieces %}
@@ -130,6 +131,10 @@
       {{ selected_day.day|upper }}'S TOP — {{ (selected_day.top_name or 'none picked')|upper }}
       {%- if selected_day.provisional %} · PROVISIONAL{% endif %}
     </p>
+
+    {# Swap today's top by hand. The day's variant is already chosen by the
+       rotation; this is for the mornings where he wants a different one. #}
+    {{ variant_strip(showing_variants, hero_fit.id, {}, "Swap the top") }}
 
     <p class="commentary">{{ showing.fit.commentary }}</p>
 

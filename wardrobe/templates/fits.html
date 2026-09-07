@@ -135,10 +135,19 @@
 
       <div class="fit-title-row">
         <span class="fit-title">{{ fit.name }}</span>
-        <span class="fit-score">{{ (fit.score ~ '/10') if fit.score else 'unscored' }}</span>
+        {# `unscored` is marked rather than omitted: desktop keeps it, the phone
+           hides it in CSS. A score slot that says "no score" is fine on a wide
+           card and is one more thing to read past on a narrow one. #}
+        <span class="fit-score{{ ' unscored' if not fit.score }}">{{ (fit.score ~ '/10') if fit.score else 'unscored' }}</span>
       </div>
 
       {{ fit_badges(fit, c.meta) }}
+
+      {# One card stands for the whole set, so the card has to say so. Without
+         this the grid silently hides four fits and looks like it lost them. #}
+      {% if c.variants and c.variants|length > 1 %}
+        <span class="badge looks">{{ c.variants|length }} looks</span>
+      {% endif %}
 
       <div class="fit-meta">
         {{ c.meta.bands|join(' · ') }}
@@ -188,9 +197,19 @@
 
 {% block drawer %}
   {% if selected %}{% include "_fit_modal.html" %}{% endif %}
-  {% if building %}{% include "_fit_builder.html" %}{% endif %}
+  {# One builder, two modes. Ask AI is a full-screen overlay and Manual is the
+     drawer it has always been; the segmented toggle in either switches by URL,
+     so both are linkable and a refresh keeps you where you were. #}
+  {% if ai_mode %}
+    {% include "_ai_builder.html" %}
+  {% elif building %}
+    {% include "_fit_builder.html" %}
+  {% endif %}
   {# Last, because it binds the cards AND the open pane and the pane is written
      after the grid. One state, one script, both surfaces. #}
   <script src="{{ url_for('static', filename='layer-switch.js') }}"></script>
   <script src="{{ url_for('static', filename='fit-sections.js') }}"></script>
+  {# The sheet's own folds, and the scroll lock behind any overlay. Last, for
+     the same reason as the two above: it binds markup written after the grid. #}
+  <script src="{{ url_for('static', filename='sheet-sections.js') }}"></script>
 {% endblock %}

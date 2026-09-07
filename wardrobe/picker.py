@@ -95,6 +95,10 @@ class Fit:
     # stand up without the layer. NULL for every fit that has no optional layer.
     layered_path: str | None = None
     layered_thumb: str | None = None
+    # A fit set: several fits sharing every garment but the top, rotated by
+    # date. NULL on the large majority of fits, which behave exactly as before.
+    variant_set: str | None = None
+    variant_position: int | None = None
 
     # Resolution order, in one place so no screen can disagree with another:
     # the upload wins, then the file-based hero, then the piece-strip fallback.
@@ -181,9 +185,15 @@ class Rejection:
     reason: str
 
 
-def rotation_value(fit_id: str, day: date) -> float:
-    """A stable pseudo-random 0..ROTATION_MAX, fixed for a given day and fit."""
-    digest = hashlib.sha256(f"{day.isoformat()}:{fit_id}".encode()).hexdigest()
+def rotation_value(key: str, day: date) -> float:
+    """A stable pseudo-random 0..ROTATION_MAX, fixed for a given day and key.
+
+    The key is a fit id for an ordinary fit and the SET key for a variant set.
+    That is what makes a set score once: its rotation term does not jump around
+    as the day's top changes, so a five-variant set competes with the same
+    number every day rather than five different ones.
+    """
+    digest = hashlib.sha256(f"{day.isoformat()}:{key}".encode()).hexdigest()
     return (int(digest[:8], 16) % 1000) / 1000 * ROTATION_MAX
 
 
@@ -339,7 +349,7 @@ def evaluate(
         score += 0.5
         reasons.append("has a rain-ready layer")
 
-    score += rotation_value(fit.id, day)
+    score += rotation_value(fit.variant_set or fit.id, day)
 
     return Candidate(
         fit=fit,
@@ -349,6 +359,106 @@ def evaluate(
         substitutions=substitutions,
         reasons=reasons,
     )
+
+
+def variants_from(members: list[Fit], day: date) -> list[Fit]:
+    """The set's variants, rotated so today's comes first.
+
+    Deterministic from the date and nothing else — same top all day, a different
+    one tomorrow, and no random() anywhere. Rotating the whole list rather than
+    indexing one member is what lets an unavailable top fall through to the next
+    in order instead of to an arbitrary one, and it keeps working when a set has
+    four members, or six, or a gap in its positions.
+    """
+    ordered = sorted(members, key=lambda f: f.variant_position or 0)
+    if not ordered:
+        return []
+    start = day.toordinal() % len(ordered)
+    return ordered[start:] + ordered[:start]
+
+
+def current_variant(members: list[Fit], day: date) -> Fit | None:
+    """Today's variant of a set: the rotation's, or the next wearable one.
+
+    The gallery and Today both need "which top is on today" without running a
+    full weather score, and they must agree with each other and with the picker.
+    Same rotation, same fall-through rule, one function — three screens naming
+    three different tops on the same morning is the bug this prevents.
+    """
+    rotated = variants_from(members, day)
+    for fit in rotated:
+        if why_top_is_out(fit) is None:
+            return fit
+    return rotated[0] if rotated else None
+
+
+def evaluate_set(
+    key: str,
+    members: list[Fit],
+    day: date,
+    temp_c: float | None,
+    rain: bool,
+    allow_disliked: bool,
+    allow_tailoring: bool,
+    exclude: set,
+) -> Candidate | Rejection:
+    """Score a whole set as one candidate, wearing today's available variant.
+
+    The base garments are identical across the set, so whichever variant is
+    wearable scores the set. Falling through a dirty top is not a rejection —
+    it is the feature: the point of a set is that the shoes, trousers, belt and
+    gilet stay put and only the top moves.
+    """
+    rotated = [f for f in variants_from(members, day) if f.id not in exclude]
+    if not rotated:
+        return Rejection(members[0], f"every variant of {key} was excluded by hand")
+
+    skipped: list[str] = []
+    for fit in rotated:
+        result = evaluate(fit, day, temp_c, rain, allow_disliked, allow_tailoring)
+        if isinstance(result, Rejection):
+            skipped.append(why_top_is_out(fit) or result.reason)
+            continue
+        if skipped:
+            # Said out loud, in the same voice as the substitution messages a
+            # single fit produces: silently showing a different top than the
+            # rotation called for would look like the rotation was broken.
+            result.substitutions.insert(
+                0, f"swapped to the {top_name(fit)} — {skipped[0]}"
+            )
+        return result
+
+    # Nothing in the set is wearable, so the set leaves the running entirely
+    # rather than contributing an unwearable fit to it.
+    return Rejection(
+        members[0],
+        f"every variant is out — {skipped[0]}" if skipped else f"{key} has no wearable variant",
+    )
+
+
+def why_top_is_out(fit: Fit) -> str | None:
+    """`the burgundy crew is in the wash`, or None if the top is fine.
+
+    A skip that lets a LATER variant through is always the top's fault: every
+    variant shares one base, so an unwearable shoe or trouser takes the whole
+    set down rather than one member of it. Reading the top directly gives the
+    message the garment's name instead of the fit's, which is what Max is
+    actually being told to go and find.
+    """
+    for item in fit.primary():
+        if item["role"] != "top":
+            continue
+        blocker = unavailable(item)
+        return f"the {item['name']} is {blocker}" if blocker else None
+    return None
+
+
+def top_name(fit: Fit) -> str:
+    """The display name of the fit's top, for the swap message."""
+    for item in fit.primary():
+        if item["role"] == "top":
+            return item["name"]
+    return fit.name
 
 
 def pick(
@@ -365,11 +475,31 @@ def pick(
     candidates: list[Candidate] = []
     rejections: list[Rejection] = []
 
+    # A variant set is ONE candidate, not five. Without this a five-variant set
+    # gets five entries in the running and floods Today — it would win most days
+    # simply by holding most of the tickets.
+    sets: dict[str, list[Fit]] = {}
+    singles: list[Fit] = []
     for fit in fits:
+        if fit.variant_set and fit.variant_position is not None:
+            sets.setdefault(fit.variant_set, []).append(fit)
+        else:
+            singles.append(fit)
+
+    for fit in singles:
         if fit.id in exclude:
             rejections.append(Rejection(fit, f"{fit.name} was excluded by hand"))
             continue
         result = evaluate(fit, day, temp_c, rain, allow_disliked, allow_tailoring)
+        if isinstance(result, Rejection):
+            rejections.append(result)
+        else:
+            candidates.append(result)
+
+    for key, members in sorted(sets.items()):
+        result = evaluate_set(
+            key, members, day, temp_c, rain, allow_disliked, allow_tailoring, exclude
+        )
         if isinstance(result, Rejection):
             rejections.append(result)
         else:
@@ -397,6 +527,7 @@ FITS_SQL = """
 SELECT f.id, f.name, f.register_code, f.commentary, f.catch, f.style, f.score,
        f.killer, f.hidden_by_default, f.sort_order, f.source,
        f.hero_image_path, f.hero_thumb_path, f.hero_is_generated,
+       f.variant_set, f.variant_position,
        f.render_upload_path, f.layered_image_path, f.layered_thumb_path,
        (f.gone_at IS NOT NULL) AS fit_gone,
        fi.item_id, i.name AS item_name, i.material, i.cat_code,
@@ -462,6 +593,8 @@ def load_fits(conn) -> list[Fit]:
                     if b in bands.get(row["id"], [])
                 ],
                 blocked_by=blockers.get(row["id"], []),
+                variant_set=row["variant_set"],
+                variant_position=row["variant_position"],
             )
             fits[row["id"]] = fit
         if row["item_id"] is None:

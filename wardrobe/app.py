@@ -17,6 +17,7 @@ require_login() below.
 from __future__ import annotations
 
 import hmac
+import os
 
 from datetime import date, datetime
 from urllib.parse import urlsplit
@@ -37,12 +38,47 @@ from flask import (
     url_for,
 )
 
-from . import config, db, fit_derive, picker, seed_data, wardrobes, week
+from . import (
+    access,
+    ai_fits,
+    config,
+    db,
+    fit_derive,
+    forecast,
+    picker,
+    seed_data,
+    wardrobes,
+    week,
+)
 
 app = Flask(__name__)
 app.secret_key = config.secret_key()
 
 TZ = ZoneInfo(config.TIMEZONE)
+
+
+@app.url_defaults
+def static_cache_buster(endpoint, values):
+    """Stamp every static URL with the file's modification time.
+
+    Without this a changed stylesheet keeps its URL, so a browser that already
+    has app.css goes on using it — and a template that has moved on renders with
+    classes the cached CSS has never heard of. That is not a subtle failure: the
+    full-screen builder came out as an unstyled block at the bottom of the fits
+    page, because `.builder-overlay` existed in the markup and nowhere in the
+    stylesheet the browser was holding.
+
+    Editing a file changes its mtime, which changes the URL, which is a cache
+    miss. Nothing to remember and nothing to clear by hand.
+    """
+    if endpoint != "static" or "filename" not in values:
+        return
+    try:
+        stamp = os.stat(os.path.join(app.static_folder, values["filename"])).st_mtime
+    except OSError:
+        # A filename that does not resolve is the 404's problem, not this hook's.
+        return
+    values["v"] = int(stamp)
 
 
 def today() -> date:
@@ -51,12 +87,35 @@ def today() -> date:
 
 @app.before_request
 def require_login():
-    """Basic auth, but only once AUTH_USER and AUTH_PASSWORD are both set.
-    Unset is the localhost default, so development is unchanged.
+    """The gate, in two layers, most specific first.
+
+    1. CLOUDFLARE ACCESS, when CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD are set.
+       Google sign-in happens at Cloudflare's edge; this verifies the signed
+       token it forwards and checks the email against the allow-list. See
+       wardrobe/access.py for why the token is verified rather than trusted.
+    2. BASIC AUTH, when AUTH_USER and AUTH_PASSWORD are set. The older gate,
+       kept so that turning Access on is one environment variable and turning
+       it off never leaves the app barer than it was.
+    3. Neither set: open, which is the localhost development default.
 
     Being a before_request, this covers /photos as well: the images cannot be
     fetched around the gate.
     """
+    if access.configured():
+        try:
+            request.access_email = access.identity(access.token_from(request))
+        except access.Denied as denied:
+            # The reason goes to the log, not to the browser: "that email is
+            # not on the allow-list" tells whoever is trying exactly what to
+            # forge next. What they get is that they are not getting in.
+            app.logger.warning("Access denied: %s", denied)
+            return Response(
+                "Not authorised. Sign in through Cloudflare Access.",
+                403,
+                {"Content-Type": "text/plain; charset=utf-8"},
+            )
+        return None
+
     expected = config.auth_credentials()
     if expected is None:
         return None
@@ -392,18 +451,36 @@ def today_view():
         adopted = plan["base_fit_id"] and fits.get(plan["base_fit_id"])
         if adopted and not request.args.get("rank"):
             showing = next((c for c in ranked if c.fit.id == adopted.id), None)
+            # An adopted fit that belongs to a SET will usually not be in the
+            # ranking by its own id: the picker collapses a set to whichever
+            # variant is on today, so adopting Monday's charcoal shirt and then
+            # looking for it on Wednesday finds nothing and silently falls back
+            # to whatever is ranked first. Match the set instead.
+            if showing is None and adopted.variant_set:
+                showing = next(
+                    (c for c in ranked if c.fit.variant_set == adopted.variant_set),
+                    None,
+                )
         if showing is None and ranked:
             rank_index = max(0, min(rank_index, len(ranked) - 1))
             showing = ranked[rank_index]
         if showing is not None:
             rank_index = ranked.index(showing)
 
+        # The variant strip on Today, so the top can be swapped by hand. Empty
+        # for a fit that is not in a set, which is nearly all of them.
+        showing_variants = []
+        if showing is not None and showing.fit.variant_set:
+            members = [
+                f for f in fits.values() if f.variant_set == showing.fit.variant_set
+            ]
+            showing_variants = sorted(members, key=lambda f: f.variant_position or 0)
+
         day_index = request.args.get("day", type=int)
         day_index = today_index if day_index is None else max(0, min(day_index, 4))
 
         week_days = week.days(conn, start)
         rotation = week.rotation(conn, showing.fit) if showing else []
-
         # A week nobody has planned still shows a plan — from the rotation of
         # whatever fit is on screen — it just isn't stored until you adopt it.
         for row in week_days:
@@ -421,6 +498,22 @@ def today_view():
         selected_day = week_days[day_index]
         day_top = selected_day["top_item_id"]
 
+        # The hero follows the SELECTED DAY, not the fit that happens to be
+        # showing. A variant set has a render per top, so clicking Thursday
+        # should show Thursday's picture — before this the name under the strip
+        # changed and the photograph above it did not, which reads as the app
+        # ignoring the click.
+        #
+        # Only a variant set can do this: an ordinary fit has exactly one render
+        # for the whole week however its top rotates, and falls straight through
+        # to `showing.fit` below.
+        hero_fit = showing.fit if showing else None
+        if showing is not None and day_top:
+            for variant in showing_variants:
+                tops = [i for i in variant.primary() if i["role"] == "top"]
+                if tops and tops[0]["item_id"] == day_top:
+                    hero_fit = variant
+                    break
         pieces = week.base_pieces(showing.fit, day_top) if showing else []
         if showing and day_top and not any(p["item_id"] == day_top for p in pieces):
             top = db.fetch_one(
@@ -441,6 +534,8 @@ def today_view():
 
     return render_template(
         "today.html",
+        showing_variants=showing_variants,
+        hero_fit=hero_fit,
         showing=showing,
         # Two different nothings, and they need different words: a wardrobe with
         # no fits in it at all, versus one whose fits are all blocked today.
@@ -1130,11 +1225,57 @@ def build_cards(conn):
     return cards
 
 
+def variant_groups(cards: list[dict], day) -> tuple[list[dict], dict]:
+    """Collapse each variant set into the one card the grid should show.
+
+    Returns (cards for the grid, {fit_id: the set's cards in position order}).
+
+    The grid is for scanning, and five cards that differ only in the top is five
+    times the same scan. Every card keeps its siblings on it, so the detail pane
+    and Today can draw the strip without asking a second question.
+
+    The FULL list is what the caller still uses to resolve ?fit=<id>: opening a
+    variant that is not today's must keep working, or a link to one becomes a
+    404 on the days it is not showing.
+    """
+    sets: dict[str, list[dict]] = {}
+    for card in cards:
+        key = card["fit"].variant_set
+        if key and card["fit"].variant_position is not None:
+            sets.setdefault(key, []).append(card)
+
+    siblings: dict[str, list[dict]] = {}
+    for key, members in sets.items():
+        members.sort(key=lambda c: c["fit"].variant_position or 0)
+        for card in members:
+            siblings[card["fit"].id] = members
+
+    shown_ids = set()
+    for key, members in sets.items():
+        current = picker.current_variant([c["fit"] for c in members], day)
+        shown_ids.add(current.id if current else members[0]["fit"].id)
+
+    grid = []
+    for card in cards:
+        key = card["fit"].variant_set
+        if key and card["fit"].id not in shown_ids:
+            continue
+        if key:
+            card = dict(card)
+            card["variants"] = siblings.get(card["fit"].id, [])
+        grid.append(card)
+    return grid, siblings
+
+
 @app.route("/fits")
 def fits_view():
     filters = FitFilters(request.args)
     selected_id = request.args.get("fit") or ""
     building = request.args.get("build") == "1"
+    # Ask AI is a mode of the builder, not a separate destination: same ?build=1
+    # overlay, a segmented toggle inside it. Reachable by URL so a half-filled
+    # brief survives a refresh.
+    ai_mode = building and request.args.get("ai") == "1"
 
     with db.connect() as conn:
         mode = get_wardrobe(conn)
@@ -1142,19 +1283,25 @@ def fits_view():
         # One wardrobe's fits. Everything below — the chip counts, the summary,
         # the empty state — is counted off this, so no number on the page can
         # describe a fit the page will not show.
-        cards = [c for c in build_cards(conn)
-                 if (c["fit"].id in golf_fits) == (mode == "golf")]
+        all_cards = [c for c in build_cards(conn)
+                     if (c["fit"].id in golf_fits) == (mode == "golf")]
+        # One card per set in the grid; the full list stays for ?fit=<id>.
+        cards, variant_siblings = variant_groups(all_cards, today())
         renders = item_renders(conn)
         sources = fit_sources(conn)
         categories = fit_categories(conn)
         selected = None
         builder = None
+        ai = None
 
         if selected_id:
-            match = next((c for c in cards if c["fit"].id == selected_id), None)
+            match = next((c for c in all_cards if c["fit"].id == selected_id), None)
             if match is None:
                 abort(404)
             selected = dict(match)
+            # The strip under the hero. Present only for a fit in a set, so an
+            # ordinary fit renders exactly as before — no strip, no empty pane.
+            selected["variants"] = variant_siblings.get(selected_id, [])
             selected["sources"] = sources.get(selected_id, {})
             # Whether the category is Max's own move, for the badge. Read from
             # the provenance row rather than diffed against anything.
@@ -1199,6 +1346,9 @@ def fits_view():
                 for role, label, _, _ in wardrobes.roles(mode)
                 if not builder["borrowed"][role]
             ]
+
+        if ai_mode:
+            ai = ai_context(conn, mode)
 
     # Counted over the live shelf — a binned fit is not "blocked", it is out.
     live = [c for c in cards if not c["fit"].gone]
@@ -1296,8 +1446,140 @@ def fits_view():
         selected=selected,
         building=building,
         builder=builder,
+        ai_mode=ai_mode,
+        ai=ai,
         rules=seed_data.STYLING_RULES,
     )
+
+
+# ------------------------------------------------------- AI build a fit --
+
+
+def ai_context(conn, mode: str) -> dict:
+    """Everything the AI setup view draws before anything has been asked.
+
+    The closet tiles, the day pills and the two counts under the button. All of
+    it is read fresh: the pool is the same one the prompt will be built from, so
+    the number on the button cannot disagree with the number Claude is told.
+    """
+    garments, skipped = ai_fits.pool(conn, mode)
+    weather = header_weather()["weather"]
+    days = forecast.week(conn, weather.get("temp_c"), weather.get("rain", False))
+    return {
+        "garments": garments,
+        "skipped": skipped,
+        "tabs": ai_fits.tabs(garments),
+        "tab_for": ai_fits.tab_for,
+        "days": days,
+        "place": forecast.PLACE,
+        "occasions": ai_fits.OCCASIONS,
+        "sharpness": ai_fits.SHARPNESS,
+        "default_sharpness": ai_fits.DEFAULT_SHARPNESS,
+        "mode": mode,
+    }
+
+
+def _brief_from_form(form, mode: str) -> ai_fits.Brief:
+    try:
+        sharpness = int(form.get("sharpness") or ai_fits.DEFAULT_SHARPNESS)
+    except (TypeError, ValueError):
+        sharpness = ai_fits.DEFAULT_SHARPNESS
+    return ai_fits.Brief(
+        mode=mode,
+        day_key=form.get("day") or "",
+        occasion=form.get("occasion") or "work",
+        sharpness=min(5, max(1, sharpness)),
+        note=(form.get("note") or "").strip(),
+        seeds=[s for s in form.getlist("seed") if s],
+    )
+
+
+def ai_fit_meta(fit: dict, by_id: dict) -> str:
+    """`4 pieces · mild/warm · rain-safe` — derived here, never asked of Claude.
+
+    The handover is explicit that this line is computed locally, and it is right
+    to be: these are facts about the garments, and a model asked to restate them
+    would eventually restate one wrongly. Same functions the manual builder's
+    strip uses, so a fit reads the same however it was made.
+    """
+    rows = [by_id[pick["id"]] for pick in fit["items"] if pick["id"] in by_id]
+    # Every key fit_derive reads, including `is_alternate` — it indexes rather
+    # than .get()s, so a missing one is a KeyError inside a request that has
+    # already been paid for at the API.
+    garments = [
+        {
+            "cat": row["cat_code"],
+            "warmth": row["warmth"],
+            "rain_unsafe": row["rain_unsafe"],
+            "formality_rank": row["formality_rank"],
+            "role": pick["role"],
+            "occasions": [],
+            # An AI fit has no alternates: the model names one garment per role
+            # and the second and third fits are whole fits, not substitutions.
+            "is_alternate": False,
+        }
+        for pick, row in zip(fit["items"], rows)
+    ]
+    pieces = f"{len(rows)} piece" + ("s" if len(rows) != 1 else "")
+    bands = fit_derive.temp_bands(garments)
+    parts = [pieces]
+    if bands:
+        parts.append("/".join(bands))
+    parts.append("rain-safe" if fit_derive.rain_safe(garments) else "not rain-safe")
+    return " · ".join(parts)
+
+
+@app.route("/fits/ai/build", methods=["POST"])
+def ai_build():
+    """Ask Claude for three fits. Returns the results pane, not a page.
+
+    An HTML fragment rather than JSON because the fit card is a Jinja partial
+    with renders, role labels and derived bands in it — rebuilding that in
+    JavaScript would be a second implementation of the same card, free to drift
+    from the first. The ask takes about forty seconds, which is why this is
+    fetched rather than posted: a form submit would show a white page for the
+    whole of it.
+    """
+    with db.connect(autocommit=True) as conn:
+        mode = get_wardrobe(conn)
+        brief = _brief_from_form(request.form, mode)
+        garments, _ = ai_fits.pool(conn, mode)
+        by_id = {row["id"]: row for row in garments}
+        days = forecast.week(conn)
+        day = forecast.find(days, brief.day_key)
+        try:
+            answer = ai_fits.ask(
+                conn,
+                brief,
+                seed_data.STYLING_RULES,
+                use_cache=request.form.get("again") != "1",
+            )
+        except ai_fits.AiError as exc:
+            # Readable, and it names Manual: the builder Max is standing in
+            # already works, and a dead end that does not say so is worse than
+            # the failure.
+            return render_template(
+                "_ai_results.html", error=str(exc), fits=None, day=day, brief=brief
+            ), 200
+
+        for fit in answer["fits"]:
+            fit["meta"] = ai_fit_meta(fit, by_id)
+
+        return render_template(
+            "_ai_results.html",
+            error=None,
+            fits=answer["fits"],
+            day=day,
+            brief=brief,
+            answer=answer,
+            by_id=by_id,
+            renders=item_renders(conn),
+            role_labels={
+                slot: label for slot, label, _, _ in wardrobes.roles(mode)
+            },
+            occasion_label=brief.occasion_row()[1],
+            sharpness_label=brief.sharpness_label(),
+        )
 
 
 @app.route("/looks")
@@ -1435,10 +1717,20 @@ def fit_create():
         # everyday and sharp and nothing else, so writing casual is a foreign
         # key violation. It is also unnecessary: register says how dressed-up a
         # fit is, and what makes this a golf fit is the occasion below.
+        # A fit built with the AI carries its own provenance and keeps the
+        # paragraph Claude wrote as the style note. Both arrive as plain form
+        # fields, so there is one save path and not two: the AI results pane
+        # posts the same slots the manual builder posts, and everything below —
+        # the derived bands, the occasions, the field sources — happens
+        # identically whichever built it.
+        source = (request.form.get("source") or "").strip() or (
+            f"built in the app {today().isoformat()}"
+        )
+        style = (request.form.get("style") or "").strip() or None
         conn.execute(
-            "INSERT INTO fits (id, name, register_code, vetted, source, sort_order) "
-            "VALUES (%s, %s, 'everyday', false, %s, 200)",
-            (fit_id, name, f"built in the app {today().isoformat()}"),
+            "INSERT INTO fits (id, name, register_code, vetted, style, source, sort_order) "
+            "VALUES (%s, %s, 'everyday', false, %s, %s, 200)",
+            (fit_id, name, style, source),
         )
         for position, (item_id, role) in enumerate(rows, start=1):
             conn.execute(

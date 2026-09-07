@@ -104,6 +104,23 @@ def rotation(conn, fit, exclude_unavailable: bool = True) -> list[str]:
             )
         }
 
+    # A VARIANT SET IS ITS OWN ROTATION, and this is the whole reason the set
+    # exists: five tops over one held base, each with its own render. Offering
+    # any old Keep top here would plan a week of days the set has no picture of,
+    # which is exactly the week Max built the set to stop having.
+    if getattr(fit, "variant_set", None):
+        members = db.fetch_all(
+            conn,
+            "SELECT fi.item_id FROM fits f "
+            "JOIN fit_items fi ON fi.fit_id = f.id "
+            " AND fi.role = 'top' AND NOT fi.is_alternate "
+            "WHERE f.variant_set = %s ORDER BY f.variant_position",
+            (fit.variant_set,),
+        )
+        tops = [r["item_id"] for r in members if r["item_id"] not in blocked]
+        if tops:
+            return tops
+
     rotatable = {
         r["id"]
         for r in db.fetch_all(
