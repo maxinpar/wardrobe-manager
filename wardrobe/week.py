@@ -123,13 +123,21 @@ def rotation(conn, fit, exclude_unavailable: bool = True) -> list[str]:
         # The garment that VARIES, not the one in a particular slot. black_canvas
         # swaps the top; the_shawl holds the shawl as the top and swaps the tee
         # beneath it, which is `base`. Reading a role here gets one of them wrong.
-        shared = set.intersection(*(set(v) for v in by_position.values())) if by_position else set()
-        varying = [
-            item_id
-            for position in sorted(by_position)
-            for item_id in by_position[position]
-            if item_id not in shared and item_id not in blocked
-        ]
+        # One entry per position, and it must be the garment unique to that
+        # position. Collecting everything "not shared by all" gives beige_brown
+        # seven entries for five looks, because its white crew tee sits under
+        # two of the knits and is therefore not shared by all — a week that
+        # names the same tee twice as if it were two different days.
+        counts: dict[str, int] = {}
+        for items in by_position.values():
+            for item_id in set(items):
+                counts[item_id] = counts.get(item_id, 0) + 1
+
+        varying = []
+        for position in sorted(by_position):
+            unique = [i for i in by_position[position] if counts.get(i) == 1]
+            if unique and unique[0] not in blocked:
+                varying.append(unique[0])
         if varying:
             return varying
 

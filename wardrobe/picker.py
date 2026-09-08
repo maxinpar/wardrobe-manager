@@ -449,13 +449,54 @@ def variant_item(fit: Fit, members: list[Fit]) -> dict | None:
     position 1 of the_shawl carries an optional waxed biker that belongs to that
     fit alone and is not what distinguishes it.
     """
-    others = [m for m in members if m.id != fit.id]
-    if not others:
+    if len(members) < 2:
         return None
-    shared = set.intersection(
-        *({i["item_id"] for i in m.primary()} for m in others)
-    ) if others else set()
-    mine = [i for i in fit.primary() if i["item_id"] not in shared]
+
+    # UNIQUE TO ONE MEMBER, not merely "not shared by all the others". The
+    # difference is not academic: beige_brown puts a white crew tee under the
+    # knits at positions 2 and 5, so under the weaker test both of those members
+    # have TWO candidate garments — the knit and the tee — and which one wins
+    # comes down to the order fit_items happens to return.
+    #
+    # The label survived that by luck. The week rotation did not: it collects
+    # every candidate, so the set would have rotated over seven entries with the
+    # white tee showing up twice as though it were a look of its own.
+    counts: dict[str, int] = {}
+    for member in members:
+        for item_id in {i["item_id"] for i in member.primary()}:
+            counts[item_id] = counts.get(item_id, 0) + 1
+
+    unique = [i for i in fit.primary() if counts.get(i["item_id"]) == 1]
+    if len(unique) == 1:
+        return unique[0]
+
+    if unique:
+        # More than one garment is unique to this member, so "unique" alone does
+        # not settle it. black_canvas position 2 is the case: the burgundy crew
+        # is its own, and so is the white tee that 077 put underneath it,
+        # because no other member of that set needs one.
+        #
+        # A set varies a SLOT. Most members say plainly which one — they have
+        # exactly one unique garment — so the ambiguous member follows the
+        # majority rather than whichever row happened to sort first. That is how
+        # position 2 goes on being the burgundy crew instead of suddenly being a
+        # white tee, while the_shawl keeps varying `base` throughout.
+        votes: dict[str, int] = {}
+        for member in members:
+            singles = [i for i in member.primary() if counts.get(i["item_id"]) == 1]
+            if len(singles) == 1:
+                votes[singles[0]["role"]] = votes.get(singles[0]["role"], 0) + 1
+        if votes:
+            winner = max(votes, key=votes.get)
+            for item in unique:
+                if item["role"] == winner:
+                    return item
+        return unique[0]
+
+    # No garment is unique to this member — two positions with identical
+    # compositions, which is a set worth fixing rather than a case to guess at.
+    # Fall back to the rarest thing it has so the strip still says something.
+    mine = sorted(fit.primary(), key=lambda i: counts.get(i["item_id"], 0))
     return mine[0] if mine else None
 
 
