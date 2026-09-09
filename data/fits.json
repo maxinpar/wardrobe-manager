@@ -1,17 +1,17 @@
 {
- "generated": "2026-09-02",
+ "generated": "2026-09-09",
  "owner": "Max",
  "schemaNote": "Fits are ordered slots. Roles: outer, layer, top, base, bottom, shoe, belt, accessory. 'position' is the layering/display order. itemId references wardrobe.json items[].id. 'id' is the database key and the only reliable one — 'code' survives only on the fits that were imported from the 2026-08-27 markdown.",
  "renderNote": "'images' carries every picture of a fit and 'images.display' is the one a screen should draw. A hero or layered render is a GENERATED IMAGE, never a photograph of Max wearing the clothes, and images.heroIsGenerated says so. 'images.upload' is a picture Max uploaded in the app: it outranks the hero and is deliberately NOT labelled — whether it is a photograph or a render of his own is not recorded. images.looks is 2 only when a base/layered pair should be shown as a pair.",
  "wardrobeNote": "'wardrobe' is derived from the occasion tags of a fit and its garments, exactly as the /fits screen derives it — it is not a stored flag. A fit is golf when it carries the golf occasion, or is built on a crested club garment.",
  "counts": {
-  "total": 90,
-  "live": 89,
+  "total": 113,
+  "live": 111,
   "golf": 20,
-  "withComposition": 89,
+  "withComposition": 111,
   "twoLooks": 12,
-  "uploaded": 10,
-  "noImage": 0
+  "uploaded": 11,
+  "noImage": 2
  },
  "fits": [
   {
@@ -213,7 +213,8 @@
     "heroThumb": "fits/thumbs/fit_friday_layer_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "gone": true
   },
   {
    "id": "fit_everyday_burgundy",
@@ -235,6 +236,12 @@
      "role": "top",
      "position": 1,
      "itemId": "polo-rl-burgundy-cashmere-crew"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
     },
     {
      "role": "bottom",
@@ -434,6 +441,12 @@
      "itemId": "polo-rl-burgundy-cashmere-crew"
     },
     {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
+    },
+    {
      "role": "outer",
      "position": 2,
      "itemId": "outerwear_03_grey-unbranded-blazer"
@@ -562,6 +575,12 @@
      "role": "top",
      "position": 1,
      "itemId": "polo-rl-burgundy-cashmere-crew"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
     },
     {
      "role": "outer",
@@ -744,6 +763,12 @@
      "itemId": "ben-sherman-aubergine-shawl"
     },
     {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "The tee under the shawl — logged 2026-09-07, it was always worn with one"
+    },
+    {
      "role": "bottom",
      "position": 2,
      "itemId": "trousers_11_black-coated-jeans"
@@ -810,6 +835,12 @@
      "itemId": "fedeli-cashmere-crew"
     },
     {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
+    },
+    {
      "role": "bottom",
      "position": 2,
      "itemId": "trousers_08_tyrwhitt-navy-wool"
@@ -873,6 +904,12 @@
      "role": "outer",
      "position": 1,
      "itemId": "outerwear_03_grey-unbranded-blazer"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
     },
     {
      "role": "top",
@@ -1064,6 +1101,12 @@
      "role": "outer",
      "position": 1,
      "itemId": "outerwear_06_anko-slate-puffer-vest"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
     },
     {
      "role": "top",
@@ -1824,6 +1867,12 @@
      "itemId": "fedeli-cashmere-crew"
     },
     {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
+    },
+    {
      "role": "bottom",
      "position": 2,
      "itemId": "trousers_03_decathlon-cobalt"
@@ -1924,6 +1973,62 @@
    }
   },
   {
+   "id": "fit_bc_charcoal-shirt",
+   "name": "Charcoal shirt & the gilet",
+   "source": "brief-fit-variant-sets.md",
+   "category": "cold",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": false,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "outer",
+     "position": 1,
+     "itemId": "outerwear_06_anko-slate-puffer-vest"
+    },
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "tops_31_zara-charcoal-textured-shirt"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_11_black-coated-jeans"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_03_ecco-black-nubuck"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_11_black-classic-pin-buckle"
+    }
+   ],
+   "render": "fit_bc_charcoal-shirt_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 59,
+   "images": {
+    "display": "fits/fit_bc_charcoal-shirt_render.jpeg",
+    "hero": "fits/fit_bc_charcoal-shirt_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bc_charcoal-shirt_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
    "code": "K1",
    "id": "fit_k1_burgundy-and-black",
    "name": "Burgundy & black",
@@ -1949,6 +2054,12 @@
      "role": "top",
      "position": 1,
      "itemId": "polo-rl-burgundy-cashmere-crew"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
     },
     {
      "role": "bottom",
@@ -1987,6 +2098,68 @@
      "done": false
     }
    ]
+  },
+  {
+   "id": "fit_bc_burgundy-crew",
+   "name": "Burgundy crew & the gilet",
+   "source": "brief-fit-variant-sets.md",
+   "category": "cold",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": false,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "outer",
+     "position": 1,
+     "itemId": "outerwear_06_anko-slate-puffer-vest"
+    },
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "polo-rl-burgundy-cashmere-crew"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_11_black-coated-jeans"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_03_ecco-black-nubuck"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_11_black-classic-pin-buckle"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
+    }
+   ],
+   "render": "fit_bc_burgundy-crew_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 60,
+   "images": {
+    "display": "fits/fit_bc_burgundy-crew_render.jpeg",
+    "hero": "fits/fit_bc_burgundy-crew_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bc_burgundy-crew_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
   },
   {
    "code": "K2",
@@ -2053,6 +2226,62 @@
    }
   },
   {
+   "id": "fit_bc_sage-polo",
+   "name": "Sage polo & the gilet",
+   "source": "brief-fit-variant-sets.md",
+   "category": "cold",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": false,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "outer",
+     "position": 1,
+     "itemId": "outerwear_06_anko-slate-puffer-vest"
+    },
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "tops_05_sage-pique-polo"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_11_black-coated-jeans"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_03_ecco-black-nubuck"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_11_black-classic-pin-buckle"
+    }
+   ],
+   "render": "fit_bc_sage-polo_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 61,
+   "images": {
+    "display": "fits/fit_bc_sage-polo_render.jpeg",
+    "hero": "fits/fit_bc_sage-polo_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bc_sage-polo_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
    "code": "K3",
    "id": "fit_k3_mustard-and-black",
    "name": "Mustard & black",
@@ -2106,6 +2335,62 @@
     "display": "fits/fit_k3_mustard-and-black_render.png",
     "hero": "fits/fit_k3_mustard-and-black_render.png",
     "heroThumb": "fits/thumbs/fit_k3_mustard-and-black_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_bc_grey-henley",
+   "name": "Grey henley & the gilet",
+   "source": "brief-fit-variant-sets.md",
+   "category": "cold",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": false,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "outer",
+     "position": 1,
+     "itemId": "outerwear_06_anko-slate-puffer-vest"
+    },
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "tees_15_adidas-grey-henley"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_11_black-coated-jeans"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_03_ecco-black-nubuck"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_11_black-classic-pin-buckle"
+    }
+   ],
+   "render": "fit_bc_grey-henley_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 62,
+   "images": {
+    "display": "fits/fit_bc_grey-henley_render.jpeg",
+    "hero": "fits/fit_bc_grey-henley_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bc_grey-henley_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
    }
@@ -2225,6 +2510,62 @@
    }
   },
   {
+   "id": "fit_sh_grey-tee",
+   "name": "The Shawl, grey tee",
+   "source": "brief-shawl-set-and-henley.md",
+   "category": "casual",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": false,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "ben-sherman-aubergine-shawl"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_02_grey-crew"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_11_black-coated-jeans"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_03_ecco-black-nubuck"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_11_black-classic-pin-buckle"
+    }
+   ],
+   "render": "fit_sh_grey-tee_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 63,
+   "images": {
+    "display": "fits/fit_sh_grey-tee_render.jpeg",
+    "hero": "fits/fit_sh_grey-tee_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_sh_grey-tee_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
    "code": "K6",
    "id": "fit_k6_biker-and-blue",
    "name": "Biker & blue",
@@ -2308,6 +2649,62 @@
    ]
   },
   {
+   "id": "fit_sh_black-tee",
+   "name": "The Shawl, black tee",
+   "source": "brief-shawl-set-and-henley.md",
+   "category": "casual",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": false,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "ben-sherman-aubergine-shawl"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_03_black-crew"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_11_black-coated-jeans"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_03_ecco-black-nubuck"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_11_black-classic-pin-buckle"
+    }
+   ],
+   "render": "fit_sh_black-tee_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 64,
+   "images": {
+    "display": "fits/fit_sh_black-tee_render.jpeg",
+    "hero": "fits/fit_sh_black-tee_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_sh_black-tee_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
    "code": "S1",
    "id": "fit_s1_blazer-over-a-vneck",
    "name": "Blazer over a V-neck",
@@ -2376,6 +2773,62 @@
    }
   },
   {
+   "id": "fit_sh_white-polo",
+   "name": "The Shawl, white polo",
+   "source": "brief-shawl-set-and-henley.md",
+   "category": "casual",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": false,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "ben-sherman-aubergine-shawl"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tops_09_white-pique-polo"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_11_black-coated-jeans"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_03_ecco-black-nubuck"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_11_black-classic-pin-buckle"
+    }
+   ],
+   "render": "fit_sh_white-polo_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 65,
+   "images": {
+    "display": "fits/fit_sh_white-polo_render.jpeg",
+    "hero": "fits/fit_sh_white-polo_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_sh_white-polo_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
    "code": "S2",
    "id": "fit_s2_overcoat-over-shawl",
    "name": "Overcoat over the shawl",
@@ -2401,6 +2854,12 @@
      "role": "outer",
      "position": 1,
      "itemId": "outerwear_04_indaco-brown-wool-overcoat"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
     },
     {
      "role": "top",
@@ -2444,6 +2903,62 @@
      "done": false
     }
    ]
+  },
+  {
+   "id": "fit_sh_pale-blue-polo",
+   "name": "The Shawl, pale blue polo",
+   "source": "brief-shawl-set-and-henley.md",
+   "category": "casual",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": false,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "ben-sherman-aubergine-shawl"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tops_01_pale-blue-pique-polo"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_11_black-coated-jeans"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_03_ecco-black-nubuck"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_11_black-classic-pin-buckle"
+    }
+   ],
+   "render": "fit_sh_pale-blue-polo_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 66,
+   "images": {
+    "display": "fits/fit_sh_pale-blue-polo_render.jpeg",
+    "hero": "fits/fit_sh_pale-blue-polo_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_sh_pale-blue-polo_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
   },
   {
    "code": "C7",
@@ -3249,6 +3764,12 @@
      "itemId": "accessories_00_leopard-wool-silk-scarf"
     },
     {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
+    },
+    {
      "role": "top",
      "position": 2,
      "itemId": "polo-rl-burgundy-cashmere-crew"
@@ -3753,6 +4274,63 @@
    }
   },
   {
+   "id": "fit_bb_burgundy-crew",
+   "name": "Burgundy crew & beige",
+   "source": "brief-beige-brown-set.md",
+   "category": "casual",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "polo-rl-burgundy-cashmere-crew"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_01_decathlon-beige"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_07_oxford-brown-chelsea"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_04_distressed-brown-everyday"
+    }
+   ],
+   "render": "fit_bb_burgundy-crew_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 90,
+   "images": {
+    "display": "fits/fit_bb_burgundy-crew_render.jpeg",
+    "hero": "fits/fit_bb_burgundy-crew_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bb_burgundy-crew_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
    "code": "K14",
    "id": "fit_k14_bomber-navy-and-black",
    "name": "Bomber, navy knit & black jeans",
@@ -3821,6 +4399,57 @@
    }
   },
   {
+   "id": "fit_bb_charcoal-shirt",
+   "name": "Charcoal shirt & beige",
+   "source": "brief-beige-brown-set.md",
+   "category": "casual",
+   "temp": [
+    "mild",
+    "warm"
+   ],
+   "rainSafe": true,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "tops_31_zara-charcoal-textured-shirt"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_01_decathlon-beige"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_07_oxford-brown-chelsea"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_04_distressed-brown-everyday"
+    }
+   ],
+   "render": "fit_bb_charcoal-shirt_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 91,
+   "images": {
+    "display": "fits/fit_bb_charcoal-shirt_render.jpeg",
+    "hero": "fits/fit_bb_charcoal-shirt_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bb_charcoal-shirt_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
    "code": "K15",
    "id": "fit_k15_henley-and-black",
    "name": "Henley & black jeans",
@@ -3873,6 +4502,57 @@
     "display": "fits/fit_k15_henley-and-black_render.jpeg",
     "hero": "fits/fit_k15_henley-and-black_render.jpeg",
     "heroThumb": "fits/thumbs/fit_k15_henley-and-black_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_bb_sage-polo",
+   "name": "Sage polo & beige",
+   "source": "brief-beige-brown-set.md",
+   "category": "casual",
+   "temp": [
+    "mild",
+    "warm"
+   ],
+   "rainSafe": true,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "tops_05_sage-pique-polo"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_01_decathlon-beige"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_07_oxford-brown-chelsea"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_04_distressed-brown-everyday"
+    }
+   ],
+   "render": "fit_bb_sage-polo_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 92,
+   "images": {
+    "display": "fits/fit_bb_sage-polo_render.jpeg",
+    "hero": "fits/fit_bb_sage-polo_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bb_sage-polo_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
    }
@@ -3940,6 +4620,63 @@
    }
   },
   {
+   "id": "fit_bb_brown-vneck",
+   "name": "Brown V-neck & beige",
+   "source": "brief-beige-brown-set.md",
+   "category": "casual",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "zara-brown-cashmere-vneck"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_01_decathlon-beige"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_07_oxford-brown-chelsea"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_04_distressed-brown-everyday"
+    }
+   ],
+   "render": "fit_bb_brown-vneck_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 93,
+   "images": {
+    "display": "fits/fit_bb_brown-vneck_render.jpeg",
+    "hero": "fits/fit_bb_brown-vneck_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bb_brown-vneck_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
    "code": "M1",
    "id": "fit_m1_tan-and-cornflower",
    "name": "Tan and cornflower",
@@ -4002,6 +4739,454 @@
     "display": "fits/fit_m1_tan-and-cornflower_render.jpg",
     "hero": "fits/fit_m1_tan-and-cornflower_render.jpg",
     "heroThumb": "fits/thumbs/fit_m1_tan-and-cornflower_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_sb_brown-stripe",
+   "name": "Brown stripe under the brown V",
+   "source": "brief-w5-w3-sets.md",
+   "category": "warm",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 4,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "zara-brown-cashmere-vneck"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tops_34_tm-lewin-brown-tan-multistripe-shirt"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_06_stone-gingham"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_04_churchs-apron-derby"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_02_tan-vera-pelle"
+    }
+   ],
+   "render": "fit_sb_brown-stripe_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 100,
+   "images": {
+    "display": "fits/fit_sb_brown-stripe_render.jpeg",
+    "hero": "fits/fit_sb_brown-stripe_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_sb_brown-stripe_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_sb_pale-blue-twill",
+   "name": "Pale blue twill under the brown V",
+   "source": "brief-w5-w3-sets.md",
+   "category": "warm",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 4,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "zara-brown-cashmere-vneck"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tops_47_tm-lewin-blue-twill-shirt"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_06_stone-gingham"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_04_churchs-apron-derby"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_02_tan-vera-pelle"
+    }
+   ],
+   "render": "fit_sb_pale-blue-twill_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 101,
+   "images": {
+    "display": "fits/fit_sb_pale-blue-twill_render.jpeg",
+    "hero": "fits/fit_sb_pale-blue-twill_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_sb_pale-blue-twill_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_sb_pink-stripe",
+   "name": "Pink stripe under the brown V",
+   "source": "brief-w5-w3-sets.md",
+   "category": "warm",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 4,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "zara-brown-cashmere-vneck"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tops_12_paul-smith-pink-stripe-shirt"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_06_stone-gingham"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_04_churchs-apron-derby"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_02_tan-vera-pelle"
+    }
+   ],
+   "render": "fit_sb_pink-stripe_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 102,
+   "images": {
+    "display": "fits/fit_sb_pink-stripe_render.jpeg",
+    "hero": "fits/fit_sb_pink-stripe_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_sb_pink-stripe_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_sb_grey-tee",
+   "name": "Grey tee under the brown V",
+   "source": "brief-w5-w3-sets.md",
+   "category": "warm",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 4,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "zara-brown-cashmere-vneck"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_02_grey-crew"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_06_stone-gingham"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_04_churchs-apron-derby"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_02_tan-vera-pelle"
+    }
+   ],
+   "render": "fit_sb_grey-tee_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 103,
+   "images": {
+    "display": "fits/fit_sb_grey-tee_render.jpeg",
+    "hero": "fits/fit_sb_grey-tee_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_sb_grey-tee_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_bb2_grey-tee",
+   "name": "Grey tee under the blue V",
+   "source": "brief-w5-w3-sets.md",
+   "category": "warm",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "tissaia-blue-vneck"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_02_grey-crew"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_01_decathlon-beige"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_02_andre-tan-brogue"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_03_oxford-arlen-tan"
+    }
+   ],
+   "render": "fit_bb2_grey-tee_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 104,
+   "images": {
+    "display": "fits/fit_bb2_grey-tee_render.jpeg",
+    "hero": "fits/fit_bb2_grey-tee_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bb2_grey-tee_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_bb2_pink-stripe",
+   "name": "Pink stripe under the blue V",
+   "source": "brief-w5-w3-sets.md",
+   "category": "warm",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "tissaia-blue-vneck"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tops_12_paul-smith-pink-stripe-shirt"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_01_decathlon-beige"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_02_andre-tan-brogue"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_03_oxford-arlen-tan"
+    }
+   ],
+   "render": "fit_bb2_pink-stripe_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 105,
+   "images": {
+    "display": "fits/fit_bb2_pink-stripe_render.jpeg",
+    "hero": "fits/fit_bb2_pink-stripe_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bb2_pink-stripe_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_bb2_provencal",
+   "name": "Provencal print under the blue V",
+   "source": "brief-w5-w3-sets.md",
+   "category": "warm",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "tissaia-blue-vneck"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tops_48_souleiado-cream-navy-geometric-print-shirt"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_01_decathlon-beige"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_02_andre-tan-brogue"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_03_oxford-arlen-tan"
+    }
+   ],
+   "render": "fit_bb2_provencal_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 106,
+   "images": {
+    "display": "fits/fit_bb2_provencal_render.jpeg",
+    "hero": "fits/fit_bb2_provencal_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bb2_provencal_render.jpg",
+    "heroIsGenerated": true,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_bb2_red-tee",
+   "name": "Red tee under the blue V",
+   "source": "brief-w5-w3-sets.md",
+   "category": "warm",
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "top",
+     "position": 1,
+     "itemId": "tissaia-blue-vneck"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_05_red-crew"
+    },
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_01_decathlon-beige"
+    },
+    {
+     "role": "shoe",
+     "position": 1,
+     "itemId": "shoes_02_andre-tan-brogue"
+    },
+    {
+     "role": "belt",
+     "position": 1,
+     "itemId": "belts_03_oxford-arlen-tan"
+    }
+   ],
+   "render": "fit_bb2_red-tee_render.jpeg",
+   "vetted": true,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 107,
+   "images": {
+    "display": "fits/fit_bb2_red-tee_render.jpeg",
+    "hero": "fits/fit_bb2_red-tee_render.jpeg",
+    "heroThumb": "fits/thumbs/fit_bb2_red-tee_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
    }
@@ -4125,6 +5310,12 @@
      "role": "belt",
      "position": 1,
      "itemId": "belts_11_black-classic-pin-buckle"
+    },
+    {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
     },
     {
      "role": "bottom",
@@ -4280,6 +5471,12 @@
      "itemId": "fedeli-cashmere-crew"
     },
     {
+     "role": "base",
+     "position": 1,
+     "itemId": "tees_01_white-crew",
+     "note": "No wool next to skin — added 2026-09-08"
+    },
+    {
      "role": "bottom",
      "position": 2,
      "itemId": "trousers_17_inesis-navy"
@@ -4314,7 +5511,7 @@
    "id": "fit_full_send",
    "name": "Full send",
    "source": "built in the app 2026-08-31",
-   "category": null,
+   "category": "golf_seen",
    "temp": [
     "mild",
     "warm"
@@ -4365,10 +5562,116 @@
    }
   },
   {
+   "id": "fit_indigo_and_cream",
+   "name": "Indigo And Cream",
+   "source": "built with AI · Sun 6 Sep",
+   "category": null,
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": false,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_09_celio-indigo-jeans"
+    },
+    {
+     "role": "shoe",
+     "position": 2,
+     "itemId": "shoes_03_ecco-black-nubuck"
+    },
+    {
+     "role": "belt",
+     "position": 3,
+     "itemId": "belts_11_black-classic-pin-buckle"
+    },
+    {
+     "role": "top",
+     "position": 4,
+     "itemId": "unbranded-charcoal-fullzip"
+    },
+    {
+     "role": "base",
+     "position": 5,
+     "itemId": "tops_69_glenmuir-cream-mercerised-polo"
+    }
+   ],
+   "render": null,
+   "vetted": false,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "style": "Dark indigo denim under a cream mercerised polo is the easiest version of current — the charcoal zip bridges the two without adding a third colour idea. Black nubuck sneakers and a matching black belt keep the base tight and modern rather than heavy. It's the most relaxed of the three but the mercerised cotton stops it reading like a weekend.",
+   "sortOrder": 200,
+   "images": {
+    "heroIsGenerated": false,
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_navy_chino_client_lunch",
+   "name": "Navy Chino Client Lunch",
+   "source": "built with AI · Sun 6 Sep",
+   "category": null,
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": true,
+   "formalityRank": 4,
+   "goodFor": [
+    "casual"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "bottom",
+     "position": 1,
+     "itemId": "trousers_17_inesis-navy"
+    },
+    {
+     "role": "shoe",
+     "position": 2,
+     "itemId": "shoes_04_churchs-apron-derby"
+    },
+    {
+     "role": "belt",
+     "position": 3,
+     "itemId": "belts_02_tan-vera-pelle"
+    },
+    {
+     "role": "top",
+     "position": 4,
+     "itemId": "unbranded-charcoal-fullzip"
+    },
+    {
+     "role": "base",
+     "position": 5,
+     "itemId": "tops_09_white-pique-polo"
+    }
+   ],
+   "render": null,
+   "vetted": false,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "style": "The slate charcoal zip sits cleanly over a crisp white piqué, and the dark navy chino gives you the contrast the pale top needs so nothing washes out on the walk down to lunch. Chestnut derbies and a tan belt warm the whole grey-and-navy stack up and pull it out of gym territory. Unzip the knit at the table and the polo collar still carries it.",
+   "sortOrder": 200,
+   "images": {
+    "heroIsGenerated": false,
+    "looks": 1
+   }
+  },
+  {
    "id": "fit_peter_millar_clean",
    "name": "Peter Millar clean",
    "source": "built in the app 2026-08-31",
-   "category": null,
+   "category": "golf_pro",
    "temp": [
     "mild",
     "warm"
@@ -4522,6 +5825,66 @@
     "display": "fits/uploads/fit_raspberry_and_teal.jpg",
     "heroIsGenerated": false,
     "upload": "fits/uploads/fit_raspberry_and_teal.jpg",
+    "looks": 1
+   }
+  },
+  {
+   "id": "fit_the_shawl_0907",
+   "name": "The Shawl",
+   "source": "built in the app 2026-09-07",
+   "category": null,
+   "temp": [
+    "cold",
+    "mild"
+   ],
+   "rainSafe": false,
+   "formalityRank": 3,
+   "goodFor": [
+    "casual",
+    "work"
+   ],
+   "badFor": [],
+   "items": [
+    {
+     "role": "outer",
+     "position": 1,
+     "itemId": "outerwear_02_indindustrie-black-waxed-biker"
+    },
+    {
+     "role": "layer",
+     "position": 2,
+     "itemId": "ben-sherman-aubergine-shawl"
+    },
+    {
+     "role": "bottom",
+     "position": 3,
+     "itemId": "trousers_11_black-coated-jeans"
+    },
+    {
+     "role": "shoe",
+     "position": 4,
+     "itemId": "shoes_03_ecco-black-nubuck"
+    },
+    {
+     "role": "belt",
+     "position": 5,
+     "itemId": "belts_11_black-classic-pin-buckle"
+    },
+    {
+     "role": "top",
+     "position": 6,
+     "itemId": "tops_09_white-pique-polo"
+    }
+   ],
+   "render": null,
+   "vetted": false,
+   "wardrobe": "everyday",
+   "register": "everyday",
+   "sortOrder": 200,
+   "images": {
+    "display": "fits/uploads/fit_the_shawl_0907.jpg",
+    "heroIsGenerated": false,
+    "upload": "fits/uploads/fit_the_shawl_0907.jpg",
     "looks": 1
    }
   },
@@ -4692,7 +6055,7 @@
    "id": "fit_tour_monochrome",
    "name": "Tour monochrome",
    "source": "built in the app 2026-08-31",
-   "category": null,
+   "category": "golf_pro",
    "temp": [
     "mild",
     "warm"
