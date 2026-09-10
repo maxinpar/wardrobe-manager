@@ -19,7 +19,7 @@ from __future__ import annotations
 import hmac
 import os
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
@@ -47,6 +47,7 @@ from . import (
     forecast,
     picker,
     seed_data,
+    sets,
     wardrobes,
     week,
 )
@@ -440,6 +441,7 @@ def today_view():
             for f in picker.load_fits(conn)
             if (f.id in golf_fits) == (mode == "golf")
         }
+
         _, ranked, rejected = picker.pick(
             list(fits.values()), now, temp_c=temp_c, rain=rain, allow_disliked=allow_disliked
         )
@@ -660,6 +662,312 @@ def wear_today():
 
     flash(f"Logged “{fit['name']}”. Those garments are marked worn — still wearable.")
     return redirect(request.form.get("next") or url_for("today_view"))
+
+
+# ------------------------------------------------------------ this week ---
+#
+# Two screens: pick a set on Monday, then live on the week. Everything after
+# the pick happens on one page — tapping a day promotes it into the hero and
+# Move swaps two days, both without a navigation, because an earlier design had
+# a per-day detail view and it was cut as navigation that bought nothing.
+#
+# So the split of state is: the SERVER owns which set is on, which variant sits
+# on each day, and what was worn — the three facts that must survive a refresh
+# and a Tuesday. The BROWSER owns which day is in the hero and which day is
+# picked up, which are ways of looking at the week rather than facts about it.
+
+# The week's shape in words. week_days stores office/home per day and the
+# handoff writes them out longhand, which is the difference between a label and
+# a sentence: "Wed · in the office · today".
+DAY_PLACES = {"office": "in the office", "home": "working from home"}
+
+
+def week_context(conn) -> dict:
+    """Everything both This Week screens read, gathered once.
+
+    The picker and the week are one route because they are one feature with one
+    piece of state: whether a set has been chosen. Splitting them into two
+    endpoints would mean loading the sets twice and deciding twice which screen
+    a bare /week means.
+    """
+    fits = picker.load_fits(conn)
+    all_sets = sets.load(conn, fits)
+    by_key = {s.key: s for s in all_sets}
+
+    now = today()
+    start = week.week_start(now)
+    plan = week.get_or_create(conn, now)
+    chosen = by_key.get(plan["variant_set"])
+
+    variant_by_fit = {v.fit.id: v for v in chosen.variants} if chosen else {}
+
+    days = []
+    for row in week.days(conn, start):
+        # A variant that has since been binned, or a day left over from last
+        # week's set, is an EMPTY day rather than a broken one. The screen
+        # already knows how to draw a day with nothing on it.
+        variant = variant_by_fit.get(row["set_fit_id"]) if row["set_fit_id"] else None
+        days.append(
+            {
+                "weekday": row["weekday"],
+                "day": row["day"],
+                "place": DAY_PLACES.get(row["context_code"], row["context_label"]),
+                "variant": variant,
+                "worn": row["wear_event_id"] is not None,
+                "is_today": row["weekday"] == week.weekday_index(now),
+            }
+        )
+
+    laid = {d["variant"].fit.id for d in days if d["variant"]}
+    bench = [v for v in (chosen.variants if chosen else []) if v.fit.id not in laid]
+
+    return {
+        "sets": all_sets,
+        "week_set": chosen,
+        "days": days,
+        "bench": bench,
+        "worn_days": [d["day"] for d in days if d["worn"]],
+        # Derived from what was actually ticked, not from what was planned: the
+        # basket only holds the days that happened.
+        "wash_line": (
+            sets.wash_line(chosen, [d["variant"] for d in days if d["worn"] and d["variant"]])
+            if chosen
+            else ""
+        ),
+    }
+
+
+def lay_set_across_week(conn, start, chosen) -> None:
+    """Put a set on this week — every column both screens read, from one list.
+
+    THIS IS THE ONLY PLACE A WEEK GETS A SET, and it exists because there were
+    briefly two. Today adopted a base fit and planned `week_days.top_item_id`;
+    This Week chose a `variant_set` and filled `week_days.set_fit_id`. Same week,
+    same five days, two sets of columns — so picking a set on one screen left the
+    other one asking which set you wanted, which is not a week, it is two weeks
+    that disagree.
+
+    Order is formality first, authored position second. The ranks inside a set
+    are nearly uniform, so what this actually does is push the one softer variant
+    to the end of the week, which is where the softer days are — Thursday and
+    Friday are worked from home. Position breaks the ties, because that is the
+    order the brief put them in.
+
+    A day that has already been WORN is history and keeps what it has, exactly as
+    week.plan_tops has always treated it.
+    """
+    ordered = sorted(chosen.variants, key=lambda v: (-v.formality, v.position))
+
+    conn.execute(
+        "UPDATE week_plans SET variant_set = %s, base_fit_id = %s, adopted_at = now() "
+        "WHERE week_start = %s",
+        (chosen.key, ordered[0].fit.id if ordered else None, start),
+    )
+
+    worn = {
+        row["weekday"]
+        for row in week.days(conn, start)
+        if row["wear_event_id"] is not None
+    }
+    for index in range(len(sets.WEEKDAYS)):
+        if index in worn:
+            continue
+        variant = ordered[index] if index < len(ordered) else None
+        conn.execute(
+            # Both columns, from the same variant. `set_fit_id` is the whole fit,
+            # which is what carries the render; `top_item_id` is the garment that
+            # varies, which is what Today's strip names. Written together so the
+            # picture and the name cannot end up describing different days.
+            "UPDATE week_days SET set_fit_id = %s, top_item_id = %s "
+            "WHERE week_start = %s AND weekday = %s",
+            (
+                variant.fit.id if variant else None,
+                variant.vary_id if variant else None,
+                start,
+                index,
+            ),
+        )
+
+
+@app.route("/week")
+def week_view():
+    """This Week: pick a set, then wear it.
+
+    `?pick=1` forces the picker back up over a week that is already running —
+    that is the "Change set" button. A query parameter rather than a second
+    route, so that "Keep it, back to the week" is a link home rather than a
+    step further into history.
+    """
+    with db.connect() as conn:
+        context = week_context(conn)
+        renders = item_renders(conn)
+
+    picking = request.args.get("pick") == "1" or context["week_set"] is None
+    return render_template("week.html", picking=picking, renders=renders, **context)
+
+
+@app.route("/week/use", methods=["POST"])
+def week_use_set():
+    """Lay a set across Mon–Fri and go to the week.
+
+    The writing is lay_set_across_week's, so that adopting from Today and
+    choosing here produce the same week rather than two.
+    """
+    key = request.form["set_id"]
+    with db.connect() as conn:
+        chosen = next((s for s in sets.load(conn) if s.key == key), None)
+        if chosen is None:
+            abort(404)
+        start = week.week_start(today())
+        week.get_or_create(conn, today())
+        lay_set_across_week(conn, start, chosen)
+        conn.commit()
+
+    return redirect(url_for("week_view"))
+
+
+@app.route("/week/swap", methods=["POST"])
+def week_swap():
+    """Exchange two days' variants.
+
+    Only the variant moves. A worn tick stays with the day it was ticked on —
+    Monday happened on Monday — and in practice the question never arises,
+    because a worn day is inert: it cannot be picked up and cannot be dropped
+    onto. That guard is enforced here as well as in the browser, because a POST
+    is a POST however it arrived.
+    """
+    a = request.form.get("a", type=int)
+    b = request.form.get("b", type=int)
+    with db.connect() as conn:
+        start = week.week_start(today())
+        week.get_or_create(conn, today())
+        rows = {r["weekday"]: r for r in week.days(conn, start)}
+        if a not in rows or b not in rows or a == b:
+            abort(400)
+        if rows[a]["wear_event_id"] or rows[b]["wear_event_id"]:
+            abort(409)
+
+        for target, source in ((a, b), (b, a)):
+            conn.execute(
+                "UPDATE week_days SET set_fit_id = %s "
+                "WHERE week_start = %s AND weekday = %s",
+                (rows[source]["set_fit_id"], start, target),
+            )
+        conn.commit()
+    return week_reply()
+
+
+@app.route("/week/place", methods=["POST"])
+def week_place():
+    """Put a bench variant on a day. Never over a day that has been worn."""
+    weekday = request.form.get("weekday", type=int)
+    fit_id = request.form["fit_id"]
+    with db.connect() as conn:
+        start = week.week_start(today())
+        week.get_or_create(conn, today())
+        row = next((r for r in week.days(conn, start) if r["weekday"] == weekday), None)
+        if row is None:
+            abort(404)
+        if row["wear_event_id"]:
+            abort(409)
+
+        plan = db.fetch_one(
+            conn, "SELECT variant_set FROM week_plans WHERE week_start = %s", (start,)
+        )
+        # Only a member of the set that is actually on this week. The bench is
+        # drawn from that set, so anything else arrived from a stale page or by
+        # hand.
+        member = db.fetch_one(
+            conn,
+            "SELECT id FROM fits WHERE id = %s AND variant_set = %s",
+            (fit_id, plan["variant_set"] if plan else None),
+        )
+        if member is None:
+            abort(400)
+
+        conn.execute(
+            "UPDATE week_days SET set_fit_id = %s WHERE week_start = %s AND weekday = %s",
+            (fit_id, start, weekday),
+        )
+        conn.commit()
+    return week_reply()
+
+
+@app.route("/week/worn", methods=["POST"])
+def week_worn():
+    """Tick a day off, or take the tick back.
+
+    A tick is a real wearing: it writes the wear log and marks the garments
+    worn, because "what he actually wore" is not a second private notion this
+    screen keeps to itself — it is what the Log, the Hospital and Friday's wash
+    list are already built on.
+
+    Untick deletes the event. It does NOT put the garments back to clean: worn
+    blocks nothing in this app by design, and another day of the same week may
+    well have marked the same trouser. Undoing a tick made ten seconds ago
+    should not quietly launder a pair of jeans.
+    """
+    weekday = request.form.get("weekday", type=int)
+    with db.connect() as conn:
+        start = week.week_start(today())
+        week.get_or_create(conn, today())
+        row = next((r for r in week.days(conn, start) if r["weekday"] == weekday), None)
+        if row is None:
+            abort(404)
+
+        if row["wear_event_id"]:
+            # week_days.wear_event_id is ON DELETE SET NULL, so the day unticks
+            # itself and wear_event_items goes with the event.
+            conn.execute(
+                "DELETE FROM wear_events WHERE id = %s", (row["wear_event_id"],)
+            )
+            conn.commit()
+            return week_reply()
+
+        fit_id = row["set_fit_id"]
+        if not fit_id:
+            # "Nothing to wear yet" is a disabled button, not an error — but a
+            # POST can still arrive from a page that has gone stale.
+            abort(409)
+
+        fit = next((f for f in picker.load_fits(conn) if f.id == fit_id), None)
+        if fit is None:
+            abort(404)
+
+        event = db.fetch_one(
+            conn,
+            "INSERT INTO wear_events (worn_on, fit_id, context) "
+            "VALUES (%s, %s, %s) RETURNING id",
+            (start + timedelta(days=weekday), fit.id, row["context_code"]),
+        )
+        for item in fit.primary():
+            conn.execute(
+                "INSERT INTO wear_event_items (wear_event_id, item_id) VALUES (%s, %s)",
+                (event["id"], item["item_id"]),
+            )
+            set_laundry(conn, item["item_id"], "worn")
+        conn.execute(
+            "UPDATE week_days SET wear_event_id = %s "
+            "WHERE week_start = %s AND weekday = %s",
+            (event["id"], start, weekday),
+        )
+        conn.commit()
+    return week_reply()
+
+
+def week_reply():
+    """Where a week mutation goes next: back to the week, changed.
+
+    Every mutation here is an ordinary form POST, as everywhere else in this
+    app. The handoff's "no navigation" is about TAPPING A DAY — promoting it
+    into the hero is a way of looking, not a change, and that stays in the
+    browser. Swapping two days and ticking one off are changes, and a change
+    that has not reached Postgres is a change that lasts until the next reload.
+
+    Which day is in the hero survives the round trip in sessionStorage; see
+    this-week.js.
+    """
+    return redirect(url_for("week_view"))
 
 
 @app.route("/closet")

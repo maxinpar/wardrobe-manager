@@ -70,6 +70,7 @@ def days(conn, start: date) -> list[dict]:
         conn,
         """
         SELECT d.weekday, d.context_code, d.top_item_id, d.wear_event_id,
+               d.set_fit_id,
                c.label AS context_label, c.commutes,
                i.name AS top_name, i.hex AS top_hex
         FROM week_days d

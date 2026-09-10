@@ -53,14 +53,14 @@ KEY_ORDER = [
     "render", "commentary", "catch", "importNote", "vetted",
     # --- app-owned from here ---
     "wardrobe", "register", "style", "score", "killer", "hiddenByDefault",
-    "sortOrder", "images", "preconditions", "gone",
+    "sortOrder", "images", "preconditions", "gone", "variantSet", "variantPosition",
 ]
 
 # Keys that exist in the export and have never existed in data/fits.json.
 # --compare skips them: reporting them would be reporting the design working.
 APP_OWNED_KEYS = (
     "id", "wardrobe", "register", "style", "score", "killer", "hiddenByDefault",
-    "sortOrder", "images", "preconditions", "gone",
+    "sortOrder", "images", "preconditions", "gone", "variantSet", "variantPosition",
 )
 
 # fits_json.REGISTER_BY_CATEGORY, inverted: the hand file's `category` is a
@@ -232,6 +232,18 @@ def build_payload(conn, generated: str) -> dict:
             elif key == "preconditions":
                 if row["id"] in jobs:
                     fit[key] = jobs[row["id"]]
+            elif key in ("variantSet", "variantPosition"):
+                # WHICH SET A FIT BELONGS TO, written out because a reader that
+                # cannot see it invents a rule to replace it. The This Week
+                # design pack grouped the sets by fit-id prefix — the only
+                # signal this file used to carry — and lost one variant from
+                # every set, because each set has a member that already existed
+                # and was retagged rather than duplicated. Four days planned for
+                # a five-day week, from a set that has five.
+                column = "variant_set" if key == "variantSet" else "variant_position"
+                if row[column] is not None:
+                    fit[key] = row[column]
+
             elif key == "gone":
                 # Binned in the app. Exported so a session reading this file
                 # does not recommend an outfit Max has thrown out.
@@ -250,6 +262,17 @@ def build_payload(conn, generated: str) -> dict:
             "references wardrobe.json items[].id. 'id' is the database key and the "
             "only reliable one — 'code' survives only on the fits that were "
             "imported from the 2026-08-27 markdown."
+        ),
+        "variantNote": (
+            "A variant set is a fixed base with one garment changing per day. "
+            "'variantSet' is the AUTHORED grouping and the only correct one — "
+            "do not group these fits by the prefix in their id, which drops the "
+            "member of each set that already existed and was retagged rather "
+            "than duplicated, leaving four variants for a five-day week. "
+            "'variantPosition' is the order the brief put them in, not a "
+            "ranking. Which garment varies is the item unique to one member, "
+            "never a fixed role: some sets swap the top, others swap the shirt "
+            "or tee UNDER a knit that stays on."
         ),
         "renderNote": (
             "'images' carries every picture of a fit and 'images.display' is the "

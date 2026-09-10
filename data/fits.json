@@ -2,6 +2,7 @@
  "generated": "2026-09-09",
  "owner": "Max",
  "schemaNote": "Fits are ordered slots. Roles: outer, layer, top, base, bottom, shoe, belt, accessory. 'position' is the layering/display order. itemId references wardrobe.json items[].id. 'id' is the database key and the only reliable one — 'code' survives only on the fits that were imported from the 2026-08-27 markdown.",
+ "variantNote": "A variant set is a fixed base with one garment changing per day. 'variantSet' is the AUTHORED grouping and the only correct one — do not group these fits by the prefix in their id, which drops the member of each set that already existed and was retagged rather than duplicated, leaving four variants for a five-day week. 'variantPosition' is the order the brief put them in, not a ranking. Which garment varies is the item unique to one member, never a fixed role: some sets swap the top, others swap the shirt or tee UNDER a knit that stays on.",
  "renderNote": "'images' carries every picture of a fit and 'images.display' is the one a screen should draw. A hero or layered render is a GENERATED IMAGE, never a photograph of Max wearing the clothes, and images.heroIsGenerated says so. 'images.upload' is a picture Max uploaded in the app: it outranks the hero and is deliberately NOT labelled — whether it is a photograph or a render of his own is not recorded. images.looks is 2 only when a base/layered pair should be shown as a pair.",
  "wardrobeNote": "'wardrobe' is derived from the occasion tags of a fit and its garments, exactly as the /fits screen derives it — it is not a stored flag. A fit is golf when it carries the golf occasion, or is built on a crested club garment.",
  "counts": {
@@ -805,7 +806,9 @@
     "heroThumb": "fits/thumbs/fit_the_shawl_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "the_shawl",
+   "variantPosition": 1
   },
   {
    "code": "kl2",
@@ -1384,7 +1387,9 @@
     "heroThumb": "fits/thumbs/fit_w3_blue-vneck-and-beige_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "beige_blue",
+   "variantPosition": 1
   },
   {
    "code": "W4",
@@ -1512,7 +1517,9 @@
     "heroThumb": "fits/thumbs/fit_w5_brown-cashmere-and-gingham_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "stone_brown",
+   "variantPosition": 4
   },
   {
    "code": "W6",
@@ -1970,7 +1977,9 @@
     "heroThumb": "fits/thumbs/fit_c6_pale-blue-vest-and-black_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "black_canvas",
+   "variantPosition": 4
   },
   {
    "id": "fit_bc_charcoal-shirt",
@@ -2026,7 +2035,9 @@
     "heroThumb": "fits/thumbs/fit_bc_charcoal-shirt_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "black_canvas",
+   "variantPosition": 1
   },
   {
    "code": "K1",
@@ -2159,7 +2170,9 @@
     "heroThumb": "fits/thumbs/fit_bc_burgundy-crew_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "black_canvas",
+   "variantPosition": 2
   },
   {
    "code": "K2",
@@ -2279,7 +2292,9 @@
     "heroThumb": "fits/thumbs/fit_bc_sage-polo_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "black_canvas",
+   "variantPosition": 3
   },
   {
    "code": "K3",
@@ -2393,7 +2408,9 @@
     "heroThumb": "fits/thumbs/fit_bc_grey-henley_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "black_canvas",
+   "variantPosition": 5
   },
   {
    "code": "K4",
@@ -2450,7 +2467,9 @@
     "heroThumb": "fits/thumbs/fit_k4_navy-knit-and-beige_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "beige_brown",
+   "variantPosition": 1
   },
   {
    "code": "K5",
@@ -2563,7 +2582,9 @@
     "heroThumb": "fits/thumbs/fit_sh_grey-tee_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "the_shawl",
+   "variantPosition": 2
   },
   {
    "code": "K6",
@@ -2702,7 +2723,9 @@
     "heroThumb": "fits/thumbs/fit_sh_black-tee_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "the_shawl",
+   "variantPosition": 3
   },
   {
    "code": "S1",
@@ -2826,7 +2849,9 @@
     "heroThumb": "fits/thumbs/fit_sh_white-polo_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "the_shawl",
+   "variantPosition": 4
   },
   {
    "code": "S2",
@@ -2958,7 +2983,9 @@
     "heroThumb": "fits/thumbs/fit_sh_pale-blue-polo_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "the_shawl",
+   "variantPosition": 5
   },
   {
    "code": "C7",
@@ -4328,7 +4355,9 @@
     "heroThumb": "fits/thumbs/fit_bb_burgundy-crew_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "beige_brown",
+   "variantPosition": 2
   },
   {
    "code": "K14",
@@ -4447,7 +4476,9 @@
     "heroThumb": "fits/thumbs/fit_bb_charcoal-shirt_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "beige_brown",
+   "variantPosition": 3
   },
   {
    "code": "K15",
@@ -4555,7 +4586,9 @@
     "heroThumb": "fits/thumbs/fit_bb_sage-polo_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "beige_brown",
+   "variantPosition": 4
   },
   {
    "code": "K16",
@@ -4674,7 +4707,9 @@
     "heroThumb": "fits/thumbs/fit_bb_brown-vneck_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "beige_brown",
+   "variantPosition": 5
   },
   {
    "code": "M1",
@@ -4797,7 +4832,9 @@
     "heroThumb": "fits/thumbs/fit_sb_brown-stripe_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "stone_brown",
+   "variantPosition": 1
   },
   {
    "id": "fit_sb_pale-blue-twill",
@@ -4853,7 +4890,9 @@
     "heroThumb": "fits/thumbs/fit_sb_pale-blue-twill_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "stone_brown",
+   "variantPosition": 2
   },
   {
    "id": "fit_sb_pink-stripe",
@@ -4909,7 +4948,9 @@
     "heroThumb": "fits/thumbs/fit_sb_pink-stripe_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "stone_brown",
+   "variantPosition": 3
   },
   {
    "id": "fit_sb_grey-tee",
@@ -4965,7 +5006,9 @@
     "heroThumb": "fits/thumbs/fit_sb_grey-tee_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "stone_brown",
+   "variantPosition": 5
   },
   {
    "id": "fit_bb2_grey-tee",
@@ -5021,7 +5064,9 @@
     "heroThumb": "fits/thumbs/fit_bb2_grey-tee_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "beige_blue",
+   "variantPosition": 2
   },
   {
    "id": "fit_bb2_pink-stripe",
@@ -5077,7 +5122,9 @@
     "heroThumb": "fits/thumbs/fit_bb2_pink-stripe_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "beige_blue",
+   "variantPosition": 3
   },
   {
    "id": "fit_bb2_provencal",
@@ -5133,7 +5180,9 @@
     "heroThumb": "fits/thumbs/fit_bb2_provencal_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "beige_blue",
+   "variantPosition": 4
   },
   {
    "id": "fit_bb2_red-tee",
@@ -5189,7 +5238,9 @@
     "heroThumb": "fits/thumbs/fit_bb2_red-tee_render.jpg",
     "heroIsGenerated": true,
     "looks": 1
-   }
+   },
+   "variantSet": "beige_blue",
+   "variantPosition": 5
   },
   {
    "code": "M2",
