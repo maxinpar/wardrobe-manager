@@ -43,6 +43,30 @@ BASE_ORDER = ("outer", "top", "layer", "bottom", "belt", "shoe")
 
 ANCHOR_ROLES = ("outer", "top")
 
+# picker.weather_band's vocabulary, coldest first, so a set's bands always read
+# in the same order however they were stored.
+BAND_ORDER = ("cold", "mild", "warm")
+
+# The hero tiles label a garment by what it is doing in the outfit, not by the
+# schema's role name. `outer` and `top` both read as the thing over everything
+# else once the varying piece has been named separately.
+HERO_ROLE_LABELS = {
+    "outer": "layer",
+    "top": "layer",
+    "layer": "layer",
+    "bottom": "trouser",
+    "belt": "belt",
+    "shoe": "shoe",
+}
+
+
+def and_list(parts: list[str]) -> str:
+    """"cold, mild and warm" — never "cold and mild and warm"."""
+    parts = list(parts)
+    if len(parts) < 2:
+        return "".join(parts)
+    return ", ".join(parts[:-1]) + " and " + parts[-1]
+
 
 @dataclass
 class Piece:
@@ -52,6 +76,11 @@ class Piece:
     name: str
     short: str
     role: str
+    # Rain's one real consequence is suede and nubuck, and the sentence has to
+    # name the material. Both come off the item picker already loaded, rather
+    # than off a substring search of the garment's name.
+    rain_unsafe: bool = False
+    material: str | None = None
 
 
 @dataclass
@@ -66,6 +95,7 @@ class Variant:
     # Read here rather than off the Fit: picker.load_fits scores against the
     # temperature bands and has never needed the rank, so it does not load it.
     formality: int = 0
+    bands: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -141,6 +171,100 @@ class Set:
             "on the next pull."
         )
 
+
+    # ------------------------------------------------------------ weather --
+    #
+    # Three facts and one sentence. The facts are the set's own — which
+    # temperatures its fits were built for, and whether its shoe survives rain.
+    # The sentence is written against a week, and is the only place the two
+    # meet.
+
+    @property
+    def shoe(self) -> Piece | None:
+        return next((p for p in self.base if p.role == "shoe"), None)
+
+    def bands(self) -> list[str]:
+        """The union of the variants' temperature bands, coldest first."""
+        held = {band for variant in self.variants for band in variant.bands}
+        return [band for band in BAND_ORDER if band in held]
+
+    def rain_word(self) -> str | None:
+        """"nubuck", when this set has a shoe that cannot be rained on.
+
+        Only the shoe and the anchor: a shirt under a knit never meets the
+        weather, and warning about it would be noise on every wet day.
+        """
+        for piece in (self.shoe, self.anchor):
+            if piece and piece.rain_unsafe:
+                return piece.material or "suede"
+        return None
+
+    def shoe_phrase(self, word: str) -> str:
+        """"the Ecco nubuck sneaker" — the material said once, not twice."""
+        shoe = self.shoe
+        if shoe is None:
+            return "shoe"
+        if word and word.lower() in shoe.short.lower():
+            return shoe.short
+        return f"{shoe.short} ({word})"
+
+    def weather_note(self, target: str, wet: bool, range_label: str) -> dict:
+        """Whether this set suits the week, in one line and a tone.
+
+        Rain outranks temperature, because a wet week has a consequence you can
+        act on — a different shoe, or a different set — and being a degree off
+        does not.
+        """
+        soaked = self.rain_word() if wet else None
+        if soaked:
+            return {
+                "text": f"Wet week — the {self.shoe_phrase(soaked)} stays in.",
+                "tone": "rained-out",
+            }
+
+        bands = self.bands()
+        if bands and target not in bands:
+            return {
+                "text": f"A {'/'.join(bands)} set on a {target} day.",
+                "tone": "wrong-band",
+            }
+        if not bands:
+            # A set whose fits carry no bands makes no claim, so the screen
+            # makes none on its behalf.
+            return {"text": "", "tone": "right"}
+        return {
+            "text": f"Built for {and_list(bands)} — right for {range_label}.",
+            "tone": "right",
+        }
+
+    def hero_pieces(self, variant: "Variant | None") -> list[dict]:
+        """The garments of one day, varying piece first.
+
+        The base is identical all week, so the only thing worth leading with is
+        the piece that makes this day itself — labelled `top` or `under`
+        depending on where it sits, which is `varyRole` read out loud.
+        """
+        out: list[dict] = []
+        if variant and variant.vary_id:
+            out.append(
+                {
+                    "item_id": variant.vary_id,
+                    "name": variant.vary_name,
+                    "role": "under" if variant.vary_role == "base" else "top",
+                }
+            )
+        for piece in self.base:
+            if variant and piece.item_id == variant.vary_id:
+                continue
+            out.append(
+                {
+                    "item_id": piece.item_id,
+                    "name": piece.name,
+                    "role": HERO_ROLE_LABELS.get(piece.role, piece.role),
+                }
+            )
+        return out
+
     def count_note(self) -> str:
         """"4 variants built, 1 day open" — or, for a full set, "5 days covered"."""
         open_days = len(WEEKDAYS) - len(self.variants)
@@ -204,6 +328,8 @@ def _piece(item: dict) -> Piece:
         name=item["name"],
         short=short_name(item),
         role=item["role"],
+        rain_unsafe=bool(item.get("rain_unsafe")),
+        material=item.get("material_hint"),
     )
 
 
@@ -292,6 +418,7 @@ def load(conn, fits: list[picker.Fit] | None = None) -> list[Set]:
                     vary_id=item["item_id"] if item else None,
                     vary_role=item["role"] if item else None,
                     formality=formality.get(member.id, 0),
+                    bands=list(member.temp_bands),
                 )
             )
 

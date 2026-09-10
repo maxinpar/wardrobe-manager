@@ -37,14 +37,16 @@ def garment(item_id, name, role, position=1, **extra):
         "verdict": "Keep",
         "scope": "core",
         "laundry_state": "clean",
-        "material_hint": None,
+        "material_hint": extra.get("material_hint"),
+        "rain_unsafe": extra.get("rain_unsafe", False),
         "formality_rank": 3,
         "occasions": ("work", "casual"),
     }
 
 
-def fit(fit_id, name, items, position, variant_set):
+def fit(fit_id, name, items, position, variant_set, bands=("cold", "mild")):
     return picker.Fit(
+        temp_bands=list(bands),
         id=fit_id,
         name=name,
         register="everyday",
@@ -65,7 +67,8 @@ def fit(fit_id, name, items, position, variant_set):
 BASE = [
     garment("trousers_11_black-coated-jeans", "Black coated straight jeans", "bottom", 4),
     garment("belts_11_black-classic-pin-buckle", "Black classic pin-buckle belt", "belt", 5),
-    garment("shoes_03_ecco-black-nubuck", "Ecco nubuck sneaker", "shoe", 6, cat="Shoes"),
+    garment("shoes_03_ecco-black-nubuck", "Ecco nubuck sneaker", "shoe", 6, cat="Shoes",
+            rain_unsafe=True, material_hint="nubuck"),
 ]
 
 COLOURS = {
@@ -78,6 +81,9 @@ COLOURS = {
     "tops_05_sage-pique-polo": "Sage green",
     "tees_02_grey-crew": "Grey",
     "tees_03_black-crew": "Black",
+    "trousers_01_decathlon-beige": "Sand / warm beige",
+    "belts_04_distressed-brown-everyday": "Rustic / distressed medium brown",
+    "shoes_07_oxford-brown-chelsea": "Brown / chestnut",
 }
 
 
@@ -148,6 +154,16 @@ def shawl_set():
     ]
 
 
+# beige_brown's own base: a Chelsea boot, which is not suede or nubuck and so
+# survives a wet week. Separate from BASE on purpose — sharing the black set's
+# nubuck sneaker would make every rain test pass for the wrong reason.
+BROWN_BASE = [
+    garment("trousers_01_decathlon-beige", "Decathlon chino", "bottom", 4),
+    garment("belts_04_distressed-brown-everyday", "Distressed brown everyday belt", "belt", 5),
+    garment("shoes_07_oxford-brown-chelsea", "Oxford Chelsea boot", "shoe", 6, cat="Shoes"),
+]
+
+
 def anchorless_set():
     """beige_brown: nothing is fixed above the waist — the top itself varies."""
     tops = [
@@ -156,7 +172,8 @@ def anchorless_set():
         ("fit_bb_sage-polo", "tops_05_sage-pique-polo", "Sage green piqué polo"),
     ]
     return [
-        fit(fit_id, name, [garment(item_id, name, "top", 2)] + BASE, i + 1, "beige_brown")
+        fit(fit_id, name, [garment(item_id, name, "top", 2)] + BROWN_BASE, i + 1,
+            "beige_brown", bands=("cold", "mild", "warm"))
         for i, (fit_id, item_id, name) in enumerate(tops)
     ]
 
@@ -288,3 +305,107 @@ def test_a_lone_fit_is_not_a_set(monkeypatch):
 def test_a_set_with_no_name_row_falls_back_to_its_key(monkeypatch):
     (built,) = load(monkeypatch, gilet_set(), [])
     assert built.name == "black canvas"
+
+
+# -------------------------------------------------------------- weather ---
+#
+# The three states of the line under a set on the picker, and the one rule
+# underneath them: rain outranks temperature, because a wet week has something
+# you can do about it and being a degree off does not.
+
+
+def test_bands_are_the_union_of_the_variants(monkeypatch):
+    (built,) = load(monkeypatch, gilet_set(), NAMES)
+    assert built.bands() == ["cold", "mild"]
+
+
+def test_bands_come_back_coldest_first_however_they_were_stored(monkeypatch):
+    fits = gilet_set()
+    fits[0].temp_bands = ["warm"]
+    fits[1].temp_bands = ["mild", "cold"]
+    (built,) = load(monkeypatch, fits, NAMES)
+    assert built.bands() == ["cold", "mild", "warm"]
+
+
+def test_a_set_that_suits_the_week_says_what_it_is_built_for(monkeypatch):
+    (built,) = load(monkeypatch, gilet_set(), NAMES)
+    note = built.weather_note("mild", False, "10–18°C")
+    assert note == {
+        "text": "Built for cold and mild — right for 10–18°C.",
+        "tone": "right",
+    }
+
+
+def test_a_set_for_the_wrong_end_of_the_thermometer_says_so(monkeypatch):
+    (built,) = load(monkeypatch, gilet_set(), NAMES)
+    note = built.weather_note("warm", False, "24–30°C")
+    assert note["tone"] == "wrong-band"
+    assert note["text"] == "A cold/mild set on a warm day."
+
+
+def test_rain_outranks_the_band(monkeypatch):
+    """Wet and the wrong band at once: the shoe is the actionable one."""
+    (built,) = load(monkeypatch, gilet_set(), NAMES)
+    note = built.weather_note("warm", True, "24–30°C")
+    assert note["tone"] == "rained-out"
+    assert note["text"] == "Wet week — the Ecco nubuck sneaker stays in."
+
+
+def test_the_material_is_said_once(monkeypatch):
+    """"the Ecco nubuck sneaker", never "the Ecco nubuck sneaker (nubuck)"."""
+    (built,) = load(monkeypatch, gilet_set(), NAMES)
+    assert built.shoe_phrase("nubuck") == "Ecco nubuck sneaker"
+    assert built.shoe_phrase("suede") == "Ecco nubuck sneaker (suede)"
+
+
+def test_a_set_with_a_rainproof_shoe_is_not_rained_out(monkeypatch):
+    """beige_brown's Chelsea boot carries no rain flag, so a wet week is fine."""
+    (built,) = load(monkeypatch, anchorless_set(), NAMES)
+    assert built.rain_word() is None
+    assert built.weather_note("mild", True, "10–18°C")["tone"] == "right"
+
+
+def test_a_set_claiming_no_bands_makes_no_claim(monkeypatch):
+    """Silence beats inventing a temperature the fits never said they suit."""
+    fits = gilet_set()
+    for f in fits:
+        f.temp_bands = []
+    (built,) = load(monkeypatch, fits, NAMES)
+    assert built.weather_note("warm", False, "24–30°C") == {"text": "", "tone": "right"}
+
+
+def test_and_list_never_says_and_twice():
+    assert sets.and_list(["cold"]) == "cold"
+    assert sets.and_list(["cold", "mild"]) == "cold and mild"
+    assert sets.and_list(["cold", "mild", "warm"]) == "cold, mild and warm"
+
+
+# --------------------------------------------------------- hero garments ---
+
+
+def test_hero_leads_with_the_garment_that_makes_the_day(monkeypatch):
+    (built,) = load(monkeypatch, gilet_set(), NAMES)
+    pieces = built.hero_pieces(built.variants[0])
+    assert [p["role"] for p in pieces] == ["top", "layer", "trouser", "belt", "shoe"]
+    assert pieces[0]["name"] == "Zara Man charcoal textured shirt"
+
+
+def test_a_set_that_varies_underneath_labels_it_under(monkeypatch):
+    """`varyRole` read out loud: the shawl stays on, the tee under it changes."""
+    (built,) = load(monkeypatch, shawl_set(), NAMES)
+    pieces = built.hero_pieces(built.variants[0])
+    assert pieces[0]["role"] == "under"
+    assert pieces[1]["role"] == "layer"
+
+
+def test_the_varying_piece_is_never_listed_twice(monkeypatch):
+    (built,) = load(monkeypatch, shawl_set(), NAMES)
+    for variant in built.variants:
+        ids = [p["item_id"] for p in built.hero_pieces(variant)]
+        assert len(ids) == len(set(ids))
+
+
+def test_a_day_with_no_variant_still_lists_the_base(monkeypatch):
+    (built,) = load(monkeypatch, gilet_set(), NAMES)
+    pieces = built.hero_pieces(None)
+    assert [p["role"] for p in pieces] == ["layer", "trouser", "belt", "shoe"]

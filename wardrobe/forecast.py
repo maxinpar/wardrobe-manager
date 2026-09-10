@@ -35,12 +35,17 @@ from . import db
 LATITUDE = -33.8777
 LONGITUDE = 151.2427
 PLACE = "Sydney East · Double Bay / Rose Bay / City"
+# The suburb on its own, for a line that has room for a place and not a region.
+PLACE_SHORT = "Double Bay"
 
 ENDPOINT = (
     "https://api.open-meteo.com/v1/forecast"
     "?latitude={lat}&longitude={lon}"
     "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code"
-    "&timezone=Australia%2FSydney&forecast_days=7"
+    # past_days as well as forecast_days: a Monday that has already been worn
+    # still shows what the weather actually did, which is the whole reason the
+    # week strip can be a record rather than only a plan.
+    "&timezone=Australia%2FSydney&past_days=7&forecast_days=7"
 )
 
 TIMEOUT_SECONDS = 8
@@ -162,10 +167,23 @@ def _at(values, index):
     return values[index]
 
 
+# How much of the past to keep. A week back covers the Monday of the current
+# week from its Friday, which is as far as any screen looks; beyond that it is
+# just old weather.
+KEEP_PAST = timedelta(days=14)
+
+
 def refresh(conn) -> list[Day]:
-    """Fetch and store the week. Old days go — a stale guess is not history."""
+    """Fetch and store the week, and the week behind it.
+
+    Days older than KEEP_PAST go. The recent past stays: once a day is in the
+    past its forecast has become a record, and the week strip reads it to say
+    what Monday was actually like.
+    """
     days = _fetch()
-    conn.execute("DELETE FROM forecast_days WHERE day < %s", (date.today(),))
+    conn.execute(
+        "DELETE FROM forecast_days WHERE day < %s", (date.today() - KEEP_PAST,)
+    )
     for entry in days:
         conn.execute(
             """
@@ -202,12 +220,19 @@ def _code_for(label: str) -> int | None:
 # --------------------------------------------------------------- reading --
 
 
-def _stored(conn) -> tuple[list[Day], datetime | None]:
+def _stored(conn, since: date | None = None) -> tuple[list[Day], datetime | None]:
+    """Stored days from `since` on, defaulting to today.
+
+    `since` is what lets the week strip reach backwards. The freshness check
+    still reads the newest fetch across whatever was asked for, so a screen
+    looking at Monday does not decide the forecast is stale because Monday's
+    row was written on Monday.
+    """
     rows = db.fetch_all(
         conn,
         "SELECT day, temp_min_c, temp_max_c, rain_chance_pct, sky_label, fetched_at "
         "FROM forecast_days WHERE day >= %s ORDER BY day",
-        (date.today(),),
+        (since or date.today(),),
     )
     days = [
         Day(
@@ -268,6 +293,37 @@ def _from_manual(temp_c: float | None, rain: bool) -> list[Day]:
         )
         for offset in range(7)
     ]
+
+
+def for_week(conn, start: date, manual_temp_c: float | None = None,
+             manual_rain: bool = False) -> dict[int, Day]:
+    """Mon–Fri of the week beginning `start`, keyed by weekday index.
+
+    MATCHED ON THE REAL DATE, NEVER ON THE WEEKDAY NAME. The feed returns a
+    fortnight centred on today, so two Mondays are in it; a name match on a
+    Thursday hands Monday's card *next* Monday's weather, confidently and
+    wrongly. Days the feed does not reach are simply absent from the dict, and
+    the screen draws no icon and no range for them rather than inventing one.
+
+    Same silence as week(): a weather service must never take a screen down.
+    """
+    stored, fetched_at = _stored(conn, start)
+    fresh = fetched_at is not None and (
+        datetime.now(fetched_at.tzinfo) - fetched_at
+    ) < STALE_AFTER
+
+    if not (stored and fresh):
+        try:
+            refresh(conn)
+            stored, _ = _stored(conn, start)
+        except (urllib.error.URLError, TimeoutError, ValueError, KeyError, OSError):
+            pass
+
+    if not stored:
+        stored = _from_manual(manual_temp_c, manual_rain)
+
+    wanted = {start + timedelta(days=index): index for index in range(5)}
+    return {wanted[day.day]: day for day in stored if day.day in wanted}
 
 
 def find(days: list[Day], key: str | None) -> Day:

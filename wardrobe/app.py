@@ -141,7 +141,12 @@ def require_login():
 
 @app.context_processor
 def header_weather():
-    """The header's read-only weather chips. Today is where it's actually set."""
+    """The header's read-only weather chips.
+
+    Read-only everywhere now: the form that set them was on Today. This Week
+    reads the real forecast, and these two settings are the floor it falls back
+    to when Open-Meteo cannot be reached.
+    """
     try:
         with db.connect() as conn:
             raw = get_setting(conn, "weather.temp_c", "18")
@@ -435,12 +440,6 @@ def today_view():
 # and a Tuesday. The BROWSER owns which day is in the hero and which day is
 # picked up, which are ways of looking at the week rather than facts about it.
 
-# The week's shape in words. week_days stores office/home per day and the
-# handoff writes them out longhand, which is the difference between a label and
-# a sentence: "Wed · in the office · today".
-DAY_PLACES = {"office": "in the office", "home": "working from home"}
-
-
 def week_context(conn) -> dict:
     """Everything both This Week screens read, gathered once.
 
@@ -455,8 +454,15 @@ def week_context(conn) -> dict:
 
     now = today()
     start = week.week_start(now)
+    today_index = week.weekday_index(now)
     plan = week.get_or_create(conn, now)
     chosen = by_key.get(plan["variant_set"])
+
+    # Mon–Fri of THIS week, matched on the real dates. A day the feed does not
+    # reach is simply absent, and its card draws no icon and no range.
+    manual_temp, manual_rain = manual_weather(conn)
+    sky = forecast.for_week(conn, start, manual_temp, manual_rain)
+    conn.commit()
 
     variant_by_fit = {v.fit.id: v for v in chosen.variants} if chosen else {}
 
@@ -470,15 +476,23 @@ def week_context(conn) -> dict:
             {
                 "weekday": row["weekday"],
                 "day": row["day"],
-                "place": DAY_PLACES.get(row["context_code"], row["context_label"]),
                 "variant": variant,
                 "worn": row["wear_event_id"] is not None,
-                "is_today": row["weekday"] == week.weekday_index(now),
+                "is_today": row["weekday"] == today_index,
+                "sky": sky.get(row["weekday"]),
             }
         )
 
     laid = {d["variant"].fit.id for d in days if d["variant"]}
     bench = [v for v in (chosen.variants if chosen else []) if v.fit.id not in laid]
+
+    # THE STRIP IS A RECORD; THE WEEK IS A DECISION. Day cards read every day
+    # the feed matched, worn ones included, because "what was Monday actually
+    # like" is a fair question. Everything that decides something — the range on
+    # the bar, which band the sets are judged against, whether the nubuck stays
+    # home — reads only from today on. History never dresses him.
+    ahead = [d["sky"] for d in days if d["weekday"] >= today_index and d["sky"]]
+    outlook = week_outlook(ahead, manual_temp, manual_rain)
 
     return {
         "sets": all_sets,
@@ -486,6 +500,15 @@ def week_context(conn) -> dict:
         "days": days,
         "bench": bench,
         "worn_days": [d["day"] for d in days if d["worn"]],
+        "outlook": outlook,
+        "set_notes": {
+            s.key: s.weather_note(outlook["band"], outlook["wet"], outlook["range"])
+            for s in all_sets
+        },
+        # Only when the set already on the week is the wrong one for it. The
+        # picker's bar says all this; on the week screen it is only worth a band
+        # if it is telling you something you can act on.
+        "weather_flag": week_flag(chosen, outlook) if chosen else "",
         # Derived from what was actually ticked, not from what was planned: the
         # basket only holds the days that happened.
         "wash_line": (
@@ -494,6 +517,79 @@ def week_context(conn) -> dict:
             else ""
         ),
     }
+
+
+def manual_weather(conn) -> tuple[float | None, bool]:
+    """The temperature and rain flag stored in settings — the offline floor.
+
+    Nothing sets these any more: Today was the screen with the little weather
+    form on it. They survive as the last thing the app was told, which is what
+    every forecast failure path falls back to.
+    """
+    raw = get_setting(conn, "weather.temp_c", "18")
+    rain = get_setting(conn, "weather.rain", "0") == "1"
+    try:
+        return float(raw), rain
+    except (TypeError, ValueError):
+        return None, rain
+
+
+def week_outlook(ahead: list, manual_temp: float | None, manual_rain: bool) -> dict:
+    """The week in one line, from the days still to come.
+
+    Band comes off the HIGHS rather than the midpoint: what Max dresses for is
+    how warm the day gets, not the average of dawn and mid-afternoon.
+    """
+    if not ahead:
+        # No forecast reached us. Say so plainly and fall back to the number the
+        # header already carries — never a blank, never an invented degree.
+        label = f"{manual_temp:g}°C" if manual_temp is not None else "—"
+        return {
+            "range": label,
+            "sky": "no forecast — using the temperature you set",
+            "band": picker.weather_band(manual_temp),
+            "wet": bool(manual_rain),
+            "source": "Open-Meteo unreachable",
+            "known": False,
+        }
+
+    lows = [d.lo for d in ahead if d.lo is not None]
+    highs = [d.hi for d in ahead if d.hi is not None]
+    low = round(min(lows)) if lows else None
+    high = round(max(highs)) if highs else None
+    label = "—" if low is None else (f"{low}°C" if low == high else f"{low}–{high}°C")
+
+    words: list[str] = []
+    for day in ahead:
+        if day.sky and day.sky not in words:
+            words.append(day.sky)
+
+    mean_high = sum(highs) / len(highs) if highs else None
+    return {
+        "range": label,
+        "sky": sets.and_list(words[:3]),
+        "band": picker.weather_band(mean_high),
+        "wet": any(d.wet for d in ahead),
+        "source": f"{forecast.PLACE_SHORT} · Open-Meteo, the days still to come",
+        "known": True,
+    }
+
+
+def week_flag(chosen, outlook: dict) -> str:
+    """The band under the week header, when the set no longer suits the week."""
+    soaked = chosen.rain_word() if outlook["wet"] else None
+    if soaked:
+        return (
+            f"It's wet and the {chosen.shoe_phrase(soaked)} stays home — "
+            "swap the shoe by hand, or change set."
+        )
+    bands = chosen.bands()
+    if bands and outlook["band"] not in bands:
+        return (
+            f"This is a {'/'.join(bands)} set and the week is "
+            f"{outlook['band']} at {outlook['range']}."
+        )
+    return ""
 
 
 def lay_set_across_week(conn, start, chosen) -> None:
@@ -512,8 +608,17 @@ def lay_set_across_week(conn, start, chosen) -> None:
     Friday are worked from home. Position breaks the ties, because that is the
     order the brief put them in.
 
-    A day that has already been WORN is history and keeps what it has, exactly as
-    week.plan_tops has always treated it.
+    PICKING A SET STARTS THE WEEK OVER, ticks included. week.plan_tops used to
+    treat a worn day as history and leave it alone, and carrying that rule over
+    here made the screen lie: the picker's own warning band says "Mon and Tue
+    lose their tick" and then they kept them. Worse, a day worn under the old
+    set held a fit the new set has never heard of, so it drew as "No variant
+    built for this day" — an empty Wednesday in the middle of a full week.
+
+    The ticks go; the WEAR EVENTS DO NOT. Unticking here only clears
+    `week_days.wear_event_id`, so the Log still records that he wore the shawl
+    on Wednesday — because he did. What is being reset is the plan, and a plan
+    is not entitled to delete history to tidy itself up.
     """
     ordered = sorted(chosen.variants, key=lambda v: (-v.formality, v.position))
 
@@ -523,22 +628,15 @@ def lay_set_across_week(conn, start, chosen) -> None:
         (chosen.key, ordered[0].fit.id if ordered else None, start),
     )
 
-    worn = {
-        row["weekday"]
-        for row in week.days(conn, start)
-        if row["wear_event_id"] is not None
-    }
     for index in range(len(sets.WEEKDAYS)):
-        if index in worn:
-            continue
         variant = ordered[index] if index < len(ordered) else None
         conn.execute(
             # Both columns, from the same variant. `set_fit_id` is the whole fit,
             # which is what carries the render; `top_item_id` is the garment that
             # varies, which is what Today's strip names. Written together so the
             # picture and the name cannot end up describing different days.
-            "UPDATE week_days SET set_fit_id = %s, top_item_id = %s "
-            "WHERE week_start = %s AND weekday = %s",
+            "UPDATE week_days SET set_fit_id = %s, top_item_id = %s, "
+            "wear_event_id = NULL WHERE week_start = %s AND weekday = %s",
             (
                 variant.fit.id if variant else None,
                 variant.vary_id if variant else None,

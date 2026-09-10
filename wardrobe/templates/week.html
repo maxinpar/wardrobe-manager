@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_weather.html" import glyph %}
 {% block title %}This Week — Wardrobe{% endblock %}
 
 {#- A variant tile: the render on white, or the dashed box for a day the set
@@ -19,12 +20,29 @@
 
 {% if picking %}
 {# ------------------------------------------------------------ the picker -
-   Monday, or "Change set". One row per authored set: what it is made of, the
-   five renders, and one primary button. #}
+   Monday, or "Change set". One row per authored set: what it is made of, what
+   the week is doing, the five renders, and one primary button. #}
 <section class="thisweek-pick">
+
+  {# The weather bar lives on THIS screen only. On the week screen every day
+     card and the hero carry their own, and a third statement of it was noise. #}
+  <div class="wx-bar">
+    {{ glyph(outlook.wet, 26) }}
+    <span class="wx-range">{{ outlook.range }}</span>
+    <span class="wx-sky">{{ outlook.sky }}</span>
+    <span class="wx-chip">{{ outlook.band }}</span>
+    <span class="wx-chip">{{ 'Rain' if outlook.wet else 'Dry' }}</span>
+    <span class="wx-source">{{ outlook.source }}</span>
+  </div>
+
   <header class="thisweek-pick-head">
     <h1>Which set this week?</h1>
-    <p>The sets you've built: a fixed base, and one garment that changes day to day.</p>
+    <p>
+      A fixed base, one garment that changes day to day.
+      {%- if outlook.known %}
+        At {{ outlook.range }}{{ ' and wet' if outlook.wet }}, these are the ones built for it.
+      {%- endif %}
+    </p>
   </header>
 
   {% if week_set %}
@@ -48,7 +66,11 @@
 
   <div class="thisweek-sets">
     {% for s in sets %}
-      <article class="thisweek-set">
+      {% set note = set_notes[s.key] %}
+      {# The whole row dims when the weather is against it. Not hidden: a set
+         that is wrong for the week is still a set he owns, and the reason is
+         written on the row. #}
+      <article class="thisweek-set is-{{ note.tone }}">
         <div class="thisweek-set-head">
           <div class="thisweek-set-title">
             <h2>{{ s.name }}</h2>
@@ -73,6 +95,10 @@
             <button type="submit" class="btn btn-ink thisweek-use">Wear this set →</button>
           </form>
         </div>
+
+        {% if note.text %}
+          <p class="thisweek-set-weather">{{ note.text }}</p>
+        {% endif %}
 
         <div class="thisweek-set-slots">
           {% for index in range(5) %}
@@ -115,41 +141,75 @@
     <a class="btn btn-ghost" href="{{ url_for('week_view', pick=1) }}">Change set</a>
   </header>
 
-  {# The hero is the focused day. The server renders today's; this-week.js
-     repaints it from the day cards' data attributes when another is tapped,
-     so every day's copy is already in the page. #}
+  {% if weather_flag %}
+    {# Only when the set on the week is wrong for the week. Rain's one real
+       consequence is a shoe, and that is something he can act on this morning. #}
+    <p class="thisweek-flag">{{ weather_flag }}</p>
+  {% endif %}
+
+  {# One hero panel per day, one of them shown. The renders are the same files
+     the strip below already loads, so five panels cost five cache hits and no
+     extra bytes — and it means tapping a day needs no fetch, no JSON payload
+     and no rebuilt markup, which is what "no navigation" has to mean on a
+     server-rendered screen. #}
   {% set focus = (days | selectattr('is_today') | list | first) or days[0] %}
-  <div class="thisweek-hero">
-    {# The day line is a child of the hero rather than of the copy column so
-       that the phone can put it above the picture and the desktop beside it,
-       from one piece of markup. #}
-    <p class="thisweek-hero-day" data-hero-day>
-      {{ focus.day }} · {{ focus.place }}{{ ' · today' if focus.is_today }}
-    </p>
-    <div class="thisweek-hero-frame" data-hero-frame>
-      {{ tile(focus.variant, 'thisweek-hero-figure', 'No variant built for this day') }}
-    </div>
-    <div class="thisweek-hero-copy">
-      <h2 class="thisweek-hero-name" data-hero-name>
-        {{ focus.variant.fit.name if focus.variant else 'No variant built for this day' }}
-      </h2>
-      <p class="thisweek-hero-sub" data-hero-sub>{{ week_set.sub_line(focus.variant) }}</p>
-      <p class="thisweek-hero-note" data-hero-note>
-        {{ (focus.variant.fit.commentary or '') if focus.variant else week_set.empty_note() }}
+  {% for d in days %}
+    <div class="thisweek-hero{{ ' is-on' if d is sameas focus }}" data-hero="{{ d.day }}">
+      <div class="thisweek-hero-frame">
+        {{ tile(d.variant, 'thisweek-hero-figure', 'No variant built for this day') }}
+      </div>
+
+      <p class="thisweek-hero-day">
+        {{ glyph(d.sky.wet if d.sky else outlook.wet, 20) }}
+        <span>
+          {{ d.day }}{{ ' · today' if d.is_today }}
+          {%- if d.sky %} · {{ d.sky.temp_label }}, {{ d.sky.sky }}{% endif %}
+        </span>
       </p>
-      <form method="post" action="{{ url_for('week_worn') }}">
-        <input type="hidden" name="weekday" value="{{ focus.weekday }}" data-hero-weekday>
+
+      <h2 class="thisweek-hero-name">
+        {{ d.variant.fit.name if d.variant else 'No variant built for this day' }}
+      </h2>
+
+      <p class="thisweek-hero-note">
+        {{ (d.variant.fit.commentary or '') if d.variant else week_set.empty_note() }}
+      </p>
+
+      {# The garments themselves, varying piece first — every one a link into
+         the wardrobe, because "what is that belt" is a question this screen
+         should be able to answer. Always two rows. #}
+      {% set pieces = week_set.hero_pieces(d.variant) %}
+      <div class="thisweek-hero-pieces"
+           style="--cols: {{ ((pieces|length) / 2)|round(0, 'ceil')|int }}">
+        {% for p in pieces %}
+          {% set r = renders.get(p.item_id) %}
+          <a class="thisweek-piece" href="{{ url_for('item_detail', item_id=p.item_id) }}">
+            <span class="thisweek-piece-frame">
+              {% if r and r.thumb %}
+                <img src="{{ url_for('photo', relative_path=r.thumb) }}" alt="" loading="lazy">
+              {% else %}
+                <span class="thisweek-chip-swatch" style="background: {{ (r.hex if r else none) or '#DCD5C7' }}"></span>
+              {% endif %}
+            </span>
+            <span class="thisweek-piece-role">{{ p.role }}</span>
+            <span class="thisweek-piece-name">{{ p.name }}</span>
+          </a>
+        {% endfor %}
+      </div>
+
+      <form method="post" action="{{ url_for('week_worn') }}" class="thisweek-hero-act">
+        <input type="hidden" name="weekday" value="{{ d.weekday }}">
         {# Disabled on an empty day, with the reason in the note above rather
            than in a tooltip nobody opens. #}
-        <button type="submit" class="thisweek-wear{{ ' is-worn' if focus.worn }}"
-                data-hero-wear {{ 'disabled' if not focus.variant }}>
-          {%- if not focus.variant -%}Nothing to wear yet
-          {%- elif focus.worn -%}Worn ✓
+        <button type="submit" class="thisweek-wear{{ ' is-worn' if d.worn }}"
+                {{ 'disabled' if not d.variant }}>
+          {%- if not d.variant -%}Nothing to wear yet
+          {%- elif d.worn -%}Worn ✓
           {%- else -%}I wore this{%- endif -%}
         </button>
       </form>
     </div>
-  </div>
+  {% endfor %}
 
   <section class="thisweek-strip">
     <div class="thisweek-strip-head">
@@ -163,18 +223,18 @@
                  data-day-name="{{ d.day }}"
                  data-weekday="{{ d.weekday }}"
                  data-worn="{{ '1' if d.worn else '0' }}"
-                 data-day-line="{{ d.day }} · {{ d.place }}{{ ' · today' if d.is_today }}"
-                 data-name="{{ d.variant.fit.name if d.variant else 'No variant built for this day' }}"
-                 data-sub="{{ week_set.sub_line(d.variant) }}"
-                 data-note="{{ (d.variant.fit.commentary or '') if d.variant else week_set.empty_note() }}"
-                 data-image="{{ url_for('photo', relative_path=d.variant.fit.render_thumb) if d.variant else '' }}"
                  {{ 'draggable=true' if not d.worn }}>
-          {# Five flat children, placed by grid area: down the card on desktop,
-             across the row on a phone. No wrapper divs, because a wrapper is
-             the thing that would have to be reordered. #}
           <div class="thisweek-day-head">
-            <span class="thisweek-day-name">{{ d.day }}</span>
-            <span class="thisweek-day-place">{{ d.place }}</span>
+            {# The filled pill is the only thing that says "today" now. The
+               state word went: the tick, the dimmed tile and the missing Move
+               pill already say worn three times over. #}
+            <span class="thisweek-day-name{{ ' is-today' if d.is_today }}">{{ d.day }}</span>
+            {% if d.sky %}
+              {{ glyph(d.sky.wet, 17, 1.7) }}
+              <span class="thisweek-day-temp">
+                {{ d.sky.lo|round|int }}–{{ d.sky.hi|round|int }}°
+              </span>
+            {% endif %}
           </div>
           <button type="button" class="thisweek-day-tile" data-day-pick>
             {{ tile(d.variant, 'thisweek-day-frame', 'No variant built for this day') }}
@@ -183,11 +243,8 @@
           <span class="thisweek-day-top">
             {{ d.variant.fit.name if d.variant else 'Build a fifth variant in the app' }}
           </span>
-          <span class="thisweek-day-state">
-            {%- if d.worn %}Worn{% elif d.is_today %}Today{% else %}To come{% endif -%}
-          </span>
-          {# No Move on a worn day: it was duplicating the state text, and a
-             worn day is not draggable, not liftable and not a drop target. #}
+          {# No Move on a worn day: a worn day is not draggable, not liftable
+             and not a valid drop target. #}
           {% if not d.worn %}
             <button type="button" class="thisweek-move" data-day-move>Move</button>
           {% endif %}

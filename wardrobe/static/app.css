@@ -43,6 +43,10 @@
   --line-drop: #C6BCA6;
   --band: #EFEADF;      /* the warning band under a header */
   --held: #EFE7D6;      /* the ground under something picked up */
+  --wx-bar: #E8E2D6;    /* the weather strip across the picker */
+  --wx-chip: #D2C9B6;   /* its two read-only pills */
+  --wx-flag: #F0E7D8;   /* the band that says the set is wrong for the week */
+  --wx-warn: #8A3A1E;   /* a set the rain has ruled out */
 
   --ui: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
@@ -2030,6 +2034,60 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
    cropping them to fill made five days of one week look like five different
    sizes of picture. */
 
+/* ------------------------------------------------------------ weather -- */
+/*
+   The bar is on the PICKER only. On the week screen every day card and the
+   hero carry their own weather, and a third statement of it was noise. */
+
+.wx-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: -22px -28px 0;   /* full bleed, out through main's padding */
+  padding: 13px 28px;
+  background: var(--wx-bar);
+  border-bottom: 1px solid var(--line-strong);
+}
+.wx-icon { flex: 0 0 auto; display: block; }
+.wx-range { flex: 0 0 auto; white-space: nowrap; font: 600 20px var(--ui); }
+.wx-sky {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14.5px;
+  color: var(--secondary);
+}
+.wx-chip {
+  flex: 0 0 auto;
+  border: 1px solid var(--wx-chip);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  color: var(--ink-hover);
+}
+.wx-source {
+  margin-left: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--ink-label);
+}
+
+/* The band under the week header, raised only when the set already on the week
+   is wrong for the week — a shoe that cannot be rained on, or a set built for
+   the wrong end of the thermometer. */
+.thisweek-flag {
+  margin: 0;
+  padding: 13px 28px;
+  margin-inline: -28px;
+  background: var(--wx-flag);
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-hover);
+}
+
 .thisweek-pick, .thisweek-screen {
   max-width: 1120px;
   display: flex;
@@ -2106,6 +2164,15 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 
 .thisweek-set-note { margin: 0; font-size: 13.5px; color: var(--ink-label); }
 
+/* One line per set saying whether the week suits it. The row dims rather than
+   hiding: a set the rain has ruled out is still a set he owns, and the reason
+   is written on the row. */
+.thisweek-set-weather { margin: 0; font-size: 14.5px; color: var(--secondary); }
+.thisweek-set.is-wrong-band { opacity: 0.7; }
+.thisweek-set.is-wrong-band .thisweek-set-weather { color: var(--brass-text); }
+.thisweek-set.is-rained-out { opacity: 0.55; }
+.thisweek-set.is-rained-out .thisweek-set-weather { color: var(--wx-warn); }
+
 /* ------------------------------------------------------------- the week -- */
 
 .thisweek-head {
@@ -2119,40 +2186,82 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 .thisweek-head h1 { margin: 0; font: 600 23px/1.25 var(--ui); letter-spacing: -0.02em; }
 .thisweek-head p { margin: 4px 0 0; font-size: 15px; color: var(--secondary); }
 
-.thisweek-hero {
+/* Five heroes are rendered, one is shown. See this-week.js: switching days
+   must not navigate, and five panels of markup over already-cached images is
+   cheaper than rebuilding six garment links in innerHTML. */
+.thisweek-hero { display: none; }
+.thisweek-hero.is-on {
   display: grid;
-  grid-template-columns: 380px minmax(0, 1fr);
+  grid-template-columns: 520px minmax(0, 1fr);
   grid-template-areas:
     "frame day"
-    "frame copy";
-  /* The frame spans both rows and is the tallest thing here, so without an
-     explicit `auto 1fr` the grid shares its 420px between the two tracks and
-     opens a hole under the day line. */
-  grid-template-rows: auto minmax(0, 1fr);
+    "frame name"
+    "frame note"
+    "frame pieces"
+    "frame act";
+  /* The picture is the main character of this screen and does not shrink to fit
+     the copy. `auto` down to the last row, which takes the slack, so the wear
+     button sits at the bottom of the column rather than floating mid-way. */
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   align-content: start;
   column-gap: 26px;
-  row-gap: 12px;
+  row-gap: 14px;
 }
 .thisweek-hero-day {
   grid-area: day;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 6px 0 0;
   font-size: 15px;
   color: var(--ink-label);
 }
 .thisweek-hero-frame { grid-area: frame; }
-.thisweek-hero-copy {
-  grid-area: copy;
+.thisweek-hero-name {
+  grid-area: name;
   align-self: start;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  margin: 0;
+  font: 600 30px/1.15 var(--ui);
+  letter-spacing: -0.02em;
 }
-.thisweek-hero-name { margin: 0; font: 600 32px/1.15 var(--ui); letter-spacing: -0.02em; }
-.thisweek-hero-sub { margin: 0; font-size: 15px; line-height: 1.55; color: var(--secondary); }
+
+/* The set's garments, the varying piece first. Always two rows — the column
+   count comes from the template, which knows how many pieces there are. */
+.thisweek-hero-pieces {
+  grid-area: pieces;
+  align-self: start;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+  gap: 12px;
+  max-width: 470px;
+}
+.thisweek-piece { display: flex; flex-direction: column; gap: 6px; text-decoration: none; }
+.thisweek-piece-frame {
+  display: block;
+  height: 118px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.thisweek-piece-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.thisweek-piece-role {
+  font-size: 11.5px;
+  color: #8A8272;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.thisweek-piece-name { font-size: 12.5px; line-height: 1.3; color: var(--ink-hover); }
+.thisweek-piece:hover .thisweek-piece-frame { border-color: var(--ink); }
+.thisweek-piece:hover .thisweek-piece-name { color: var(--ink); }
+
+.thisweek-hero-act { grid-area: act; align-self: end; }
 /* Most fits carry commentary; a few do not, and an empty paragraph would
    still take its share of the column's gap. */
 .thisweek-hero-note:empty { display: none; }
 .thisweek-hero-note {
+  grid-area: note;
+  align-self: start;
   margin: 0;
   font-size: 14.5px;
   line-height: 1.55;
@@ -2161,8 +2270,6 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 }
 
 .thisweek-wear {
-  align-self: flex-start;
-  margin-top: 6px;
   border: 0;
   border-radius: 999px;
   padding: 16px 28px;
@@ -2208,10 +2315,10 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "head  head"
-    "tile  tile"
-    "top   top"
-    "state move";
+    "head head"
+    "tile tile"
+    "top  top"
+    ".    move";
   align-items: center;
   gap: 8px;
   padding: 10px;
@@ -2237,11 +2344,26 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 .thisweek-day-head {
   grid-area: head;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 7px;
   min-width: 0;
 }
-.thisweek-day-name { font: 600 17px var(--ui); }
+.thisweek-day-name { flex: 0 0 auto; font: 600 17px var(--ui); }
+/* The only thing that says "today" now. The state word went — the tick, the
+   dimmed tile and the missing Move pill already said worn three times. */
+.thisweek-day-name.is-today {
+  background: var(--ink);
+  color: var(--page);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.thisweek-day-temp {
+  font-size: 13px;
+  color: var(--secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .thisweek-day-place {
   font-size: 13px;
   color: var(--ink-label);
@@ -2288,9 +2410,6 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
   min-height: 38px;
 }
 .thisweek-day.is-worn .thisweek-day-top { color: var(--secondary); }
-
-.thisweek-day-state { grid-area: state; font-size: 13.5px; color: var(--secondary); }
-.thisweek-day.is-worn .thisweek-day-state { color: var(--ink-faint); }
 
 .thisweek-move {
   grid-area: move;
@@ -2382,7 +2501,7 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 }
 
 .thisweek-slot-frame { height: 170px; border-radius: 8px; padding: 12px; font-size: 13.5px; }
-.thisweek-hero-figure { height: 420px; border-radius: 10px; padding: 30px; font-size: 16px; }
+.thisweek-hero-figure { height: 620px; border-radius: 10px; padding: 30px; font-size: 16px; }
 .thisweek-day-frame { height: 176px; border-radius: 9px; padding: 12px; font-size: 13.5px; }
 .thisweek-bench-frame { height: 150px; border-radius: 9px; }
 
@@ -2395,6 +2514,19 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
 
 @media (max-width: 760px) {
   .thisweek-pick, .thisweek-screen { gap: 18px; }
+
+  .wx-bar {
+    margin: -18px -14px 0;
+    padding: 11px 18px;
+    gap: 10px;
+  }
+  .wx-range { font-size: 18px; }
+  .wx-sky { font-size: 13.5px; }
+  /* Only the rain chip survives, pushed right: the band is already said in
+     words two lines below, and a source line is not worth 390px of anything. */
+  .wx-chip:first-of-type, .wx-source { display: none; }
+  .wx-chip { margin-left: auto; padding: 5px 11px; font-size: 12.5px; }
+  .thisweek-flag { margin-inline: -14px; padding: 12px 18px; font-size: 14.5px; }
 
   .thisweek-pick-head h1 { font-size: 24px; }
   .thisweek-pick-head p { font-size: 14.5px; }
@@ -2430,18 +2562,25 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
   .thisweek-head p { display: none; }
   .btn-ghost { padding: 12px 14px; font-size: 13.5px; min-height: 46px; }
 
-  /* The day line above the picture, the name and the button below it. */
-  .thisweek-hero {
+  /* The day line and the name go above the picture — on a phone the thing you
+     opened the app for is what you are wearing today, not the set's title. */
+  .thisweek-hero.is-on {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "day" "frame" "copy";
-    row-gap: 10px;
+    grid-template-areas: "day" "name" "frame" "pieces" "act" "note";
+    grid-template-rows: none;
+    row-gap: 12px;
   }
   .thisweek-hero-day { margin: 0; }
-  .thisweek-hero-figure { height: 340px; border-radius: 12px; padding: 24px; font-size: 15px; }
-  .thisweek-hero-copy { gap: 8px; }
   .thisweek-hero-name { font-size: 22px; }
-  .thisweek-hero-sub { font-size: 14.5px; line-height: 1.5; }
-  .thisweek-wear { align-self: stretch; padding: 18px; min-height: 54px; font-size: 17px; }
+  .thisweek-hero-figure { height: 440px; border-radius: 12px; padding: 24px; font-size: 15px; }
+  .thisweek-hero-pieces { max-width: none; gap: 10px; }
+  .thisweek-piece-frame { height: 96px; border-radius: 6px; }
+  .thisweek-piece-role { font-size: 10.5px; }
+  /* The garment names go: five of them under 96px tiles is a wall of text
+     between the picture and the button that matters. */
+  .thisweek-piece-name { display: none; }
+  .thisweek-hero-note { font-size: 14px; }
+  .thisweek-wear { width: 100%; padding: 18px; min-height: 54px; font-size: 17px; }
 
   /* Stacked rows, not a squeezed five-column grid: an 88px thumb, the day and
      its garment, and Move at a real 44px. */
@@ -2449,9 +2588,8 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
   .thisweek-day {
     grid-template-columns: 88px minmax(0, 1fr) auto;
     grid-template-areas:
-      "tile head  move"
-      "tile top   move"
-      "tile state move";
+      "tile head move"
+      "tile top  move";
     column-gap: 12px;
     row-gap: 2px;
     border-width: 1.5px;
@@ -2460,8 +2598,7 @@ h3 { font-size: 14px; margin: 18px 0 8px; }
   .thisweek-day-name { font-size: 16px; }
   .thisweek-day-frame { height: 88px; border-radius: 8px; padding: 6px; font-size: 11.5px; }
   .thisweek-day-drop { font-size: 12.5px; padding: 6px; border-radius: 7px; }
-  .thisweek-day-top { align-self: center; min-height: 0; font-size: 14.5px; }
-  .thisweek-day-state { align-self: start; }
+  .thisweek-day-top { align-self: start; min-height: 0; font-size: 14.5px; }
   .thisweek-move { min-height: 44px; padding: 0 14px; }
 
   .thisweek-strip-foot { display: none; }

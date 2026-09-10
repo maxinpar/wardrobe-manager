@@ -6,22 +6,24 @@
    day into the hero is not a change, and the handoff is explicit that it must
    not navigate, because an earlier design had a per-day screen and it was cut.
 
-   So the page arrives with all five days' copy already in it, as data
-   attributes on the day cards, and this file moves it into the hero. Nothing is
-   fetched and nothing is invented: if a day card says it, the hero can show it.
+   THE SERVER RENDERS ALL FIVE HEROES and this file shows one. It used to hold
+   each day's copy in data- attributes and rebuild the hero from them, which was
+   fine while a hero was a picture and three lines. It is now a picture, three
+   lines and up to six garment tiles that are links into the wardrobe, and
+   rebuilding that in innerHTML would be a second, worse copy of the template
+   living in a .js file. Five panels of markup cost nothing: every render and
+   every garment thumbnail on them is a file the day strip below has already
+   pulled, so switching days is five cache hits and a class change.
 
    THE FOCUS SURVIVES A ROUND TRIP. Ticking Wednesday off is a POST and a
    redirect, and coming back to a screen that has jumped to today would undo the
-   click that got you there. sessionStorage, keyed by nothing more than the app:
-   it is view state, it does not belong in Postgres, and it should not outlive
-   the tab. Same reasoning as layer-switch.js.
+   click that got you there. sessionStorage, keyed to the set so that changing
+   set drops it rather than opening the new week on whichever day you were
+   looking at in the old one. Same reasoning as layer-switch.js: it is view
+   state, it does not belong in Postgres, and it should not outlive the tab.
 
-   It is stored WITH THE SET, so that changing set drops it rather than opening
-   the new week on whichever day you happened to be looking at in the old one.
-   A fresh set opens on today, which is what the server drew.
-
-   Without this file the screen still works: the hero shows today, the forms
-   still post, and only the Move pills go quiet. */
+   Without this file the screen still works: today's hero is the one the server
+   marked, the forms still post, and only the Move pills go quiet. */
 
 (function () {
   "use strict";
@@ -61,73 +63,37 @@
     return null;
   }
 
-  function focused() {
-    return screen.querySelector(".thisweek-day.is-focus") || days[0];
-  }
-
   /* ------------------------------------------------------------- the hero */
 
-  function setText(selector, text) {
-    var node = screen.querySelector(selector);
-    if (node) node.textContent = text;
-  }
+  function focus(card) {
+    var day = card.getAttribute("data-day-name");
 
-  function paintHero(card) {
-    var frame = screen.querySelector("[data-hero-frame]");
-    var image = card.getAttribute("data-image");
-    if (frame) {
-      if (image) {
-        frame.innerHTML = "";
-        var figure = document.createElement("span");
-        figure.className = "thisweek-hero-figure";
-        var img = document.createElement("img");
-        img.src = image;
-        img.alt = card.getAttribute("data-name");
-        figure.appendChild(img);
-        frame.appendChild(figure);
-      } else {
-        frame.innerHTML = "";
-        var empty = document.createElement("span");
-        empty.className = "thisweek-hero-figure is-empty";
-        empty.textContent = "No variant built for this day";
-        frame.appendChild(empty);
-      }
+    for (var i = 0; i < days.length; i++) {
+      days[i].classList.toggle("is-focus", days[i] === card);
     }
-
-    setText("[data-hero-day]", card.getAttribute("data-day-line"));
-    setText("[data-hero-name]", card.getAttribute("data-name"));
-    setText("[data-hero-sub]", card.getAttribute("data-sub"));
-    setText("[data-hero-note]", card.getAttribute("data-note"));
-
-    var weekday = screen.querySelector("[data-hero-weekday]");
-    if (weekday) weekday.value = card.getAttribute("data-weekday");
-
-    var worn = card.getAttribute("data-worn") === "1";
-    var empty = !image;
-    var button = screen.querySelector("[data-hero-wear]");
-    if (button) {
-      button.disabled = empty;
-      button.classList.toggle("is-worn", worn && !empty);
-      button.textContent = empty ? "Nothing to wear yet" : (worn ? "Worn ✓" : "I wore this");
+    var heroes = screen.querySelectorAll("[data-hero]");
+    for (var j = 0; j < heroes.length; j++) {
+      heroes[j].classList.toggle("is-on", heroes[j].getAttribute("data-hero") === day);
     }
 
     /* The bench puts a variant on the FOCUSED day, so its buttons and its hint
        follow the hero. A worn day is not a target — the tiles dim and stop
-       being clickable rather than disappearing, so the set is still visible. */
-    var day = card.getAttribute("data-day-name");
+       being clickable rather than disappearing, so the set stays visible. */
     var bench = screen.querySelector(".thisweek-bench");
     if (bench) {
+      var worn = card.getAttribute("data-worn") === "1";
+      var weekday = card.getAttribute("data-weekday");
+
       var targets = bench.querySelectorAll("[data-bench-weekday]");
-      for (var i = 0; i < targets.length; i++) {
-        targets[i].value = card.getAttribute("data-weekday");
-      }
+      for (var k = 0; k < targets.length; k++) targets[k].value = weekday;
+
       var picks = bench.querySelectorAll("[data-bench-pick]");
-      for (var j = 0; j < picks.length; j++) picks[j].disabled = worn;
+      for (var m = 0; m < picks.length; m++) picks[m].disabled = worn;
       bench.classList.toggle("is-blocked", worn);
 
       var tags = bench.querySelectorAll("[data-bench-tag]");
-      for (var k = 0; k < tags.length; k++) {
-        tags[k].textContent = worn ? day + " is worn" : "Put it on " + day;
+      for (var n = 0; n < tags.length; n++) {
+        tags[n].textContent = worn ? day + " is worn" : "Put it on " + day;
       }
       var hint = bench.querySelector("[data-bench-hint]");
       var hintDay = bench.querySelector("[data-bench-day]");
@@ -137,13 +103,8 @@
         hintDay.textContent = day;
       }
     }
-  }
 
-  function focus(card) {
-    for (var i = 0; i < days.length; i++) days[i].classList.remove("is-focus");
-    card.classList.add("is-focus");
-    write(card.getAttribute("data-day-name"));
-    paintHero(card);
+    write(day);
   }
 
   /* ------------------------------------------------------- picking a day up */
@@ -202,19 +163,20 @@
 
   /* --------------------------------------------------------------- wiring */
 
-  var hint = screen.querySelector("[data-strip-hint]");
-  if (hint) hint.setAttribute("data-resting", hint.textContent.trim());
+  var restingHint = screen.querySelector("[data-strip-hint]");
+  if (restingHint) restingHint.setAttribute("data-resting", restingHint.textContent.trim());
 
   for (var i = 0; i < days.length; i++) {
     (function (card) {
       var pick = card.querySelector("[data-day-pick]");
       if (pick) {
         pick.addEventListener("click", function () {
-          /* While a day is held, tapping another day is the swap — that is the
+          /* While a day is held, tapping another day IS the swap — that is the
              one-handed path, and it has to beat "focus this day" or the pill
              would be the only way to finish a move. */
-          if (isTarget(card)) swap(lifted, card);
-          else {
+          if (isTarget(card)) {
+            swap(lifted, card);
+          } else {
             lifted = null;
             paintLift();
             focus(card);
@@ -266,6 +228,5 @@
   /* Arrive where you left off — or on today, which is what the server drew. */
   var remembered = read();
   var card = remembered ? cardFor(remembered) : null;
-  if (card && card !== focused()) focus(card);
-  else focus(focused());
+  if (card) focus(card);
 })();

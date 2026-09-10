@@ -1,0 +1,32 @@
+{#- The app's weather glyphs, defined once.
+
+    Before this the weather was text everywhere — two chips in the header
+    reading "24°C · warm" and "Dry". This Week needs a sun and a rain cloud at
+    four sizes, and the rule from the handoff is that they get added centrally
+    and the header chips start using them too, rather than the app growing a
+    second weather vocabulary that happens to live on one screen.
+
+    Stroke, not fill, at a 24px viewBox: they sit next to 13–20px type and a
+    filled glyph at that size reads as a blob. `currentColor` is deliberately
+    NOT used — a sun is amber and rain is slate wherever they appear, and
+    inheriting the ink of whatever line they land in would make them grey. -#}
+
+{% macro sun(size=20, stroke=1.6) -%}
+<svg class="wx-icon" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24"
+     fill="none" stroke="#B07A16" stroke-width="{{ stroke }}" stroke-linecap="round"
+     aria-hidden="true" focusable="false"
+  ><circle cx="12" cy="12" r="4.2"></circle><path d="M12 2.8v2.3M12 18.9v2.3M2.8 12h2.3M18.9 12h2.3M5.4 5.4l1.6 1.6M17 17l1.6 1.6M18.6 5.4L17 7M7 17l-1.6 1.6"></path></svg>
+{%- endmacro %}
+
+{% macro rain(size=20, stroke=1.6) -%}
+<svg class="wx-icon" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24"
+     fill="none" stroke="#3E5A6B" stroke-width="{{ stroke }}" stroke-linecap="round"
+     aria-hidden="true" focusable="false"
+  ><path d="M7.4 16.2a3.9 3.9 0 0 1 .5-7.8 5.2 5.2 0 0 1 9.8 1.3 3.3 3.3 0 0 1-.6 6.5H7.4Z"></path><path d="M9.2 19l-.9 1.9M13 19l-.9 1.9M16.8 19l-.9 1.9"></path></svg>
+{%- endmacro %}
+
+{#- The one callers actually want: wet or dry, decided here so no template has
+    to remember which way round the test goes. -#}
+{% macro glyph(wet, size=20, stroke=1.6) -%}
+{% if wet %}{{ rain(size, stroke) }}{% else %}{{ sun(size, stroke) }}{% endif %}
+{%- endmacro %}
