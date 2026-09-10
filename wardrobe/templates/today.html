@@ -39,9 +39,19 @@
     <div class="empty-state">
       <h2>Nothing is wearable today</h2>
       <p>
-        Every fit in your {{ wardrobe_labels[wardrobe]|lower }} wardrobe is
-        blocked — in the wash, at the tailor, or built on something that has
-        gone. The Fits screen says which, and why.
+        {# Today ranks sets where the wardrobe has them, so the sentence has to
+           say which thing is blocked. "Every fit" would send you to the Fits
+           screen to look at the ninety that were never in the running. #}
+        {% if sets_only %}
+          Every set in your {{ wardrobe_labels[wardrobe]|lower }} wardrobe is
+          blocked — in the wash, at the tailor, or built on something that has
+          gone. Today shows sets, because a set is five days that each have a
+          picture. The Fits screen says what is blocking them.
+        {% else %}
+          Every fit in your {{ wardrobe_labels[wardrobe]|lower }} wardrobe is
+          blocked — in the wash, at the tailor, or built on something that has
+          gone. The Fits screen says which, and why.
+        {% endif %}
       </p>
       <a class="btn btn-ink" href="{{ url_for('fits_view', state='blocked') }}">See what's blocking them</a>
     </div>

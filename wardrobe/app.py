@@ -442,6 +442,22 @@ def today_view():
             if (f.id in golf_fits) == (mode == "golf")
         }
 
+        # TODAY ONLY OFFERS SETS. A fit that is not part of a variant set is one
+        # outfit, and adopting it as the week's base gives four days that have
+        # no picture — week.rotation() has to go looking for "some other top
+        # that goes with this trouser", which is the week the sets were built to
+        # stop happening. A set is five days that were each thought about and
+        # each rendered, so those are the only things worth putting on a screen
+        # whose whole job is the next five days.
+        #
+        # ONLY WHERE THE WARDROBE HAS ANY. Golf has twenty fits and no sets, and
+        # a rule that leaves that screen permanently empty is not a rule, it is
+        # an outage. A wardrobe with no sets goes on behaving exactly as before.
+        in_sets = {i: f for i, f in fits.items() if f.variant_set}
+        sets_only = bool(in_sets)
+        if sets_only:
+            fits = in_sets
+
         _, ranked, rejected = picker.pick(
             list(fits.values()), now, temp_c=temp_c, rain=rain, allow_disliked=allow_disliked
         )
@@ -549,6 +565,10 @@ def today_view():
         # Two different nothings, and they need different words: a wardrobe with
         # no fits in it at all, versus one whose fits are all blocked today.
         wardrobe_empty=not fits,
+        # Whether the ranking was narrowed to sets, so the blocked message can
+        # say "every set" rather than "every fit" — which would be a lie, and
+        # the kind that sends you to the Fits screen looking for the wrong thing.
+        sets_only=sets_only,
         pieces=pieces,
         base=[p for p in pieces if p["role"] != "top"],
         day_top=day_top,
@@ -574,7 +594,17 @@ def today_view():
 
 @app.route("/today/adopt", methods=["POST"])
 def adopt_fit():
-    """Adopting a fit sets this week's base and plans the tops over it."""
+    """Adopting on Today is choosing the week's set. It is the same act.
+
+    Today ranks sets, so what is being adopted is nearly always a member of one,
+    and the thing Max means by it is "I am wearing this set this week" — not "I
+    am wearing this one outfit and something will work the rest out". So it lays
+    the whole set, through the same call This Week uses, and the two screens open
+    on the same five days.
+
+    A fit that is not in a set still adopts the old way: base plus a rotation of
+    tops. Golf has twenty of those and no sets at all.
+    """
     fit_id = request.form["fit_id"]
     with db.connect() as conn:
         fits = {f.id: f for f in picker.load_fits(conn)}
@@ -583,9 +613,25 @@ def adopt_fit():
             abort(404)
         start = week.week_start(today())
         week.get_or_create(conn, today())
-        week.adopt(conn, start, fit)
+
+        chosen = None
+        if fit.variant_set:
+            chosen = next(
+                (s for s in sets.load(conn) if s.key == fit.variant_set), None
+            )
+        if chosen is not None:
+            lay_set_across_week(conn, start, chosen)
+        else:
+            week.adopt(conn, start, fit)
         conn.commit()
-    flash(f"“{fit.name}” is this week's base. Only the top changes now.")
+
+    if chosen is not None:
+        flash(
+            f"“{chosen.name}” is this week's set. {chosen.vary_line()} — "
+            "the five days are laid out in This Week."
+        )
+    else:
+        flash(f"“{fit.name}” is this week's base. Only the top changes now.")
     return redirect(request.form.get("next") or url_for("today_view"))
 
 
