@@ -236,10 +236,10 @@ def set_wardrobe(mode: str):
         set_setting(conn, "wardrobe.mode", mode)
         conn.commit()
 
-    target = request.form.get("next") or url_for("today_view")
+    target = request.form.get("next") or url_for("week_view")
     split = urlsplit(target)
     if split.scheme or split.netloc:      # never redirect off-site
-        return redirect(url_for("today_view"))
+        return redirect(url_for("week_view"))
     keep = [
         part
         for part in split.query.split("&")
@@ -396,318 +396,31 @@ def fit_ratings(conn) -> dict[str, dict]:
 
 @app.route("/")
 def home():
-    return redirect(url_for("today_view"))
+    return redirect(url_for("week_view"))
 
 
 @app.route("/today")
 def today_view():
-    """What to wear today, in the week it belongs to.
+    """Gone. This Week is the screen, and today is a day on it.
 
-    A fit is a base plus a top: the base holds Monday to Friday and only the top
-    rotates, so this screen is a week with today marked, not a single day.
+    Kept as a redirect rather than deleted outright: it was the app's front
+    door for months, and every bookmark, every phone home-screen icon and the
+    old tab bar all point here.
+
+    WHAT WENT WITH IT, and why none of it is missing. Adopting a fit wrote
+    `week_plans.base_fit_id` and then filled each weekday's top from
+    `week.rotation()` — for a variant set, that is the set's varying garments in
+    position order, which is exactly what picking a set on This Week writes. It
+    was the same act under a second name. The ranked picker went too: the set is
+    the decision, and re-ranking ninety fits by weather every morning re-asks a
+    question already answered on Monday. The bike and top-box notes, the
+    office/home context, the catch and rain-safe prose and the Next/Previous
+    paging went with the screen that carried them.
+
+    What Today owned and This Week now carries is the weather, and logging a
+    wear.
     """
-    with db.connect() as conn:
-        temp_raw = request.args.get("temp") or get_setting(conn, "weather.temp_c", "18")
-        rain_raw = request.args.get("rain")
-        rain = (
-            get_setting(conn, "weather.rain", "0") == "1"
-            if rain_raw is None
-            else rain_raw == "1"
-        )
-        allow_disliked = request.args.get("allow_disliked") == "1"
-
-        try:
-            temp_c = float(temp_raw)
-        except (TypeError, ValueError):
-            temp_c = None
-
-        if request.args.get("temp") is not None or rain_raw is not None:
-            set_setting(conn, "weather.temp_c", str(temp_c if temp_c is not None else ""))
-            set_setting(conn, "weather.rain", "1" if rain else "0")
-            conn.commit()
-
-        now = today()
-        start = week.week_start(now)
-        today_index = week.weekday_index(now)
-        plan = week.get_or_create(conn, now)
-
-        mode = get_wardrobe(conn)
-        golf_fits = golf_fit_ids(conn)
-        # Today picks out of the active wardrobe only. With no fit to show, the
-        # whole layout is suppressed rather than drawn around a null pick —
-        # `showing` stays None and today.html renders its empty card.
-        fits = {
-            f.id: f
-            for f in picker.load_fits(conn)
-            if (f.id in golf_fits) == (mode == "golf")
-        }
-
-        # TODAY ONLY OFFERS SETS. A fit that is not part of a variant set is one
-        # outfit, and adopting it as the week's base gives four days that have
-        # no picture — week.rotation() has to go looking for "some other top
-        # that goes with this trouser", which is the week the sets were built to
-        # stop happening. A set is five days that were each thought about and
-        # each rendered, so those are the only things worth putting on a screen
-        # whose whole job is the next five days.
-        #
-        # ONLY WHERE THE WARDROBE HAS ANY. Golf has twenty fits and no sets, and
-        # a rule that leaves that screen permanently empty is not a rule, it is
-        # an outage. A wardrobe with no sets goes on behaving exactly as before.
-        in_sets = {i: f for i, f in fits.items() if f.variant_set}
-        sets_only = bool(in_sets)
-        if sets_only:
-            fits = in_sets
-
-        _, ranked, rejected = picker.pick(
-            list(fits.values()), now, temp_c=temp_c, rain=rain, allow_disliked=allow_disliked
-        )
-
-        # Which fit is showing: the adopted base if there is one, otherwise the
-        # picker's ranking, which `rank` steps through.
-        rank_index = request.args.get("rank", type=int) or 0
-        showing = None
-        adopted = plan["base_fit_id"] and fits.get(plan["base_fit_id"])
-        if adopted and not request.args.get("rank"):
-            showing = next((c for c in ranked if c.fit.id == adopted.id), None)
-            # An adopted fit that belongs to a SET will usually not be in the
-            # ranking by its own id: the picker collapses a set to whichever
-            # variant is on today, so adopting Monday's charcoal shirt and then
-            # looking for it on Wednesday finds nothing and silently falls back
-            # to whatever is ranked first. Match the set instead.
-            if showing is None and adopted.variant_set:
-                showing = next(
-                    (c for c in ranked if c.fit.variant_set == adopted.variant_set),
-                    None,
-                )
-        if showing is None and ranked:
-            rank_index = max(0, min(rank_index, len(ranked) - 1))
-            showing = ranked[rank_index]
-        if showing is not None:
-            rank_index = ranked.index(showing)
-
-        # The variant strip on Today, so the top can be swapped by hand. Empty
-        # for a fit that is not in a set, which is nearly all of them.
-        showing_variants = []
-        if showing is not None and showing.fit.variant_set:
-            members = [
-                f for f in fits.values() if f.variant_set == showing.fit.variant_set
-            ]
-            showing_variants = sorted(members, key=lambda f: f.variant_position or 0)
-
-        day_index = request.args.get("day", type=int)
-        day_index = today_index if day_index is None else max(0, min(day_index, 4))
-
-        week_days = week.days(conn, start)
-        rotation = week.rotation(conn, showing.fit) if showing else []
-        # A week nobody has planned still shows a plan — from the rotation of
-        # whatever fit is on screen — it just isn't stored until you adopt it.
-        for row in week_days:
-            if row["top_item_id"] is None and rotation:
-                row["top_item_id"] = rotation[row["weekday"] % len(rotation)]
-                row["provisional"] = True
-                item = db.fetch_one(
-                    conn, "SELECT name, hex FROM items WHERE id = %s", (row["top_item_id"],)
-                )
-                row["top_name"], row["top_hex"] = item["name"], item["hex"]
-            row["is_today"] = row["weekday"] == today_index
-            row["is_past"] = row["weekday"] < today_index
-            row["selected"] = row["weekday"] == day_index
-
-        selected_day = week_days[day_index]
-        day_top = selected_day["top_item_id"]
-
-        # The hero follows the SELECTED DAY, not the fit that happens to be
-        # showing. A variant set has a render per top, so clicking Thursday
-        # should show Thursday's picture — before this the name under the strip
-        # changed and the photograph above it did not, which reads as the app
-        # ignoring the click.
-        #
-        # Only a variant set can do this: an ordinary fit has exactly one render
-        # for the whole week however its top rotates, and falls straight through
-        # to `showing.fit` below.
-        hero_fit = showing.fit if showing else None
-        if showing is not None and day_top:
-            for variant in showing_variants:
-                item = picker.variant_item(variant, showing_variants)
-                if item and item["item_id"] == day_top:
-                    hero_fit = variant
-                    break
-
-        # Labels for the strip: the garment that varies, per member. Computed
-        # here because only the view has the whole set to compare against.
-        variant_labels = {
-            v.id: picker.variant_name(v, showing_variants) for v in showing_variants
-        }
-        pieces = week.base_pieces(showing.fit, day_top) if showing else []
-        if showing and day_top and not any(p["item_id"] == day_top for p in pieces):
-            top = db.fetch_one(
-                conn,
-                "SELECT id AS item_id, name FROM items WHERE id = %s",
-                (day_top,),
-            )
-            pieces.insert(0, {**top, "role": "top", "note": None, "is_alternate": False})
-
-        bike = (
-            week.bike_notes(conn, showing.fit, pieces)
-            if showing and selected_day["commutes"]
-            else None
-        )
-        renders = item_renders(conn)
-        wearings = wearings_by_fit(conn).get(showing.fit.id, 0) if showing else 0
-        meta = fit_metadata(conn).get(showing.fit.id, {}) if showing else {}
-
-    return render_template(
-        "today.html",
-        showing_variants=showing_variants,
-        hero_fit=hero_fit,
-        variant_labels=variant_labels,
-        showing=showing,
-        # Two different nothings, and they need different words: a wardrobe with
-        # no fits in it at all, versus one whose fits are all blocked today.
-        wardrobe_empty=not fits,
-        # Whether the ranking was narrowed to sets, so the blocked message can
-        # say "every set" rather than "every fit" — which would be a lie, and
-        # the kind that sends you to the Fits screen looking for the wrong thing.
-        sets_only=sets_only,
-        pieces=pieces,
-        base=[p for p in pieces if p["role"] != "top"],
-        day_top=day_top,
-        week_days=week_days,
-        selected_day=selected_day,
-        today_index=today_index,
-        day_index=day_index,
-        adopted=bool(adopted and showing and adopted.id == showing.fit.id),
-        bike=bike,
-        renders=renders,
-        meta=meta,
-        wearings=wearings,
-        rank_index=rank_index,
-        rank_total=len(ranked),
-        rejected=rejected,
-        temp_c=temp_c,
-        rain=rain,
-        allow_disliked=allow_disliked,
-        band=picker.weather_band(temp_c),
-        day=now,
-    )
-
-
-@app.route("/today/adopt", methods=["POST"])
-def adopt_fit():
-    """Adopting on Today is choosing the week's set. It is the same act.
-
-    Today ranks sets, so what is being adopted is nearly always a member of one,
-    and the thing Max means by it is "I am wearing this set this week" — not "I
-    am wearing this one outfit and something will work the rest out". So it lays
-    the whole set, through the same call This Week uses, and the two screens open
-    on the same five days.
-
-    A fit that is not in a set still adopts the old way: base plus a rotation of
-    tops. Golf has twenty of those and no sets at all.
-    """
-    fit_id = request.form["fit_id"]
-    with db.connect() as conn:
-        fits = {f.id: f for f in picker.load_fits(conn)}
-        fit = fits.get(fit_id)
-        if fit is None:
-            abort(404)
-        start = week.week_start(today())
-        week.get_or_create(conn, today())
-
-        chosen = None
-        if fit.variant_set:
-            chosen = next(
-                (s for s in sets.load(conn) if s.key == fit.variant_set), None
-            )
-        if chosen is not None:
-            lay_set_across_week(conn, start, chosen)
-        else:
-            week.adopt(conn, start, fit)
-        conn.commit()
-
-    if chosen is not None:
-        flash(
-            f"“{chosen.name}” is this week's set. {chosen.vary_line()} — "
-            "the five days are laid out in This Week."
-        )
-    else:
-        flash(f"“{fit.name}” is this week's base. Only the top changes now.")
-    return redirect(request.form.get("next") or url_for("today_view"))
-
-
-@app.route("/today/day/<int:weekday>/context", methods=["POST"])
-def set_day_context(weekday: int):
-    """Office or home. The default pattern is a starting point, not a rule."""
-    context = request.form["context"]
-    with db.connect() as conn:
-        week.get_or_create(conn, today())
-        conn.execute(
-            "UPDATE week_days SET context_code = %s WHERE week_start = %s AND weekday = %s",
-            (context, week.week_start(today()), weekday),
-        )
-        conn.commit()
-    return redirect(request.form.get("next") or url_for("today_view", day=weekday))
-
-
-@app.route("/today/day/<int:weekday>/top", methods=["POST"])
-def set_day_top(weekday: int):
-    with db.connect() as conn:
-        week.get_or_create(conn, today())
-        conn.execute(
-            "UPDATE week_days SET top_item_id = %s WHERE week_start = %s AND weekday = %s",
-            (request.form["item_id"], week.week_start(today()), weekday),
-        )
-        conn.commit()
-    return redirect(request.form.get("next") or url_for("today_view", day=weekday))
-
-
-@app.route("/today/wear", methods=["POST"])
-def wear_today():
-    """Log today's wearing, and record it against the day in the week.
-
-    Only the garments actually worn go to `worn` — and `worn` does not block a
-    fit, which is the point of a base that holds for five days. Only the wash
-    and the tailor block.
-    """
-    fit_id = request.form["fit_id"]
-    item_ids = request.form.getlist("item_id")
-
-    with db.connect() as conn:
-        fit = db.fetch_one(conn, "SELECT id, name FROM fits WHERE id = %s", (fit_id,))
-        if fit is None:
-            abort(404)
-
-        context = request.form.get("context") or None
-        row = db.fetch_one(
-            conn,
-            "INSERT INTO wear_events (worn_on, fit_id, context, temp_c, rain) "
-            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
-            (
-                today(),
-                fit["id"],
-                context,
-                request.form.get("temp_c") or None,
-                request.form.get("rain") == "1",
-            ),
-        )
-        event_id = row["id"]
-        for item_id in item_ids:
-            conn.execute(
-                "INSERT INTO wear_event_items (wear_event_id, item_id) VALUES (%s, %s)",
-                (event_id, item_id),
-            )
-            set_laundry(conn, item_id, "worn")
-
-        # Tie it to the day, so the week strip shows what actually happened.
-        week.get_or_create(conn, today())
-        conn.execute(
-            "UPDATE week_days SET wear_event_id = %s WHERE week_start = %s AND weekday = %s",
-            (event_id, week.week_start(today()), week.weekday_index(today())),
-        )
-        conn.commit()
-
-    flash(f"Logged “{fit['name']}”. Those garments are marked worn — still wearable.")
-    return redirect(request.form.get("next") or url_for("today_view"))
+    return redirect(url_for("week_view"))
 
 
 # ------------------------------------------------------------ this week ---
